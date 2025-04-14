@@ -1,1 +1,1 @@
-# LTU-Academic-Weapon
+# Ltu THUG SHAKE
