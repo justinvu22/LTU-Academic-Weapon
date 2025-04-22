@@ -1,0 +1,17 @@
+/* app/input.css */
+
+/* Import Tailwind CSS in one line */
+@import "tailwindcss";
+
+/* Custom global variables and base styles */
+:root {
+  --background: #0F0F1A;
+  --foreground: #FFFFFF;
+}
+
+body {
+  background: var(--background);
+  color: var(--foreground);
+  font-family: "Inter", Arial, sans-serif;
+  margin: 0;
+}
