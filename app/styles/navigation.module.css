@@ -1,0 +1,40 @@
+.navContainer {
+  margin-top: -1rem;
+  padding-top: 2rem;
+  padding-bottom: 2rem;
+  display: flex;
+  flex-direction: column;
+  gap: 2rem;
+}
+
+.navLink {
+  position: relative;
+  transition: all 0.2s ease-in-out;
+}
+
+.navLinkSelected {
+  composes: navLink;
+  background: rgba(255, 255, 255, 0.2);
+  border-radius: 9999px;
+  clip-path: polygon(0 0, 100% 0, 100% 100%, 0 100%);
+}
+
+.navLinkSelected::after {
+  content: '';
+  position: absolute;
+  right: -1px;
+  top: 0;
+  height: 100%;
+  width: 1px;
+  background: rgba(255, 255, 255, 0.1);
+}
+
+.navLinkUnselected {
+  composes: navLink;
+  background: rgba(0, 0, 0, 0.4);
+  border-radius: 9999px;
+}
+
+.navLinkUnselected:hover {
+  background: rgba(0, 0, 0, 0.6);
+} 
