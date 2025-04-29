@@ -2,21 +2,21 @@
 
 "use client";
 
-import "./output.css"; // Import the compiled Tailwind output
-import Link from "next/link";
-import { useState, useEffect } from "react";
-import {
-  FaHome,
-  FaUpload,
-  FaChartLine,
-  FaRobot,
-  FaSearch,
-  FaBell,
-  FaSun,
-  FaMoon,
-  FaUser,
-} from "react-icons/fa";
 import PageTransition from "@/components/PageTransition";
+import Link from "next/link";
+import { useEffect, useState } from "react";
+import {
+  FaBell,
+  FaChartLine,
+  FaHome,
+  FaMoon,
+  FaRobot,
+  FaSun,
+  FaUpload,
+  FaUser
+} from "react-icons/fa";
+import "./output.css"; // Import the compiled Tailwind output
+import styles from './styles/navigation.module.css';
 
 export default function RootLayout({ children }: { children: React.ReactNode; }) {
   const [darkMode, setDarkMode] = useState(true);
@@ -48,67 +48,66 @@ export default function RootLayout({ children }: { children: React.ReactNode; })
     <html lang="en" className={darkMode ? "dark" : ""}>
       <body className={`flex h-screen overflow-hidden transition-colors duration-300 ${darkMode ? "bg-[#24243e] text-white" : "bg-gray-100 text-gray-900"}`}>
         {/* LEFT SIDEBAR */}
-        <aside className={`w-64 ${darkMode ? "bg-gradient-to-b from-[#2C2C54] to-[#24243e]" : "bg-white"} text-${darkMode ? "white" : "gray-800"} flex flex-col transition-colors duration-300`}>
+        <aside className={`w-20 bg-gradient-to-b from-[#2C2C54] via-[#302b63] to-[#24243e] text-white flex flex-col transition-colors duration-300`}>
           {/* Header with Shadow Sight and Search */}
-          <div className={`p-4 flex items-center gap-2 border-b ${darkMode ? "border-white/10" : "border-gray-200"}`}>
-            <div className="flex items-center gap-3">
+          <div className={`p-4 flex items-center justify-start border-b border-white/10`}>
+            <div className="flex items-center">
               <img 
                 src="/images/shadow-sight-icon.svg" 
                 alt="Shadow Sight Logo" 
-                className="w-8 h-8"
+                className="w-12 h-12"
               />
-              <h1 className="text-xl font-bold">Shadow Sight</h1>
             </div>
           </div>
           {/* Navigation Links */}
-          <nav className="flex-1 overflow-auto py-2">
+          <nav className={`flex-1 overflow-auto ${styles.navContainer}`}>
             <Link 
               href="/" 
-              className={`flex items-center gap-2 px-4 py-3 ${activeLink === "/" ? (darkMode ? "bg-white/10" : "bg-gray-200") : ""} hover:${darkMode ? "bg-white/5" : "bg-gray-100"} transition-all duration-200`}
+              className={`flex items-center justify-center w-16 h-16 mx-auto ${activeLink === "/" ? styles.navLinkSelected : styles.navLinkUnselected}`}
               onClick={() => handleLinkClick("/")}
+              title="Home"
             >
-              <FaHome />
-              <span>Home</span>
+              <FaHome className="text-3xl" />
             </Link>
             <Link 
               href="/upload" 
-              className={`flex items-center gap-2 px-4 py-3 ${activeLink === "/upload" ? (darkMode ? "bg-white/10" : "bg-gray-200") : ""} hover:${darkMode ? "bg-white/5" : "bg-gray-100"} transition-all duration-200`}
+              className={`flex items-center justify-center w-16 h-16 mx-auto ${activeLink === "/upload" ? styles.navLinkSelected : styles.navLinkUnselected}`}
               onClick={() => handleLinkClick("/upload")}
+              title="CSV Upload"
             >
-              <FaUpload />
-              <span>CSV Upload</span>
+              <FaUpload className="text-3xl" />
             </Link>
             <Link 
               href="/dashboard" 
-              className={`flex items-center gap-2 px-4 py-3 ${activeLink === "/dashboard" ? (darkMode ? "bg-white/10" : "bg-gray-200") : ""} hover:${darkMode ? "bg-white/5" : "bg-gray-100"} transition-all duration-200`}
+              className={`flex items-center justify-center w-16 h-16 mx-auto ${activeLink === "/dashboard" ? styles.navLinkSelected : styles.navLinkUnselected}`}
               onClick={() => handleLinkClick("/dashboard")}
+              title="Dashboard"
             >
-              <FaChartLine />
-              <span>Dashboard</span>
+              <FaChartLine className="text-3xl" />
             </Link>
             <Link 
               href="/ml" 
-              className={`flex items-center gap-2 px-4 py-3 ${activeLink === "/ml" ? (darkMode ? "bg-white/10" : "bg-gray-200") : ""} hover:${darkMode ? "bg-white/5" : "bg-gray-100"} transition-all duration-200`}
+              className={`flex items-center justify-center w-16 h-16 mx-auto ${activeLink === "/ml" ? styles.navLinkSelected : styles.navLinkUnselected}`}
               onClick={() => handleLinkClick("/ml")}
+              title="ML Insights"
             >
-              <FaRobot />
-              <span>ML Insights</span>
+              <FaRobot className="text-3xl" />
             </Link>
             <Link 
               href="/alerts" 
-              className={`flex items-center gap-2 px-4 py-3 ${activeLink === "/alerts" ? (darkMode ? "bg-white/10" : "bg-gray-200") : ""} hover:${darkMode ? "bg-white/5" : "bg-gray-100"} transition-all duration-200`}
+              className={`flex items-center justify-center w-16 h-16 mx-auto ${activeLink === "/alerts" ? styles.navLinkSelected : styles.navLinkUnselected}`}
               onClick={() => handleLinkClick("/alerts")}
+              title="Custom Alerts"
             >
-              <FaBell />
-              <span>Custom Alerts</span>
+              <FaBell className="text-3xl" />
             </Link>
             <Link 
               href="/profile/settings" 
-              className={`flex items-center gap-2 px-4 py-3 ${activeLink === "/profile/settings" ? (darkMode ? "bg-white/10" : "bg-gray-200") : ""} hover:${darkMode ? "bg-white/5" : "bg-gray-100"} transition-all duration-200`}
+              className={`flex items-center justify-center w-16 h-16 mx-auto ${activeLink === "/profile/settings" ? styles.navLinkSelected : styles.navLinkUnselected}`}
               onClick={() => handleLinkClick("/profile/settings")}
+              title="Profile Settings"
             >
-              <FaUser />
-              <span>Profile Settings</span>
+              <FaUser className="text-3xl" />
             </Link>
           </nav>
         </aside>
