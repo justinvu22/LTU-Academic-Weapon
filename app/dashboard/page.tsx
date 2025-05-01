@@ -18,7 +18,7 @@ import {
   Area,
   Legend,
 } from "recharts";
-import { FaFilePdf, FaFileExport } from "react-icons/fa";
+import { FaFilePdf, FaFileExport, FaFilter } from "react-icons/fa";
 import { jsPDF } from "jspdf";
 import html2canvas from "html2canvas";
 
@@ -56,8 +56,56 @@ const riskLevelsData = [
 // Use a neon-pink / purple palette
 const COLORS = ["#FF5EEC", "#E91E63", "#9C27B0", "#673AB7"];
 
+// Filter options
+const userOptions = [
+  { value: "all", label: "All Users" },
+  { value: "sophie", label: "Sophie Fortune" },
+  { value: "anne", label: "Anne Couture" },
+  { value: "miriam", label: "Miriam Sol" },
+  { value: "lea", label: "Lea Mavi" },
+  { value: "mark", label: "Mark Morin" },
+];
+
+const monthOptions = [
+  { value: "all", label: "All Time" },
+  { value: "jan", label: "January" },
+  { value: "feb", label: "February" },
+  { value: "mar", label: "March" },
+  { value: "apr", label: "April" },
+  { value: "may", label: "May" },
+  { value: "jun", label: "June" },
+];
+
+const anomalyTypeOptions = [
+  { value: "all", label: "All Types" },
+  { value: "phishing", label: "Phishing" },
+  { value: "malware", label: "Malware" },
+  { value: "unauthorized", label: "Unauthorized Access" },
+  { value: "data", label: "Data Exfiltration" },
+];
+
 export default function DashboardPage() {
   const dashboardRef = useRef<HTMLDivElement>(null);
+  const [filters, setFilters] = useState({
+    user: "all",
+    month: "all",
+    anomalyType: "all"
+  });
+
+  const handleFilterChange = (filterType: string, value: string) => {
+    setFilters(prev => ({
+      ...prev,
+      [filterType]: value
+    }));
+  };
+
+  const handleResetFilters = () => {
+    setFilters({
+      user: "all",
+      month: "all",
+      anomalyType: "all"
+    });
+  };
 
   const handleExport = () => {
     console.log("Export triggered...");
@@ -93,6 +141,69 @@ export default function DashboardPage() {
         <div className="bg-[#191138] rounded-lg p-4 flex flex-col justify-center items-center">
           <h3 className="text-lg font-bold mb-2">High Risk Events</h3>
           <p className="text-2xl font-extrabold text-pink-400">3</p>
+        </div>
+      </div>
+
+      {/* Filter Section */}
+      <div className="bg-[#191138] rounded-lg p-4 mb-6">
+        <div className="flex items-center justify-between mb-4">
+          <div className="flex items-center gap-2">
+            <FaFilter className="text-pink-400" />
+            <h3 className="text-lg font-bold">Filters</h3>
+          </div>
+          <button
+            onClick={handleResetFilters}
+            className="text-sm text-pink-400 hover:text-pink-300 transition-colors duration-200"
+          >
+            Reset Filters
+          </button>
+        </div>
+        <div className="grid grid-cols-3 gap-4">
+          <div>
+            <label htmlFor="userFilter" className="block text-sm font-medium mb-2">User</label>
+            <select
+              id="userFilter"
+              value={filters.user}
+              onChange={(e) => handleFilterChange("user", e.target.value)}
+              className="w-full bg-[#24243e] text-white border border-white/10 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-pink-500"
+            >
+              {userOptions.map(option => (
+                <option key={option.value} value={option.value} className="bg-[#24243e] text-white">
+                  {option.label}
+                </option>
+              ))}
+            </select>
+          </div>
+          <div>
+            <label htmlFor="monthFilter" className="block text-sm font-medium mb-2">Month</label>
+            <select
+              id="monthFilter"
+              value={filters.month}
+              onChange={(e) => handleFilterChange("month", e.target.value)}
+              className="w-full bg-[#24243e] text-white border border-white/10 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-pink-500"
+            >
+              {monthOptions.map(option => (
+                <option key={option.value} value={option.value} className="bg-[#24243e] text-white">
+                  {option.label}
+                </option>
+              ))}
+            </select>
+          </div>
+          <div>
+            <label htmlFor="anomalyTypeFilter" className="block text-sm font-medium mb-2">Anomaly Type</label>
+            <select
+              id="anomalyTypeFilter"
+              value={filters.anomalyType}
+              onChange={(e) => handleFilterChange("anomalyType", e.target.value)}
+              className="w-full bg-[#24243e] text-white border border-white/10 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-pink-500"
+            >
+              {anomalyTypeOptions.map(option => (
+                <option key={option.value} value={option.value} className="bg-[#24243e] text-white">
+                  {option.label}
+                </option>
+              ))}
+            </select>
+          </div>
         </div>
       </div>
 

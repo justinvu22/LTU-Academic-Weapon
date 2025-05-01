@@ -46,11 +46,11 @@ export default function RootLayout({ children }: { children: React.ReactNode; })
 
   return (
     <html lang="en" className={darkMode ? "dark" : ""}>
-      <body className={`flex h-screen overflow-hidden transition-colors duration-300 ${darkMode ? "bg-[#24243e] text-white" : "bg-gray-100 text-gray-900"}`}>
+      <body className={`flex h-screen overflow-hidden transition-colors duration-300 ${darkMode ? "bg-gray-100 text-gray-900" : "bg-[#24243e] text-white"}`}>
         {/* LEFT SIDEBAR */}
-        <aside className={`w-20 bg-gradient-to-b from-[#2C2C54] via-[#302b63] to-[#24243e] text-white flex flex-col transition-colors duration-300`}>
+        <aside className={`w-20 ${darkMode ? "bg-white" : "bg-gradient-to-b from-[#2C2C54] via-[#302b63] to-[#24243e]"} text-${darkMode ? "gray-900" : "white"} flex flex-col transition-colors duration-300`}>
           {/* Header with Shadow Sight and Search */}
-          <div className={`p-4 flex items-center justify-start border-b border-white/10`}>
+          <div className={`p-4 flex items-center justify-start border-b ${darkMode ? "border-gray-200" : "border-white/10"}`}>
             <div className="flex items-center">
               <img 
                 src="/images/shadow-sight-icon.svg" 
@@ -101,26 +101,18 @@ export default function RootLayout({ children }: { children: React.ReactNode; })
             >
               <FaBell className="text-3xl" />
             </Link>
-            <Link 
-              href="/profile/settings" 
-              className={`flex items-center justify-center w-16 h-16 mx-auto ${activeLink === "/profile/settings" ? styles.navLinkSelected : styles.navLinkUnselected}`}
-              onClick={() => handleLinkClick("/profile/settings")}
-              title="Profile Settings"
-            >
-              <FaUser className="text-3xl" />
-            </Link>
           </nav>
         </aside>
 
         {/* MAIN CONTENT */}
-        <main className={`flex-1 overflow-auto ${darkMode ? "bg-gradient-to-tr from-[#24243e] to-[#302b63]" : "bg-gray-100"} p-6 transition-colors duration-300`}>
+        <main className={`flex-1 overflow-auto ${darkMode ? "bg-gray-100" : "bg-gradient-to-tr from-[#24243e] to-[#302b63]"} p-6 transition-colors duration-300`}>
           <div className="flex justify-end mb-4">
             <button 
               onClick={toggleDarkMode}
-              className={`p-2 rounded-full ${darkMode ? "bg-gray-700 text-yellow-300" : "bg-blue-100 text-gray-800"} transition-all duration-300`}
-              aria-label={darkMode ? "Switch to light mode" : "Switch to dark mode"}
+              className={`p-2 rounded-full ${darkMode ? "bg-yellow-100 text-yellow-600" : "bg-gray-800 text-gray-200"} transition-all duration-300`}
+              aria-label={darkMode ? "Switch to dark mode" : "Switch to light mode"}
             >
-              {darkMode ? <FaSun /> : <FaMoon />}
+              {darkMode ? <FaMoon /> : <FaSun />}
             </button>
           </div>
           <PageTransition>
@@ -129,43 +121,51 @@ export default function RootLayout({ children }: { children: React.ReactNode; })
         </main>
 
         {/* RIGHT SIDEBAR */}
-        <aside className={`w-72 ${darkMode ? "bg-[#1D1B2D]" : "bg-white"} text-${darkMode ? "white" : "gray-800"} flex flex-col p-4 border-l ${darkMode ? "border-white/10" : "border-gray-200"} transition-colors duration-300`}>
+        <aside className={`w-72 ${darkMode ? "bg-white" : "bg-[#1D1B2D]"} text-${darkMode ? "gray-800" : "white"} flex flex-col p-4 border-l ${darkMode ? "border-gray-200" : "border-white/10"} transition-colors duration-300`}>
           {/* User Profile Section */}
           <div className="flex items-center gap-3 mb-6">
-            <div className={`h-12 w-12 rounded-full ${darkMode ? "bg-white/20" : "bg-gray-200"} flex items-center justify-center`}>
+            <div className={`h-12 w-12 rounded-full ${darkMode ? "bg-gray-200" : "bg-white/20"} flex items-center justify-center`}>
               {/* Placeholder initials or avatar */}
               <span className="text-sm">SF</span>
             </div>
             <div>
               <h2 className="text-lg font-semibold">Sophie Fortune</h2>
-              <p className={`text-sm ${darkMode ? "text-gray-300" : "text-gray-500"}`}>@sophiefortune</p>
+              <p className={`text-sm ${darkMode ? "text-gray-500" : "text-gray-300"}`}>@sophiefortune</p>
             </div>
           </div>
-          <hr className={`${darkMode ? "border-white/10" : "border-gray-200"} mb-6`} />
+          <Link 
+            href="/profile/settings" 
+            className={`flex items-center gap-2 p-2 rounded ${darkMode ? "hover:bg-gray-100" : "hover:bg-white/5"} transition-colors ${activeLink === "/profile/settings" ? darkMode ? "bg-gray-100" : "bg-white/10" : ""}`}
+            onClick={() => handleLinkClick("/profile/settings")}
+          >
+            <FaUser className="text-lg" />
+            <span>Profile Settings</span>
+          </Link>
+          <hr className={`${darkMode ? "border-gray-200" : "border-white/10"} mb-6`} />
           {/* New Members Section */}
           <section>
             <h3 className="text-md font-bold mb-4">New Members</h3>
             <ul className="flex flex-col gap-4">
-              <li className="flex items-center gap-3 cursor-pointer hover:bg-white/5 p-2 rounded transition-colors">
-                <div className={`h-8 w-8 rounded-full ${darkMode ? "bg-white/20" : "bg-gray-200"} flex items-center justify-center`}>
+              <li className={`flex items-center gap-3 cursor-pointer ${darkMode ? "hover:bg-gray-100" : "hover:bg-white/5"} p-2 rounded transition-colors`}>
+                <div className={`h-8 w-8 rounded-full ${darkMode ? "bg-gray-200" : "bg-white/20"} flex items-center justify-center`}>
                   <span>AC</span>
                 </div>
                 <p className="text-sm">Anne Couture</p>
               </li>
-              <li className="flex items-center gap-3 cursor-pointer hover:bg-white/5 p-2 rounded transition-colors">
-                <div className={`h-8 w-8 rounded-full ${darkMode ? "bg-white/20" : "bg-gray-200"} flex items-center justify-center`}>
+              <li className={`flex items-center gap-3 cursor-pointer ${darkMode ? "hover:bg-gray-100" : "hover:bg-white/5"} p-2 rounded transition-colors`}>
+                <div className={`h-8 w-8 rounded-full ${darkMode ? "bg-gray-200" : "bg-white/20"} flex items-center justify-center`}>
                   <span>MS</span>
                 </div>
                 <p className="text-sm">Miriam Sol</p>
               </li>
-              <li className="flex items-center gap-3 cursor-pointer hover:bg-white/5 p-2 rounded transition-colors">
-                <div className={`h-8 w-8 rounded-full ${darkMode ? "bg-white/20" : "bg-gray-200"} flex items-center justify-center`}>
+              <li className={`flex items-center gap-3 cursor-pointer ${darkMode ? "hover:bg-gray-100" : "hover:bg-white/5"} p-2 rounded transition-colors`}>
+                <div className={`h-8 w-8 rounded-full ${darkMode ? "bg-gray-200" : "bg-white/20"} flex items-center justify-center`}>
                   <span>LM</span>
                 </div>
                 <p className="text-sm">Lea Mavi</p>
               </li>
-              <li className="flex items-center gap-3 cursor-pointer hover:bg-white/5 p-2 rounded transition-colors">
-                <div className={`h-8 w-8 rounded-full ${darkMode ? "bg-white/20" : "bg-gray-200"} flex items-center justify-center`}>
+              <li className={`flex items-center gap-3 cursor-pointer ${darkMode ? "hover:bg-gray-100" : "hover:bg-white/5"} p-2 rounded transition-colors`}>
+                <div className={`h-8 w-8 rounded-full ${darkMode ? "bg-gray-200" : "bg-white/20"} flex items-center justify-center`}>
                   <span>MM</span>
                 </div>
                 <p className="text-sm">Mark Morin</p>
@@ -173,8 +173,8 @@ export default function RootLayout({ children }: { children: React.ReactNode; })
             </ul>
           </section>
           <div className="mt-auto">
-            <hr className={`${darkMode ? "border-white/10" : "border-gray-200"} my-6`} />
-            <p className={`text-sm ${darkMode ? "text-gray-400" : "text-gray-500"}`}>© 2025 ShadowSight</p>
+            <hr className={`${darkMode ? "border-gray-200" : "border-white/10"} my-6`} />
+            <p className={`text-sm ${darkMode ? "text-gray-500" : "text-gray-400"}`}>© 2025 ShadowSight</p>
           </div>
         </aside>
       </body>
