@@ -183,13 +183,13 @@ export default function CustomAlertsPage() {
         <h1 className="text-3xl font-bold mb-8">Alerts</h1>
         <div className="flex gap-4 mb-8  p-2 rounded-xl w-fit">
           <button
-            className={`px-6 py-2 rounded-t-lg font-semibold transition-colors duration-200 ${selectedTab === 'immediate' ? 'bg-gray-900 text-white' : 'bg-gray-700 text-gray-300'}`}
+            className={`px-6 py-2 rounded flex font-semibold transition-colors duration-200 ${selectedTab === 'immediate' ? 'bg-[#191138] text-purple-200' : 'bg-[#191138] text-gray-300'}`}
             onClick={() => setSelectedTab('immediate')}
           >
             Immediate Review
           </button>
           <button
-            className={`px-6 py-2 rounded-t-lg font-semibold transition-colors duration-200 ${selectedTab === 'custom' ? 'bg-gray-900 text-white' : 'bg-gray-700 text-gray-300'}`}
+            className={`px-6 py-2 rounded flex font-semibold transition-colors duration-200 ${selectedTab === 'custom' ? 'bg-[#191138] text-purple-200' : 'bg-[#191138] text-gray-300'}`}
             onClick={() => setSelectedTab('custom')}
           >
             Custom Alerts
@@ -203,10 +203,10 @@ export default function CustomAlertsPage() {
             <div className="overflow-x-auto">
               <table className="w-full min-w-[700px] text-center text-sm">
                 <thead>
-                  <tr className="bg-purple-950">
-                    <th className="py-2 px-4 text-center">User</th>
-                    <th className="py-2 px-4 text-center">Policies breached</th>
-                    <th className="py-2 px-4 text-center">Last activity</th>
+                  <tr>
+                    <th className="bg-[#191138] py-2 px-4 text-center">User</th>
+                    <th className="bg-[#191138] py-2 px-4 text-center">Policies breached</th>
+                    <th className="bg-[#191138] py-2 px-4 text-center">Last activity</th>
                   </tr>
                 </thead>
                 <tbody>
