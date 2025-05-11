@@ -9,13 +9,13 @@
 
 .navLink {
   position: relative;
-  transition: all 0.2s ease-in-out;
+  transition: all 0.3s ease-in-out;
 }
 
 .navLinkSelected {
   composes: navLink;
-  background: rgba(255, 255, 255, 0.2);
-  border-radius: 9999px;
+  background: rgba(255, 255, 255, 0.15);
+  border-radius: 1rem;
   clip-path: polygon(0 0, 100% 0, 100% 100%, 0 100%);
 }
 
@@ -26,15 +26,17 @@
   top: 0;
   height: 100%;
   width: 1px;
-  background: rgba(255, 255, 255, 0.1);
+  background: rgba(255, 255, 255, 0.05);
+  transition: all 0.3s ease-in-out;
 }
 
 .navLinkUnselected {
   composes: navLink;
-  background: rgba(0, 0, 0, 0.4);
-  border-radius: 9999px;
+  background: rgba(0, 0, 0, 0.3);
+  border-radius: 1rem;
 }
 
 .navLinkUnselected:hover {
-  background: rgba(0, 0, 0, 0.6);
+  background: rgba(0, 0, 0, 0.4);
+  transform: translateX(2px);
 } 

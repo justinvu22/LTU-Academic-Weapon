@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { FaDatabase, FaEdit, FaKey, FaLock, FaMoneyBill, FaPlus, FaSave, FaSignInAlt, FaTimes, FaTrash, FaUser } from "react-icons/fa";
+import { FaDatabase, FaEdit, FaKey, FaLock, FaMoneyBill, FaPlus, FaSave, FaSignInAlt, FaSync, FaTimes, FaTrash, FaUser } from "react-icons/fa";
 
 interface AlertRule {
   id: string;
@@ -66,7 +66,7 @@ export default function CustomAlertsPage() {
     notifyVia: ["dashboard"]
   });
   
-  const [selectedTab, setSelectedTab] = useState<'immediate' | 'custom'>('immediate');
+  const [selectedTab, setSelectedTab] = useState<'immediate' | 'custom' | 'other' | 'closed'>('immediate');
 
   const immediateReviewData = [
     {
@@ -114,6 +114,42 @@ export default function CustomAlertsPage() {
       policies: ["login"],
       lastActivity: '23/06/2024, 9:16 am',
     },
+  ];
+  
+  const otherAlertsData = [
+    {
+      user: 'sophie.fortune@zenith.com',
+      alert: "Unusual Access Pattern",
+      severity: "medium",
+      timestamp: '23/06/2024, 2:15 pm',
+      status: "pending"
+    },
+    {
+      user: 'mark.morin@zenith.com',
+      alert: "Data Export Attempt",
+      severity: "high",
+      timestamp: '23/06/2024, 1:30 pm',
+      status: "pending"
+    }
+  ];
+  
+  const closedAlertsData = [
+    {
+      user: 'emma.wilson@zenith.com',
+      alert: "Multiple Login Attempts",
+      severity: "low",
+      timestamp: '22/06/2024, 4:45 pm',
+      closedAt: '22/06/2024, 5:00 pm',
+      closedBy: "Auto-resolution"
+    },
+    {
+      user: 'james.chen@zenith.com',
+      alert: "Suspicious IP Access",
+      severity: "medium",
+      timestamp: '22/06/2024, 3:20 pm',
+      closedAt: '22/06/2024, 3:35 pm',
+      closedBy: "Security Team"
+    }
   ];
   
   const handleToggleRule = (id: string) => {
@@ -177,22 +213,49 @@ export default function CustomAlertsPage() {
 
   const allPolicies = ["login", "data", "access", "user", "finance", "sensitive"];
 
+  const handleRefresh = () => {
+    // Force a client-side refresh
+    window.location.reload();
+  };
+
   return (
     <div className="transition-all duration-300">
       <div className="w-full mx-auto">
-        <h1 className="text-3xl font-bold mb-8">Alerts</h1>
-        <div className="flex gap-4 mb-8  p-2 rounded-xl w-fit">
+        <div className="flex justify-between items-center mb-8">
+          <h1 className="text-3xl font-bold">Alerts</h1>
           <button
-            className={`px-6 py-2 rounded flex font-semibold transition-colors duration-200 ${selectedTab === 'immediate' ? 'bg-[#191138] text-purple-200' : 'bg-[#191138] text-gray-300'}`}
+            onClick={handleRefresh}
+            className="flex items-center gap-2 px-4 py-2 rounded-lg bg-[#191138] text-purple-200 hover:bg-[#191138]/80 transition-all duration-300 ease-in-out"
+            title="Refresh alerts"
+          >
+            <FaSync className="text-lg" />
+            <span>Refresh Alerts</span>
+          </button>
+        </div>
+        <div className="flex gap-4 mb-8 p-2 rounded-xl w-fit">
+          <button
+            className={`px-6 py-2 rounded-lg flex font-semibold transition-all duration-300 ease-in-out ${selectedTab === 'immediate' ? 'bg-[#191138] text-purple-200' : 'bg-[#191138] text-gray-300'}`}
             onClick={() => setSelectedTab('immediate')}
           >
             Immediate Review
           </button>
           <button
-            className={`px-6 py-2 rounded flex font-semibold transition-colors duration-200 ${selectedTab === 'custom' ? 'bg-[#191138] text-purple-200' : 'bg-[#191138] text-gray-300'}`}
+            className={`px-6 py-2 rounded-lg flex font-semibold transition-all duration-300 ease-in-out ${selectedTab === 'custom' ? 'bg-[#191138] text-purple-200' : 'bg-[#191138] text-gray-300'}`}
             onClick={() => setSelectedTab('custom')}
           >
             Custom Alerts
+          </button>
+          <button
+            className={`px-6 py-2 rounded-lg flex font-semibold transition-all duration-300 ease-in-out ${selectedTab === 'other' ? 'bg-[#191138] text-purple-200' : 'bg-[#191138] text-gray-300'}`}
+            onClick={() => setSelectedTab('other')}
+          >
+            All Other Alerts
+          </button>
+          <button
+            className={`px-6 py-2 rounded-lg flex font-semibold transition-all duration-300 ease-in-out ${selectedTab === 'closed' ? 'bg-[#191138] text-purple-200' : 'bg-[#191138] text-gray-300'}`}
+            onClick={() => setSelectedTab('closed')}
+          >
+            Closed
           </button>
         </div>
         {selectedTab === 'immediate' && (
@@ -211,16 +274,16 @@ export default function CustomAlertsPage() {
                 </thead>
                 <tbody>
                   {immediateReviewData.map((row, idx) => (
-                    <tr key={row.user} className={idx % 2 === 0 ? 'bg-gray-900/40' : ''}>
-                      <td className="py-2 px-4 font-medium align-middle border-2 border-white">{row.user}</td>
-                      <td className="py-2 px-4 align-center border-2 border-white">
+                    <tr key={row.user} className={`${idx % 2 === 0 ? 'bg-gray-900/40' : ''} transition-colors duration-300`}>
+                      <td className="py-3 px-4 font-medium align-middle border border-white/20 rounded-lg">{row.user}</td>
+                      <td className="py-3 px-4 align-center border border-white/20 rounded-lg">
                         <div className="flex gap-4 flex-nowrap items-center min-h-[32px]">
                           {allPolicies.map((policy, i) => {
                             const breached = row.policies.includes(policy);
                             return (
                               <span
                                 key={i}
-                                className={`inline-flex items-center justify-center rounded-full border-2 px-4 py-2 text-xs font-semibold transition-all duration-200 ${breached ? 'border-red-500 bg-red-600/80 text-white' : 'border-gray-500 bg-gray-700/40 text-gray-400 opacity-50'} ml-0.5`}
+                                className={`inline-flex items-center justify-center rounded-full border px-4 py-2 text-xs font-semibold transition-all duration-300 ease-in-out ${breached ? 'border-red-500/50 bg-red-600/60 text-white' : 'border-gray-500/30 bg-gray-700/30 text-gray-400 opacity-50'} ml-0.5`}
                                 style={{ minWidth: 33, minHeight: 33, marginTop: 2 }}
                                 title={policy.charAt(0).toUpperCase() + policy.slice(1)}
                               >
@@ -232,7 +295,7 @@ export default function CustomAlertsPage() {
                           })}
                         </div>
                       </td>
-                      <td className="py-2 px-4 align-middle border-2 border-white">{row.lastActivity}</td>
+                      <td className="py-3 px-4 align-middle border border-white/20 rounded-lg">{row.lastActivity}</td>
                     </tr>
                   ))}
                 </tbody>
@@ -529,7 +592,7 @@ export default function CustomAlertsPage() {
             
             <div className="space-y-4">
               {alertRules.map(rule => (
-                <div key={rule.id} className="bg-white/5 p-6 rounded-lg">
+                <div key={rule.id} className="bg-white/5 p-6 rounded-xl transition-all duration-300 ease-in-out hover:bg-white/10">
                   <div className="flex items-center justify-between">
                     <h3 className="text-lg font-semibold flex items-center gap-2">
                       <span className={`inline-block w-3 h-3 rounded-full ${severityColors[rule.severity]}`}></span>
@@ -538,7 +601,7 @@ export default function CustomAlertsPage() {
                     <div className="flex items-center gap-3">
                       <button 
                         onClick={() => handleToggleRule(rule.id)}
-                        className={`w-12 h-6 rounded-full transition-colors duration-200 flex items-center px-1 ${rule.enabled ? 'bg-purple-500 justify-end' : 'bg-gray-700 justify-start'}`}
+                        className={`w-12 h-6 rounded-full transition-all duration-300 ease-in-out flex items-center px-1 ${rule.enabled ? 'bg-purple-500/80 justify-end' : 'bg-gray-700/60 justify-start'}`}
                       >
                         <span className="w-4 h-4 bg-white rounded-full block"></span>
                       </button>
@@ -579,6 +642,90 @@ export default function CustomAlertsPage() {
               ))}
             </div>
           </>
+        )}
+        {selectedTab === 'other' && (
+          <div className="bg-white/5 p-6 rounded-xl">
+            <div className="flex justify-between items-center mb-4">
+              <div className="text-xl font-semibold">All Other Alerts</div>
+            </div>
+            <div className="overflow-x-auto">
+              <table className="w-full min-w-[700px] text-center text-sm">
+                <thead>
+                  <tr>
+                    <th className="bg-[#191138] py-2 px-4 text-center">User</th>
+                    <th className="bg-[#191138] py-2 px-4 text-center">Alert</th>
+                    <th className="bg-[#191138] py-2 px-4 text-center">Severity</th>
+                    <th className="bg-[#191138] py-2 px-4 text-center">Timestamp</th>
+                    <th className="bg-[#191138] py-2 px-4 text-center">Status</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {otherAlertsData.map((alert, idx) => (
+                    <tr key={alert.user} className={`${idx % 2 === 0 ? 'bg-gray-900/40' : ''} transition-colors duration-300`}>
+                      <td className="py-3 px-4 font-medium align-middle border border-white/20 rounded-lg">{alert.user}</td>
+                      <td className="py-3 px-4 align-middle border border-white/20 rounded-lg">{alert.alert}</td>
+                      <td className="py-3 px-4 align-middle border border-white/20 rounded-lg">
+                        <span className={`inline-block px-3 py-1 rounded-full text-xs font-semibold ${
+                          alert.severity === 'high' ? 'bg-red-500/20 text-red-400' :
+                          alert.severity === 'medium' ? 'bg-yellow-500/20 text-yellow-400' :
+                          'bg-green-500/20 text-green-400'
+                        }`}>
+                          {alert.severity}
+                        </span>
+                      </td>
+                      <td className="py-3 px-4 align-middle border border-white/20 rounded-lg">{alert.timestamp}</td>
+                      <td className="py-3 px-4 align-middle border border-white/20 rounded-lg">
+                        <span className="inline-block px-3 py-1 rounded-full text-xs font-semibold bg-blue-500/20 text-blue-400">
+                          {alert.status}
+                        </span>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        )}
+        {selectedTab === 'closed' && (
+          <div className="bg-white/5 p-6 rounded-xl">
+            <div className="flex justify-between items-center mb-4">
+              <div className="text-xl font-semibold">Closed Alerts</div>
+            </div>
+            <div className="overflow-x-auto">
+              <table className="w-full min-w-[700px] text-center text-sm">
+                <thead>
+                  <tr>
+                    <th className="bg-[#191138] py-2 px-4 text-center">User</th>
+                    <th className="bg-[#191138] py-2 px-4 text-center">Alert</th>
+                    <th className="bg-[#191138] py-2 px-4 text-center">Severity</th>
+                    <th className="bg-[#191138] py-2 px-4 text-center">Opened</th>
+                    <th className="bg-[#191138] py-2 px-4 text-center">Closed</th>
+                    <th className="bg-[#191138] py-2 px-4 text-center">Closed By</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {closedAlertsData.map((alert, idx) => (
+                    <tr key={alert.user} className={`${idx % 2 === 0 ? 'bg-gray-900/40' : ''} transition-colors duration-300`}>
+                      <td className="py-3 px-4 font-medium align-middle border border-white/20 rounded-lg">{alert.user}</td>
+                      <td className="py-3 px-4 align-middle border border-white/20 rounded-lg">{alert.alert}</td>
+                      <td className="py-3 px-4 align-middle border border-white/20 rounded-lg">
+                        <span className={`inline-block px-3 py-1 rounded-full text-xs font-semibold ${
+                          alert.severity === 'high' ? 'bg-red-500/20 text-red-400' :
+                          alert.severity === 'medium' ? 'bg-yellow-500/20 text-yellow-400' :
+                          'bg-green-500/20 text-green-400'
+                        }`}>
+                          {alert.severity}
+                        </span>
+                      </td>
+                      <td className="py-3 px-4 align-middle border border-white/20 rounded-lg">{alert.timestamp}</td>
+                      <td className="py-3 px-4 align-middle border border-white/20 rounded-lg">{alert.closedAt}</td>
+                      <td className="py-3 px-4 align-middle border border-white/20 rounded-lg">{alert.closedBy}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
         )}
       </div>
     </div>
