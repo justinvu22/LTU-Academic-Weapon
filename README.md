@@ -114,7 +114,7 @@ The project has implemented:
 
 git fetch origin
 
-# or 
+# and then 
 
 git pull
 ```
