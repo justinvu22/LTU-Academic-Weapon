@@ -109,6 +109,16 @@ The project has implemented:
 
 ## Getting Started
 
+### For Team need to pull the code from master branch
+```bash
+
+git fetch origin
+
+# or 
+
+git pull
+```
+
 ### Prerequisites
 - Node.js (version specified in package.json)
 - npm or yarn
