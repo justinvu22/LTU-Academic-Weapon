@@ -1023,3 +1023,29 @@ p, body {
   box-shadow: 0 0 24px 6px #ff5eec55, 0 0 12px 4px #6f00ff33;
   border-color: #d1aaff;
 }
+
+@keyframes bounce {
+  0%, 100% {
+    transform: translateY(0);
+    animation-timing-function: cubic-bezier(0.8,0,1,1);
+  }
+  50% {
+    transform: translateY(-12px);
+    animation-timing-function: cubic-bezier(0,0,0.2,1);
+  }
+}
+.animate-bounce {
+  animation: bounce 1s infinite;
+}
+
+@keyframes pulse {
+  0%, 100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.5;
+  }
+}
+.animate-pulse {
+  animation: pulse 1.5s cubic-bezier(0.4,0,0.6,1) infinite;
+}

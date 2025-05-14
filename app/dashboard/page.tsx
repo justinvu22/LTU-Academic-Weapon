@@ -18,7 +18,7 @@ import {
   Area,
   Legend,
 } from "recharts";
-import { FaFilePdf, FaFileExport, FaFilter } from "react-icons/fa";
+import { FaFilePdf, FaFileExport, FaFilter, FaExclamationTriangle, FaUserShield, FaFireAlt } from "react-icons/fa";
 import { jsPDF } from "jspdf";
 import html2canvas from "html2canvas";
 import Card from "@/components/card";
@@ -135,14 +135,17 @@ export default function DashboardPage() {
       {/* TOP ROW: Quick Stats */}
       <div className="grid grid-cols-3 gap-4 mb-6">
         <Card floating className="flex flex-col justify-center items-center">
+          <FaExclamationTriangle className="text-3xl text-pink-400 animate-bounce mb-2" />
           <h3 className="text-lg font-bold mb-2">Detected Anomalies</h3>
           <p className="text-2xl font-extrabold text-pink-400">23</p>
         </Card>
         <Card floating className="flex flex-col justify-center items-center">
+          <FaUserShield className="text-3xl text-pink-400 animate-pulse mb-2" />
           <h3 className="text-lg font-bold mb-2">Users Flagged as Risky</h3>
           <p className="text-2xl font-extrabold text-pink-400">5</p>
         </Card>
         <Card floating className="flex flex-col justify-center items-center">
+          <FaFireAlt className="text-3xl text-pink-400 animate-pulse mb-2" />
           <h3 className="text-lg font-bold mb-2">High Risk Events</h3>
           <p className="text-2xl font-extrabold text-pink-400">3</p>
         </Card>
