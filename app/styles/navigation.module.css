@@ -1,42 +1,48 @@
 .navContainer {
-  margin-top: -1rem;
-  padding-top: 2rem;
+  margin-top: 0;
+  padding-top: 1rem;
   padding-bottom: 2rem;
   display: flex;
   flex-direction: column;
-  gap: 2rem;
+  gap: 0.5rem;
 }
 
 .navLink {
   position: relative;
   transition: all 0.3s ease-in-out;
+  border-radius: 0.25rem;
+  width: 100%;
+  display: flex;
+  align-items: center;
 }
 
 .navLinkSelected {
   composes: navLink;
-  background: rgba(255, 255, 255, 0.15);
-  border-radius: 1rem;
-  clip-path: polygon(0 0, 100% 0, 100% 100%, 0 100%);
+  background: rgba(88, 70, 190, 0.2);
+  color: rgba(255, 255, 255, 0.95);
+  border-left: 3px solid rgba(124, 104, 238, 1);
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
 }
 
 .navLinkSelected::after {
   content: '';
   position: absolute;
-  right: -1px;
+  left: 0;
   top: 0;
   height: 100%;
-  width: 1px;
-  background: rgba(255, 255, 255, 0.05);
+  width: 3px;
+  background: rgba(124, 104, 238, 1);
   transition: all 0.3s ease-in-out;
 }
 
 .navLinkUnselected {
   composes: navLink;
-  background: rgba(0, 0, 0, 0.3);
-  border-radius: 1rem;
+  color: rgba(255, 255, 255, 0.7);
+  border-left: 3px solid transparent;
 }
 
 .navLinkUnselected:hover {
-  background: rgba(0, 0, 0, 0.4);
-  transform: translateX(2px);
+  background: rgba(255, 255, 255, 0.08);
+  transform: translateX(1px);
+  color: rgba(255, 255, 255, 0.95);
 } 

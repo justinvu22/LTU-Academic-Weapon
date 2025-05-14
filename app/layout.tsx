@@ -3,20 +3,15 @@
 "use client";
 
 import PageTransition from "@/components/PageTransition";
+import LeftSidebar from "@/components/LeftSidebar";
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import {
-  FaBell,
-  FaChartLine,
-  FaHome,
+  FaUser,
   FaMoon,
-  FaRobot,
-  FaSun,
-  FaUpload,
-  FaUser
+  FaSun
 } from "react-icons/fa";
 import "./output.css"; // Import the compiled Tailwind output
-import styles from './styles/navigation.module.css';
 
 export default function RootLayout({ children }: { children: React.ReactNode; }) {
   const [darkMode, setDarkMode] = useState(true);
@@ -48,65 +43,20 @@ export default function RootLayout({ children }: { children: React.ReactNode; })
     <html lang="en" className={darkMode ? "dark" : ""}>
       <body className={`flex h-screen overflow-hidden transition-colors duration-300 ${darkMode ? "bg-gray-100 text-gray-900" : "bg-[#24243e] text-white"}`}>
         {/* LEFT SIDEBAR */}
-        <aside className={`w-20 ${darkMode ? "bg-white" : "bg-gradient-to-b from-[#2C2C54] via-[#302b63] to-[#24243e]"} text-${darkMode ? "gray-900" : "white"} flex flex-col transition-colors duration-300`}>
-          {/* Header with Shadow Sight and Search */}
-          <div className={`p-4 flex items-center justify-start border-b ${darkMode ? "border-gray-200" : "border-white/10"}`}>
-            <div className="flex items-center">
-              <img 
-                src="/images/shadow-sight-icon.svg" 
-                alt="Shadow Sight Logo" 
-                className="w-12 h-12"
-              />
-            </div>
-          </div>
-          {/* Navigation Links */}
-          <nav className={`flex-1 overflow-auto ${styles.navContainer}`}>
-            <Link 
-              href="/" 
-              className={`flex items-center justify-center w-16 h-16 mx-auto ${activeLink === "/" ? styles.navLinkSelected : styles.navLinkUnselected}`}
-              onClick={() => handleLinkClick("/")}
-              title="Home"
-            >
-              <FaHome className="text-3xl" />
-            </Link>
-            <Link 
-              href="/upload" 
-              className={`flex items-center justify-center w-16 h-16 mx-auto ${activeLink === "/upload" ? styles.navLinkSelected : styles.navLinkUnselected}`}
-              onClick={() => handleLinkClick("/upload")}
-              title="CSV Upload"
-            >
-              <FaUpload className="text-3xl" />
-            </Link>
-            <Link 
-              href="/dashboard" 
-              className={`flex items-center justify-center w-16 h-16 mx-auto ${activeLink === "/dashboard" ? styles.navLinkSelected : styles.navLinkUnselected}`}
-              onClick={() => handleLinkClick("/dashboard")}
-              title="Dashboard"
-            >
-              <FaChartLine className="text-3xl" />
-            </Link>
-            <Link 
-              href="/ml" 
-              className={`flex items-center justify-center w-16 h-16 mx-auto ${activeLink === "/ml" ? styles.navLinkSelected : styles.navLinkUnselected}`}
-              onClick={() => handleLinkClick("/ml")}
-              title="ML Insights"
-            >
-              <FaRobot className="text-3xl" />
-            </Link>
-            <Link 
-              href="/alerts" 
-              className={`flex items-center justify-center w-16 h-16 mx-auto ${activeLink === "/alerts" ? styles.navLinkSelected : styles.navLinkUnselected}`}
-              onClick={() => handleLinkClick("/alerts")}
-              title="Custom Alerts"
-            >
-              <FaBell className="text-3xl" />
-            </Link>
-          </nav>
-        </aside>
+        <LeftSidebar activeLink={activeLink} onLinkClick={handleLinkClick} />
 
         {/* MAIN CONTENT */}
         <main className={`flex-1 overflow-auto ${darkMode ? "bg-gray-100" : "bg-gradient-to-tr from-[#24243e] to-[#302b63]"} p-6 transition-colors duration-300`}>
-          <div className="flex justify-end mb-4">
+          <div className="flex justify-between mb-6">
+            <h1 className="text-2xl font-bold">
+              {activeLink === "/" ? "Home" : 
+               activeLink === "/upload" ? "Upload CSV" : 
+               activeLink === "/dashboard" ? "Dashboard" : 
+               activeLink === "/ml" ? "ML Insights" : 
+               activeLink === "/alerts" ? "Alerts" : 
+               activeLink === "/settings" ? "Settings" : 
+               activeLink === "/help" ? "Help" : ""}
+            </h1>
             <button 
               onClick={toggleDarkMode}
               className={`p-2 rounded-full ${darkMode ? "bg-yellow-100 text-yellow-600" : "bg-gray-800 text-gray-200"} transition-all duration-300`}
@@ -145,7 +95,7 @@ export default function RootLayout({ children }: { children: React.ReactNode; })
           {/* New Members Section */}
           <section>
             <h3 className="text-md font-bold mb-4">New Members</h3>
-            <ul className="flex flex-col gap-4">
+            <ul className="flex flex-col gap-2">
               <li className={`flex items-center gap-3 cursor-pointer ${darkMode ? "hover:bg-gray-100" : "hover:bg-white/5"} p-2 rounded transition-colors`}>
                 <div className={`h-8 w-8 rounded-full ${darkMode ? "bg-gray-200" : "bg-white/20"} flex items-center justify-center`}>
                   <span>AC</span>
