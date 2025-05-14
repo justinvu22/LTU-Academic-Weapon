@@ -21,6 +21,7 @@ import {
 import { FaFilePdf, FaFileExport, FaFilter } from "react-icons/fa";
 import { jsPDF } from "jspdf";
 import html2canvas from "html2canvas";
+import Card from "@/components/card";
 
 // Example data arrays
 const anomalyTypeData = [
@@ -127,21 +128,24 @@ export default function DashboardPage() {
   };
 
   return (
-    <div className="p-4 text-white min-h-screen" ref={dashboardRef}>
+    <div className="p-4 text-white min-h-screen relative overflow-hidden" ref={dashboardRef}>
+      {/* Animated gradient background */}
+      <div className="absolute inset-0 -z-10 animate-gradient bg-gradient-to-tr from-[#1a1a40] via-[#6f00ff] to-[#ff5eec] opacity-80 blur-2xl" />
+
       {/* TOP ROW: Quick Stats */}
       <div className="grid grid-cols-3 gap-4 mb-6">
-        <div className="bg-[#191138] rounded-lg p-4 flex flex-col justify-center items-center">
+        <Card floating className="flex flex-col justify-center items-center">
           <h3 className="text-lg font-bold mb-2">Detected Anomalies</h3>
           <p className="text-2xl font-extrabold text-pink-400">23</p>
-        </div>
-        <div className="bg-[#191138] rounded-lg p-4 flex flex-col justify-center items-center">
+        </Card>
+        <Card floating className="flex flex-col justify-center items-center">
           <h3 className="text-lg font-bold mb-2">Users Flagged as Risky</h3>
           <p className="text-2xl font-extrabold text-pink-400">5</p>
-        </div>
-        <div className="bg-[#191138] rounded-lg p-4 flex flex-col justify-center items-center">
+        </Card>
+        <Card floating className="flex flex-col justify-center items-center">
           <h3 className="text-lg font-bold mb-2">High Risk Events</h3>
           <p className="text-2xl font-extrabold text-pink-400">3</p>
-        </div>
+        </Card>
       </div>
 
       {/* Filter Section */}
@@ -210,7 +214,7 @@ export default function DashboardPage() {
       {/* MIDDLE ROW: Two Charts */}
       <div className="grid grid-cols-2 gap-4 mb-6">
         {/* Anomaly Type Breakdown (Pie) */}
-        <div className="bg-[#191138] rounded-lg p-4">
+        <Card>
           <h3 className="text-md font-bold mb-2">Anomaly Type Breakdown</h3>
           <ResponsiveContainer width="100%" height={250}>
             <PieChart>
@@ -228,10 +232,10 @@ export default function DashboardPage() {
               <Legend />
             </PieChart>
           </ResponsiveContainer>
-        </div>
+        </Card>
 
         {/* User Login Trend (Line) */}
-        <div className="bg-[#191138] rounded-lg p-4">
+        <Card>
           <h3 className="text-md font-bold mb-2">User Login Trend</h3>
           <ResponsiveContainer width="100%" height={250}>
             <LineChart data={userLoginTrendData}>
@@ -242,13 +246,13 @@ export default function DashboardPage() {
               <Line type="monotone" dataKey="logins" stroke="#FF5EEC" strokeWidth={2} />
             </LineChart>
           </ResponsiveContainer>
-        </div>
+        </Card>
       </div>
 
       {/* BOTTOM ROW: Two Charts */}
       <div className="grid grid-cols-2 gap-4 mb-6">
         {/* Detected Anomalies Section */}
-        <div className="bg-[#191138] rounded-lg p-4">
+        <Card>
           <h3 className="text-md font-bold mb-2">Detected Anomalies</h3>
           <ResponsiveContainer width="100%" height={250}>
             <BarChart data={detectedAnomaliesData}>
@@ -259,10 +263,10 @@ export default function DashboardPage() {
               <Bar dataKey="anomalies" fill="#FF5EEC" />
             </BarChart>
           </ResponsiveContainer>
-        </div>
+        </Card>
 
         {/* Risk Levels by Time (Area) */}
-        <div className="bg-[#191138] rounded-lg p-4">
+        <Card>
           <h3 className="text-md font-bold mb-2">Risk Levels by Time</h3>
           <ResponsiveContainer width="100%" height={250}>
             <AreaChart data={riskLevelsData}>
@@ -276,7 +280,7 @@ export default function DashboardPage() {
               <Area type="monotone" dataKey="critical" stackId="1" stroke="#FF0080" fill="#FF0080" />
             </AreaChart>
           </ResponsiveContainer>
-        </div>
+        </Card>
       </div>
 
       {/* Export Button Section */}

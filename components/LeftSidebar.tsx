@@ -23,9 +23,10 @@ const LeftSidebar: React.FC<LeftSidebarProps> = ({ activeLink, onLinkClick }) =>
 
   return (
     <div 
-      className="relative h-full bg-[#1A1A40] text-white flex flex-col"
+      className="relative h-full bg-[#1A1A40] text-white flex flex-col border-r border-[#23234a] shadow-lg z-20"
       onMouseEnter={() => setSidebarOpen(true)}
       onMouseLeave={() => setSidebarOpen(false)}
+      style={{ width: sidebarOpen ? '224px' : '64px', minWidth: sidebarOpen ? '224px' : '64px', maxWidth: sidebarOpen ? '224px' : '64px', transition: 'width 0.3s' }}
     >
       <div className={`flex-1 flex flex-col transition-all duration-300 ease-in-out ${sidebarOpen ? 'w-56' : 'w-16'}`}>
         {/* Logo Section */}

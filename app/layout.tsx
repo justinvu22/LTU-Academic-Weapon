@@ -12,6 +12,9 @@ import {
   FaSun
 } from "react-icons/fa";
 import "./output.css"; // Import the compiled Tailwind output
+import { Inter } from 'next/font/google';
+
+const inter = Inter({ subsets: ['latin'] });
 
 export default function RootLayout({ children }: { children: React.ReactNode; }) {
   const [darkMode, setDarkMode] = useState(true);
@@ -40,8 +43,8 @@ export default function RootLayout({ children }: { children: React.ReactNode; })
   };
 
   return (
-    <html lang="en" className={darkMode ? "dark" : ""}>
-      <body className={`flex h-screen overflow-hidden transition-colors duration-300 ${darkMode ? "bg-gray-100 text-gray-900" : "bg-[#24243e] text-white"}`}>
+    <html lang="en" className={`${inter.className} ${darkMode ? "dark" : ""}`}>
+      <body className={`font-sans flex h-screen overflow-hidden transition-colors duration-300 ${darkMode ? "bg-gray-100 text-gray-900" : "bg-[#24243e] text-white"}`}>
         {/* LEFT SIDEBAR */}
         <LeftSidebar activeLink={activeLink} onLinkClick={handleLinkClick} />
 
