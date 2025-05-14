@@ -40,7 +40,6 @@ const LeftSidebar: React.FC<LeftSidebarProps> = ({ activeLink, onLinkClick }) =>
           {sidebarOpen && (
             <div className="ml-3 overflow-hidden whitespace-nowrap">
               <span className="font-semibold text-sm block">ShadowSight</span>
-              <span className="text-xs text-gray-400 block">Dashboard</span>
             </div>
           )}
         </div>
@@ -142,14 +141,22 @@ const NavItem: React.FC<NavItemProps> = ({
   return (
     <Link 
       href={path} 
-      className={`flex items-center h-12 ${isActive ? "text-white" : "text-gray-400 hover:text-white"}`}
+      className={`flex items-center h-12 relative transition-all duration-200 px-2 my-1 rounded-lg group
+        ${isActive ?
+          "bg-gradient-to-r from-[#6f00ff33] to-[#ff00cc22] shadow-lg text-white scale-110 border-l-4 border-[#ff5eec]" :
+          "text-gray-400 hover:text-white hover:bg-white/10"}
+      `}
       onClick={() => onClick(path)}
     >
-      <div className="w-16 flex justify-center">
+      {/* Neon accent bar for active item, always visible */}
+      {isActive && (
+        <span className="absolute left-0 top-1/2 -translate-y-1/2 h-8 w-1.5 rounded-full bg-gradient-to-b from-[#6f00ff] to-[#ff00cc] shadow-[0_0_8px_2px_#ff00cc88] animate-pulse z-10"></span>
+      )}
+      <div className={`w-16 flex justify-center transition-all duration-200 ${isActive ? "text-[#ff5eec] scale-125 drop-shadow-[0_0_8px_#ff5eec]" : ""}`}>
         {icon}
       </div>
       {isOpen && (
-        <div className="flex items-center">
+        <div className={`flex items-center transition-all duration-200 ${isActive ? "font-bold text-white" : ""}`}>
           <span className="whitespace-nowrap">{label}</span>
           {hasExternalIcon && (
             <FaExternalLinkAlt className="ml-2 text-xs opacity-60" />
