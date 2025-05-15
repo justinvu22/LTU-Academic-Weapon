@@ -27,18 +27,7 @@ export default function RootLayout({ children }: { children: React.ReactNode; })
         <LeftSidebar activeLink={activeLink} onLinkClick={handleLinkClick} />
 
         {/* MAIN CONTENT */}
-        <main className="flex-1 overflow-auto bg-white p-6 transition-colors duration-300">
-          <div className="flex justify-between mb-6">
-            <h1 className="text-2xl font-bold">
-              {activeLink === "/" ? "Home" : 
-               activeLink === "/upload" ? "Upload CSV" : 
-               activeLink === "/dashboard" ? "Dashboard" : 
-               activeLink === "/ml" ? "ML Insights" : 
-               activeLink === "/alerts" ? "Alerts" : 
-               activeLink === "/settings" ? "Settings" : 
-               activeLink === "/help" ? "Help" : ""}
-            </h1>
-          </div>
+        <main className="flex-1 overflow-auto transition-colors duration-300">
           <PageTransition>
             {children}
           </PageTransition>

@@ -16,7 +16,9 @@ import {
   FaAngleDoubleRight,
   FaUserCircle,
   FaSearch,
-  FaUser
+  FaUser,
+  FaTools,
+  FaRegClipboard
 } from "react-icons/fa";
 
 interface LeftSidebarProps {
@@ -54,6 +56,20 @@ const LeftSidebar: React.FC<LeftSidebarProps> = ({ activeLink, onLinkClick }) =>
     }
   ];
 
+  // Analysis Engine section items
+  const analysisEngineItems = [
+    {
+      path: "/custom-alerts",
+      name: "Custom Alerts",
+      icon: <FaTools className="text-xl" />,
+    },
+    {
+      path: "/trusted-activities",
+      name: "Trusted Activities",
+      icon: <FaRegClipboard className="text-xl" />,
+    },
+  ];
+
   // Utility navigation items
   const utilNavItems = [
     {
@@ -80,12 +96,12 @@ const LeftSidebar: React.FC<LeftSidebarProps> = ({ activeLink, onLinkClick }) =>
 
   return (
     <aside className={`left-sidebar transition-all duration-300 h-full flex flex-col font-['Poppins',sans-serif] ${collapsed ? 'w-20' : 'w-64'}
-      bg-white/60 border-r border-gray-200 shadow-[0_0_24px_2px_rgba(80,0,120,0.10)] backdrop-blur-md relative`}
+      bg-white/20 border-r border-gray-200 shadow-[0_0_24px_2px_rgba(80,0,120,0.10)] backdrop-blur-md relative`}
     >
       {/* Modern Header Section */}
-      <div className="relative flex flex-col items-center justify-center">
+      <div className="flex flex-col items-center justify-center">
         <div className={`flex items-center justify-center w-full ${collapsed ? 'p-2' : 'p-4'} bg-[#181c2f] rounded-xl m-3 mb-0 shadow-md`}>
-          <div className="h-12 w-12 flex items-center justify-center rounded-xl border-2 border-cyan-400 bg-[#232846] overflow-hidden">
+          <div className="h-12 w-12 flex items-center justify-center rounded-xl bg-[#232846] overflow-hidden">
             <img
               src="/icon.png"
               alt="ShadowSight Icon"
@@ -96,9 +112,8 @@ const LeftSidebar: React.FC<LeftSidebarProps> = ({ activeLink, onLinkClick }) =>
             <span className="ml-2 text-2xl font-extrabold tracking-widest text-[#232846] select-none" style={{fontFamily: 'Poppins, sans-serif'}}>ShadowSight</span>
           )}
         </div>
-        {/* Chevron toggle vertically centered */}
         <button
-          className="absolute right-2 top-1/2 -translate-y-1/2 p-2 rounded-full hover:bg-[#232846] transition-colors z-10"
+          className="my-2 p-2 rounded-full hover:bg-[#232846] transition-colors z-10"
           onClick={() => setCollapsed((prev) => !prev)}
           aria-label={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}
         >
@@ -128,6 +143,35 @@ const LeftSidebar: React.FC<LeftSidebarProps> = ({ activeLink, onLinkClick }) =>
               )}
             </Link>
           ))}
+        </div>
+        {/* Gradient Divider */}
+        <div className={`${collapsed ? 'mx-2' : 'mx-4'} my-6`}>
+          <div className="h-[2px] bg-gradient-to-r from-transparent via-purple-400/80 to-transparent shadow-sm" />
+        </div>
+        {/* Analysis Engine Section */}
+        <div className="mt-2">
+          {!collapsed && (
+            <div className="px-2 mb-2 text-xs font-semibold uppercase text-gray-400 tracking-wider select-none" style={{fontFamily: 'Poppins, sans-serif'}}>Analysis Engine</div>
+          )}
+          <div className="flex flex-col gap-1">
+            {analysisEngineItems.map((item) => (
+              <Link
+                key={item.path}
+                href={item.path}
+                className={`group flex items-center ${collapsed ? 'justify-center' : 'gap-3'} px-3 py-3 rounded-md text-base font-semibold transition-all duration-200 tracking-wide
+                  ${activeLink === item.path
+                    ? 'bg-blue-600 text-white font-extrabold shadow-lg'
+                    : 'hover:bg-blue-100 hover:text-blue-600 text-blue-700 bg-transparent hover:scale-[1.03] hover:shadow-md'}
+                `}
+                style={{ fontFamily: 'Poppins, sans-serif' }}
+                onClick={() => onLinkClick(item.path)}
+                title={collapsed ? item.name : undefined}
+              >
+                <span className={`text-xl ${activeLink === item.path ? 'text-white' : 'group-hover:text-blue-600 text-blue-400'}`}>{item.icon}</span>
+                {!collapsed && <span>{item.name}</span>}
+              </Link>
+            ))}
+          </div>
         </div>
         {/* Add spacing between Alerts and Recent Activity */}
         {!collapsed && <div className="h-24" />}
