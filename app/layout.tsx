@@ -59,14 +59,6 @@ export default function RootLayout({ children }: { children: React.ReactNode; })
                 <p className="text-sm text-gray-500">@sophiefortune</p>
               </div>
             </div>
-            <Link 
-              href="/profile/settings" 
-              className={`flex items-center gap-2 p-2 rounded hover:bg-gray-100 transition-colors ${activeLink === "/profile/settings" ? "bg-gray-100" : ""}`}
-              onClick={() => handleLinkClick("/profile/settings")}
-            >
-              <FaUser className="text-lg" />
-              <span>Profile Settings</span>
-            </Link>
             <hr className="border-gray-200 my-6" />
             {/* New Members Section */}
             <h3 className="text-md font-bold mb-4">New Members</h3>

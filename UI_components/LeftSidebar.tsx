@@ -15,7 +15,8 @@ import {
   FaAngleDoubleLeft,
   FaAngleDoubleRight,
   FaUserCircle,
-  FaSearch
+  FaSearch,
+  FaUser
 } from "react-icons/fa";
 
 interface LeftSidebarProps {
@@ -55,6 +56,11 @@ const LeftSidebar: React.FC<LeftSidebarProps> = ({ activeLink, onLinkClick }) =>
 
   // Utility navigation items
   const utilNavItems = [
+    {
+      path: "/profile/settings",
+      name: "Profile",
+      icon: <FaUser className="text-xl" />,
+    },
     {
       path: "/settings",
       name: "Settings",
