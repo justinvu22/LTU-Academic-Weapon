@@ -1,0 +1,35 @@
+{
+  "name": "ltu-academic-weapon",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start",
+    "lint": "next lint"
+  },
+  "dependencies": {
+    "@tensorflow/tfjs": "^4.22.0",
+    "@types/papaparse": "^5.3.16",
+    "html2canvas": "^1.4.1",
+    "jspdf": "^3.0.1",
+    "next": "14.1.0",
+    "papaparse": "^5.5.2",
+    "react": "^18.2.0",
+    "react-dom": "^18.2.0",
+    "react-dropzone": "^14.3.8",
+    "react-icons": "^5.0.1",
+    "recharts": "^2.12.0"
+  },
+  "devDependencies": {
+    "@types/node": "20.17.47",
+    "@types/react": "^18.2.57",
+    "@types/react-dom": "^18.2.19",
+    "autoprefixer": "^10.4.17",
+    "eslint": "^8.56.0",
+    "eslint-config-next": "14.1.0",
+    "postcss": "^8.4.35",
+    "tailwindcss": "^3.4.1",
+    "typescript": "5.8.3"
+  }
+}
