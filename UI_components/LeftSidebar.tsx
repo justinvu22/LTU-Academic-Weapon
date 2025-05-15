@@ -24,9 +24,10 @@ import {
 interface LeftSidebarProps {
   activeLink: string;
   onLinkClick: (path: string) => void;
+  alertCount?: number;
 }
 
-const LeftSidebar: React.FC<LeftSidebarProps> = ({ activeLink, onLinkClick }) => {
+const LeftSidebar: React.FC<LeftSidebarProps> = ({ activeLink, onLinkClick, alertCount = 0 }) => {
   // Navigation items
   const navItems = [
     {
@@ -139,7 +140,9 @@ const LeftSidebar: React.FC<LeftSidebarProps> = ({ activeLink, onLinkClick }) =>
               <span className={`text-xl ${activeLink === item.path ? 'text-pink-600' : 'group-hover:text-pink-600 text-purple-400'}`}>{item.icon}</span>
               {!collapsed && <span>{item.name}</span>}
               {item.path === "/alerts" && !collapsed && (
-                <span className="sidebar-alert-badge ml-auto px-2 py-0.5 text-xs rounded-full">9+</span>
+                <span className="sidebar-alert-badge ml-auto px-2 py-0.5 text-xs rounded-full">
+                  {alertCount > 9 ? '+9' : `+${alertCount}`}
+                </span>
               )}
             </Link>
           ))}

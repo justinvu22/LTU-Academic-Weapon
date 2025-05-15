@@ -4,12 +4,14 @@ import React, { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Papa from 'papaparse';
 import { UploadFile, Check } from '@mui/icons-material';
+import { useActivityContext } from '../../src/contexts/ActivityContext';
 
 /**
  * Component for uploading and processing CSV data
  */
 export default function DataUploadPage() {
   const router = useRouter();
+  const { refreshActivities } = useActivityContext();
   const [file, setFile] = useState<File | null>(null);
   const [fileContent, setFileContent] = useState<any[]>([]);
   const [isUploading, setIsUploading] = useState(false);
@@ -172,6 +174,8 @@ export default function DataUploadPage() {
         throw new Error('Failed to process activity data');
       }
       
+      // Refresh activities context for live badge update
+      await refreshActivities();
       // Navigate to the alerts page to see the processed data
       router.push('/alerts');
     } catch (error) {

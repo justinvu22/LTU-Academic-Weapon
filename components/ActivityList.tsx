@@ -1,4 +1,5 @@
 import React from 'react';
+import '@fontsource/poppins/600.css';
 import { 
   Table, 
   TableBody, 
@@ -55,10 +56,7 @@ export const ActivityList: React.FC<ActivityListProps> = ({
     return (
       <Box sx={{ display: 'flex', gap: 0.5, flexWrap: 'wrap' }}>
         {categories.map(category => {
-          // Safety check to make sure category is a string
           if (typeof category !== 'string') return null;
-          
-          // Check if we have breach details as an array
           if (Array.isArray(breaches[category])) {
             return breaches[category].map((breach: string, index: number) => (
               <Chip
@@ -68,12 +66,21 @@ export const ActivityList: React.FC<ActivityListProps> = ({
                 size="small"
                 color="error"
                 variant="outlined"
-                sx={{ m: 0.5 }}
+                sx={{
+                  m: 0.5,
+                  borderRadius: 9999,
+                  background: 'rgba(255,255,255,0.25)',
+                  backdropFilter: 'blur(4px)',
+                  fontWeight: 600,
+                  fontFamily: 'Poppins, sans-serif',
+                  color: '#e11d48',
+                  border: '1.5px solid #e11d48',
+                  px: 1.5,
+                  py: 0.5,
+                }}
               />
             ));
           }
-          
-          // If not an array, just show the category
           return (
             <Chip
               key={category}
