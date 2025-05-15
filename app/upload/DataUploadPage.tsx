@@ -2,18 +2,8 @@
 
 import React, { useState } from 'react';
 import { useRouter } from 'next/navigation';
-import {
-  Box,
-  Button,
-  Card,
-  CardContent,
-  CircularProgress,
-  Typography,
-  Paper,
-  Alert,
-} from '@mui/material';
-import { UploadFile, Check, Error as ErrorIcon } from '@mui/icons-material';
 import Papa from 'papaparse';
+import { UploadFile, Check } from '@mui/icons-material';
 
 /**
  * Component for uploading and processing CSV data
@@ -193,172 +183,101 @@ export default function DataUploadPage() {
   };
 
   return (
-    <Box sx={{ p: 3 }}>
-      <Typography variant="h4" gutterBottom>
-        Data Upload
-      </Typography>
-      
-      <Paper sx={{ p: 3, mb: 3 }}>
-        <Typography variant="h6" gutterBottom>
-          Upload Activity Data CSV
-        </Typography>
-        
-        <Typography variant="body2" color="text.secondary" paragraph>
-          Upload a CSV file containing user activity data to analyze for policy breaches and security risks.
-          The CSV should include columns for user ID, timestamp, activity type, and potential policy breaches.
-        </Typography>
-        
+    <div className="font-['Poppins',sans-serif] min-h-[80vh] py-12 px-4 md:px-12 bg-gradient-to-br from-white/80 to-blue-50 transition-all duration-300">
+      <h1 className="text-3xl font-extrabold text-blue-700 mb-8 flex items-center gap-2 drop-shadow-sm">Data Upload</h1>
+
+      <div className="glass-card max-w-4xl mx-auto mb-8 p-8 rounded-2xl shadow-xl flex flex-col gap-6">
+        <h2 className="text-xl font-bold text-blue-600 mb-2 flex items-center gap-2">Upload Activity Data CSV</h2>
+        <p className="text-gray-500 mb-4">Upload a CSV file containing user activity data to analyze for policy breaches and security risks. The CSV should include columns for user ID, timestamp, activity type, and potential policy breaches.</p>
         {errorMessage && (
-          <Alert severity="error" sx={{ mb: 3 }}>
+          <div className="w-full mb-3 p-3 rounded-xl bg-red-100 text-red-700 text-center font-semibold shadow transition-all duration-300">
             {errorMessage}
-          </Alert>
+          </div>
         )}
-        
-        <Box sx={{ display: 'flex', flexDirection: { xs: 'column', md: 'row' }, gap: 2 }}>
-          <Box sx={{ flex: 1 }}>
-            <Button
-              variant="contained"
-              component="label"
-              startIcon={<UploadFile />}
+        <div className="flex flex-col md:flex-row gap-4">
+          <div className="flex-1">
+            <input
+              id="csv-upload"
+              type="file"
+              accept=".csv"
+              hidden
+              onChange={handleFileChange}
+            />
+            <button
+              type="button"
               disabled={isUploading}
-              fullWidth
-              sx={{ 
-                py: 1.5, 
-                bgcolor: uploadComplete ? 'success.main' : 'primary.main',
-                '&:hover': {
-                  bgcolor: uploadComplete ? 'success.dark' : 'primary.dark',
-                }
-              }}
+              onClick={() => document.getElementById('csv-upload')?.click()}
+              className={`w-full py-3 rounded-lg font-bold flex items-center justify-center gap-2 transition bg-gradient-to-r from-blue-500 to-cyan-400 text-white shadow-lg hover:scale-105 disabled:opacity-60 disabled:cursor-not-allowed ${uploadComplete ? 'from-green-500 to-green-400' : ''}`}
             >
+              <UploadFile />
               {uploadComplete ? 'File Uploaded - Select Another' : 'Select CSV File'}
-              <input
-                type="file"
-                accept=".csv"
-                hidden
-                onChange={handleFileChange}
-              />
-            </Button>
-          </Box>
-          
-          <Box sx={{ flex: 1 }}>
-            <Button
-              variant="outlined"
+            </button>
+          </div>
+          <div className="flex-1">
+            <button
+              type="button"
               onClick={handleUpload}
               disabled={!file || isUploading || uploadComplete}
-              fullWidth
-              sx={{ py: 1.5 }}
+              className="w-full py-3 rounded-lg font-bold flex items-center justify-center gap-2 transition bg-gradient-to-r from-purple-500 to-pink-400 text-white shadow-lg hover:scale-105 disabled:opacity-60 disabled:cursor-not-allowed"
             >
               {isUploading ? (
                 <>
-                  <CircularProgress size={24} sx={{ mr: 1 }} />
+                  <span className="animate-spin inline-block mr-2"><svg width="20" height="20" fill="none" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10" stroke="#fff" strokeWidth="4" opacity="0.2"/><path d="M22 12c0-5.523-4.477-10-10-10" stroke="#fff" strokeWidth="4" strokeLinecap="round"/></svg></span>
                   Uploading...
                 </>
               ) : 'Upload File'}
-            </Button>
-          </Box>
-        </Box>
-        
+            </button>
+          </div>
+        </div>
         {file && (
-          <Box sx={{ mt: 2 }}>
-            <Typography variant="subtitle2">
-              Selected file: {file.name} ({(file.size / 1024).toFixed(2)} KB)
-            </Typography>
-          </Box>
+          <div className="mt-2 text-sm text-gray-600">Selected file: <span className="font-semibold">{file.name}</span> ({(file.size / 1024).toFixed(2)} KB)</div>
         )}
-        
         {uploadStats && (
-          <Box sx={{ mt: 2 }}>
-            <Alert severity="success" icon={<Check />}>
+          <div className="mt-2">
+            <div className="w-full mb-3 p-3 rounded-xl bg-green-100 text-green-700 text-center font-semibold shadow transition-all duration-300 flex items-center justify-center gap-2">
+              <Check />
               Successfully parsed {uploadStats.rows} rows of data. Ready to process.
-            </Alert>
-          </Box>
+            </div>
+          </div>
         )}
-      </Paper>
-      
+      </div>
+
       {uploadComplete && (
-        <Card sx={{ mb: 3 }}>
-          <CardContent>
-            <Typography variant="h6" gutterBottom>
-              Process Data
-            </Typography>
-            
-            <Typography variant="body2" paragraph>
-              Your data has been uploaded successfully. Click the button below to process the data
-              and generate analytics on the alerts dashboard.
-            </Typography>
-            
-            <Button
-              variant="contained"
-              color="primary"
-              onClick={processForAnalytics}
-              disabled={isProcessing}
-              sx={{ mt: 1 }}
-            >
-              {isProcessing ? (
-                <>
-                  <CircularProgress size={24} sx={{ mr: 1 }} color="inherit" />
-                  Processing...
-                </>
-              ) : 'Process Data & View Alerts'}
-            </Button>
-          </CardContent>
-        </Card>
+        <div className="glass-card max-w-2xl mx-auto mb-8 p-8 rounded-2xl shadow-xl flex flex-col gap-4">
+          <h2 className="text-lg font-bold text-purple-600 mb-2">Process Data</h2>
+          <p className="text-gray-500 mb-4">Your data has been uploaded successfully. Click the button below to process the data and generate analytics on the alerts dashboard.</p>
+          <button
+            type="button"
+            onClick={processForAnalytics}
+            disabled={isProcessing}
+            className="w-full py-3 rounded-lg font-bold flex items-center justify-center gap-2 transition bg-gradient-to-r from-blue-500 to-purple-500 text-white shadow-lg hover:scale-105 disabled:opacity-60 disabled:cursor-not-allowed"
+          >
+            {isProcessing ? (
+              <>
+                <span className="animate-spin inline-block mr-2"><svg width="20" height="20" fill="none" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10" stroke="#fff" strokeWidth="4" opacity="0.2"/><path d="M22 12c0-5.523-4.477-10-10-10" stroke="#fff" strokeWidth="4" strokeLinecap="round"/></svg></span>
+                Processing...
+              </>
+            ) : 'Process Data & View Alerts'}
+          </button>
+        </div>
       )}
-      
-      <Card>
-        <CardContent>
-          <Typography variant="h6" gutterBottom>
-            CSV Format Requirements
-          </Typography>
-          
-          <Typography variant="body2" paragraph>
-            Your CSV file should include the following columns:
-          </Typography>
-          
-          <Box component="ul" sx={{ pl: 4 }}>
-            <li>
-              <Typography variant="body2" component="span" fontWeight="bold">id</Typography>
-              <Typography variant="body2" component="span"> - Unique identifier for the activity</Typography>
-            </li>
-            <li>
-              <Typography variant="body2" component="span" fontWeight="bold">userId</Typography>
-              <Typography variant="body2" component="span"> - User identifier</Typography>
-            </li>
-            <li>
-              <Typography variant="body2" component="span" fontWeight="bold">username</Typography>
-              <Typography variant="body2" component="span"> - Username or email</Typography>
-            </li>
-            <li>
-              <Typography variant="body2" component="span" fontWeight="bold">timestamp</Typography>
-              <Typography variant="body2" component="span"> - Date and time of activity</Typography>
-            </li>
-            <li>
-              <Typography variant="body2" component="span" fontWeight="bold">integration</Typography>
-              <Typography variant="body2" component="span"> - Source integration (email, cloud, usb, etc.)</Typography>
-            </li>
-            <li>
-              <Typography variant="body2" component="span" fontWeight="bold">activity</Typography>
-              <Typography variant="body2" component="span"> - Description of user activity</Typography>
-            </li>
-            <li>
-              <Typography variant="body2" component="span" fontWeight="bold">status</Typography>
-              <Typography variant="body2" component="span"> - Status of the activity (underReview, trusted, concern, etc.)</Typography>
-            </li>
-            <li>
-              <Typography variant="body2" component="span" fontWeight="bold">riskScore</Typography>
-              <Typography variant="body2" component="span"> - Numeric risk score</Typography>
-            </li>
-            <li>
-              <Typography variant="body2" component="span" fontWeight="bold">policiesBreached</Typography>
-              <Typography variant="body2" component="span"> - JSON object with policy breach information</Typography>
-            </li>
-            <li>
-              <Typography variant="body2" component="span" fontWeight="bold">values</Typography>
-              <Typography variant="body2" component="span"> - JSON object with additional activity values</Typography>
-            </li>
-          </Box>
-        </CardContent>
-      </Card>
-    </Box>
+
+      <div className="glass-card max-w-4xl mx-auto p-8 rounded-2xl shadow-xl flex flex-col gap-4">
+        <h2 className="text-xl font-bold text-blue-600 mb-2">CSV Format Requirements</h2>
+        <p className="text-gray-500 mb-2">Your CSV file should include the following columns:</p>
+        <ul className="list-disc pl-6 space-y-1 text-gray-700">
+          <li><span className="font-bold">id</span> - Unique identifier for the activity</li>
+          <li><span className="font-bold">userId</span> - User identifier</li>
+          <li><span className="font-bold">username</span> - Username or email</li>
+          <li><span className="font-bold">timestamp</span> - Date and time of activity</li>
+          <li><span className="font-bold">integration</span> - Source integration (email, cloud, usb, etc.)</li>
+          <li><span className="font-bold">activity</span> - Description of user activity</li>
+          <li><span className="font-bold">status</span> - Status of the activity (underReview, trusted, concern, etc.)</li>
+          <li><span className="font-bold">riskScore</span> - Numeric risk score</li>
+          <li><span className="font-bold">policiesBreached</span> - JSON object with policy breach information</li>
+          <li><span className="font-bold">values</span> - JSON object with additional activity values</li>
+        </ul>
+      </div>
+    </div>
   );
 }
