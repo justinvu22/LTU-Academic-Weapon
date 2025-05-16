@@ -7,11 +7,15 @@ import { UserActivity } from '../../types/activity';
 import { policyIcons } from '../../constants/policyIcons';
 import '@fontsource/poppins/600.css';
 import { FaSyncAlt } from 'react-icons/fa';
+import { useSearchParams } from 'next/navigation';
 
 /**
  * Custom styled version of ActivityList that fills the container
  */
-const FullHeightActivityList = ({ activities, policyIcons }) => {
+const FullHeightActivityList: React.FC<{
+  activities: UserActivity[];
+  policyIcons: Record<string, React.ReactNode>;
+}> = ({ activities, policyIcons }) => {
   return (
     <Box sx={{ 
       height: '100%', 
@@ -41,6 +45,7 @@ export default function AlertsPage() {
   const [activities, setActivities] = useState<UserActivity[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [tab, setTab] = useState(0);
+  const searchParams = useSearchParams();
 
   const fetchActivities = async () => {
     try {
@@ -73,7 +78,16 @@ export default function AlertsPage() {
 
   useEffect(() => {
     fetchActivities();
-  }, []);
+    
+    // Check URL for tab parameter
+    const tabParam = searchParams.get('tab');
+    if (tabParam) {
+      const tabIndex = parseInt(tabParam);
+      if (!isNaN(tabIndex) && tabIndex >= 0 && tabIndex <= 3) {
+        setTab(tabIndex);
+      }
+    }
+  }, [searchParams]);
 
   // Placeholder for custom alerts data
   const customAlerts: UserActivity[] = [];
@@ -170,4 +184,4 @@ export default function AlertsPage() {
       )}
     </Box>
   );
-} 
+}
