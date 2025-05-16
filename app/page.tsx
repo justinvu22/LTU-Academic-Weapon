@@ -3,134 +3,15 @@
 
 import { useState, useEffect } from 'react';
 import { FaHome, FaFilter, FaEllipsisV, FaSun, FaCloud, FaUsb, FaRegWindowRestore, FaExclamationTriangle, FaBell } from 'react-icons/fa';
-import { Box, CircularProgress, Typography, Card, CardContent, Grid, Chip, Tooltip as MuiTooltip, Paper } from '@mui/material';
+import { Box, CircularProgress, Typography, Card, CardContent, Grid, Chip, Tooltip as MuiTooltip, Paper, Button } from '@mui/material';
 import { 
   LineChart, Line, BarChart, Bar, PieChart, Pie, Cell, AreaChart, Area,
   XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer 
 } from 'recharts';
 import { ActivityList } from '../components/ActivityList';
 import { policyIcons } from '../constants/policyIcons';
-import { UserActivity } from '../types/activity';
-
-// Interface for ML recommendations
-interface MLRecommendation {
-  id: string;
-  title: string;
-  description: string;
-  severity: 'low' | 'medium' | 'high';
-  confidence: number;
-  affectedUsers: string[];
-  suggestedActions: string[];
-  timestamp: string;
-}
-
-// Simple recommendation engine implemented directly in the component
-const generateRecommendations = (activities: UserActivity[]): MLRecommendation[] => {
-  if (!activities || activities.length === 0) {
-    return [];
-  }
-  
-  const recommendations: MLRecommendation[] = [];
-  const usersMap = new Map<string, UserActivity[]>();
-  
-  // Group activities by user
-  activities.forEach(activity => {
-    const user = activity.username || activity.userId || activity.user || '';
-    if (!user) return;
-    
-    const userActivities = usersMap.get(user) || [];
-    userActivities.push(activity);
-    usersMap.set(user, userActivities);
-  });
-  
-  // Analyze each user's activities
-  usersMap.forEach((userActivities, user) => {
-    // Look for high risk score activities
-    const highRiskActivities = userActivities.filter(a => (a.riskScore || 0) > 1500);
-    if (highRiskActivities.length >= 2) {
-      recommendations.push({
-        id: `${user}_high_risk_${Date.now()}`,
-        title: 'Security Alert: High Risk Activities Detected',
-        description: `User ${user} has performed multiple high-risk activities`,
-        severity: 'high',
-        confidence: 0.85,
-        affectedUsers: [user],
-        suggestedActions: [
-          'Review user access permissions',
-          'Implement additional monitoring',
-          'Schedule security training',
-        ],
-        timestamp: new Date().toISOString()
-      });
-    }
-    
-    // Look for unusual time patterns
-    const nightActivities = userActivities.filter(activity => {
-      let hour = -1;
-      
-      if (activity.timestamp) {
-        const date = new Date(activity.timestamp);
-        hour = date.getHours();
-      } else if (activity.time) {
-        const timeParts = activity.time.split(':');
-        if (timeParts.length >= 1) {
-          hour = parseInt(timeParts[0]);
-        }
-      }
-      
-      return hour >= 0 && (hour < 6 || hour > 22);
-    });
-    
-    if (nightActivities.length >= 2) {
-      recommendations.push({
-        id: `${user}_unusual_time_${Date.now()}`,
-        title: 'Security Alert: Activities During Unusual Hours',
-        description: `User ${user} has been active during non-business hours`,
-        severity: 'medium',
-        confidence: 0.75,
-        affectedUsers: [user],
-        suggestedActions: [
-          'Review access patterns',
-          'Implement time-based restrictions',
-          'Monitor for similar patterns',
-        ],
-        timestamp: new Date().toISOString()
-      });
-    }
-    
-    // Look for policy breaches
-    const sensitiveBreaches = userActivities.filter(activity => {
-      if (!activity.policiesBreached) return false;
-      
-      const policies = activity.policiesBreached;
-      return (
-        (policies.pii && typeof policies.pii !== 'undefined') ||
-        (policies.phi && typeof policies.phi !== 'undefined') ||
-        (policies.sensitive && typeof policies.sensitive !== 'undefined')
-      );
-    });
-    
-    if (sensitiveBreaches.length >= 1) {
-      recommendations.push({
-        id: `${user}_sensitive_data_${Date.now()}`,
-        title: 'Security Alert: Handling of Sensitive Data Detected',
-        description: `User ${user} has accessed or transferred sensitive data`,
-        severity: 'high',
-        confidence: 0.92,
-        affectedUsers: [user],
-        suggestedActions: [
-          'Review data access policies',
-          'Implement data loss prevention',
-          'Conduct compliance audit',
-        ],
-        timestamp: new Date().toISOString()
-      });
-    }
-  });
-  
-  // Sort by confidence score (highest first)
-  return recommendations.sort((a, b) => b.confidence - a.confidence);
-};
+import { UserActivity, MLRecommendation } from '../types/activity';
+import Link from 'next/link';
 
 export default function Page() {
   const [filters, setFilters] = useState({
@@ -211,14 +92,8 @@ export default function Page() {
           setActivities(data.activities);
           processAllData(data.activities);
           
-          // Generate ML recommendations
-          try {
-            const generatedRecommendations = generateRecommendations(data.activities);
-            setRecommendations(generatedRecommendations);
-          } catch (mlError) {
-            console.error('Error generating ML recommendations:', mlError);
-          }
-          
+          // For ML recommendations, we now direct users to dedicated ML page
+          // This keeps home page focused on overview metrics
           setError(null);
         } else {
           setActivities([]);
@@ -236,15 +111,6 @@ export default function Page() {
             if (Array.isArray(parsedData) && parsedData.length > 0) {
               setActivities(parsedData);
               processAllData(parsedData);
-              
-              // Generate ML recommendations
-              try {
-                const generatedRecommendations = generateRecommendations(parsedData);
-                setRecommendations(generatedRecommendations);
-              } catch (mlError) {
-                console.error('Error generating ML recommendations:', mlError);
-              }
-              
               setError(null);
             }
           }
@@ -516,21 +382,6 @@ export default function Page() {
     );
   };
 
-  // Get severity color for recommendations
-  const getSeverityColor = (severity: string): string => {
-    switch (severity) {
-      case 'high': return 'bg-red-100 text-red-800 border-red-300';
-      case 'medium': return 'bg-yellow-100 text-yellow-800 border-yellow-300';
-      case 'low': return 'bg-blue-100 text-blue-800 border-blue-300';
-      default: return 'bg-gray-100 text-gray-800 border-gray-300';
-    }
-  };
-
-  // Format confidence percentage
-  const formatConfidence = (confidence: number): string => {
-    return `${Math.round(confidence * 100)}%`;
-  };
-
   return (
     <div className="w-full min-h-screen bg-[#f8f8f8] text-gray-800 p-6">
       {/* Header */}
@@ -567,63 +418,27 @@ export default function Page() {
             </div>
           </div>
 
-          {/* ML Recommendations Section */}
-          {recommendations.length > 0 && (
-            <div className="mb-6">
-              <div className="bg-white rounded-lg shadow-sm p-4 mb-4">
-                <div className="flex items-center mb-3">
-                  <FaExclamationTriangle className="text-yellow-500 mr-2" />
-                  <h2 className="text-lg font-semibold">Machine Learning Insights</h2>
+          {/* ML Insights Banner */}
+          <div className="mb-6">
+            <div className="bg-gradient-to-r from-indigo-500 to-purple-600 text-white rounded-lg shadow-sm p-6">
+              <div className="flex items-center justify-between">
+                <div>
+                  <h2 className="text-xl font-bold mb-2">AI-Powered Security Insights</h2>
+                  <p className="text-white text-opacity-90">
+                    Get advanced ML-powered recommendations and security insights to protect your data.
+                  </p>
                 </div>
-                <div className="space-y-4">
-                  {recommendations.slice(0, 3).map((rec) => (
-                    <div key={rec.id} className={`border p-4 rounded-md ${getSeverityColor(rec.severity)}`}>
-                      <div className="flex justify-between items-start">
-                        <div className="flex-1">
-                          <h3 className="font-medium text-gray-900">{rec.title}</h3>
-                          <p className="text-sm mt-1">{rec.description}</p>
-                          
-                          <div className="mt-3">
-                            <h4 className="text-xs font-semibold uppercase text-gray-500 mb-1">Recommended Actions:</h4>
-                            <ul className="list-disc pl-5 text-sm">
-                              {rec.suggestedActions.map((action, i) => (
-                                <li key={i}>{action}</li>
-                              ))}
-                            </ul>
-                          </div>
-                          
-                          <div className="mt-3 text-xs text-gray-500">
-                            Affected Users: {rec.affectedUsers.join(', ')}
-                          </div>
-                        </div>
-                        <div className="ml-4 flex flex-col items-end">
-                          <MuiTooltip title="Confidence Score">
-                            <Chip 
-                              label={formatConfidence(rec.confidence)} 
-                              size="small"
-                              className="mb-2"
-                              color={rec.confidence > 0.8 ? "error" : rec.confidence > 0.6 ? "warning" : "info"}
-                            />
-                          </MuiTooltip>
-                          <div className="text-xs text-gray-500">
-                            {new Date(rec.timestamp).toLocaleString()}
-                          </div>
-                        </div>
-                      </div>
-                    </div>
-                  ))}
-                  
-                  {recommendations.length > 3 && (
-                    <div className="text-center pt-2">
-                      <button className="text-blue-600 hover:text-blue-800 text-sm font-medium">
-                        View {recommendations.length - 3} more insights →
-                      </button>
-                    </div>
-                  )}
-                </div>
+                <Link href="/ml" passHref>
+                  <Button 
+                    variant="contained" 
+                    className="bg-white text-indigo-600 hover:bg-gray-100"
+                  >
+                    View ML Insights
+                  </Button>
+                </Link>
               </div>
             </div>
-          )}
+          </div>
 
           {/* Distribution Cards Section */}
           <div className="grid grid-cols-1 md:grid-cols-5 gap-4 mb-6 bg-gray-900 p-4 rounded-lg">

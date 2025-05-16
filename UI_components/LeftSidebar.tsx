@@ -65,7 +65,7 @@ const LeftSidebar: React.FC<LeftSidebarProps> = ({ activeLink, onLinkClick, aler
       icon: <FaTools className="text-xl" />,
     },
     {
-      path: "/trusted-activities",
+      path: "/trusted-activities/trusted_act_page.tsx",
       name: "Trusted Activities",
       icon: <FaRegClipboard className="text-xl" />,
     },
