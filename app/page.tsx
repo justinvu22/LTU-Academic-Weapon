@@ -602,7 +602,6 @@ export default function Page() {
     </div>
   );
 }
-
 // Calculate activity data over time - simplified version that relies on processed dates
 function calculateActivityOverTime(activities: UserActivity[]) {
   if (!activities || activities.length === 0) {
@@ -860,3 +859,4 @@ function calculateUsersAtRisk(activities: UserActivity[]) {
   
   return result;
 }
+

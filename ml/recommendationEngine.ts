@@ -230,14 +230,14 @@ export class RecommendationEngine {
    */
   private detectUnusualTimePatterns(activities: UserActivity[], user: string): MLRecommendation | null {
     const nightActivities = activities.filter(activity => {
-      let hour = -1;
-      
-      if (activity.timestamp) {
-        const date = new Date(activity.timestamp);
-        hour = date.getHours();
-      } else if (activity.time) {
-        const timeParts = activity.time.split(':');
-        if (timeParts.length >= 1) {
+        let hour = -1;
+        
+        if (activity.timestamp) {
+          const date = new Date(activity.timestamp);
+          hour = date.getHours();
+        } else if (activity.time) {
+          const timeParts = activity.time.split(':');
+          if (timeParts.length >= 1) {
           hour = parseInt(timeParts[0]);
         }
       }
@@ -487,17 +487,17 @@ export class RecommendationEngine {
     // Look for large data transfers, especially to external destinations
     const dataTransfers = activities.filter(activity => {
       const activityLower = (activity.activity || '').toLowerCase();
-      
-      return (
+        
+        return (
         activityLower.includes('download') || 
         activityLower.includes('export') ||
         activityLower.includes('transfer') ||
         activityLower.includes('email attachment') ||
         activityLower.includes('upload') ||
         (activity.fileSize !== undefined && activity.fileSize > 0)
-      );
-    });
-    
+        );
+      });
+      
     // Filter for large transfers or sensitive data
     const suspiciousTransfers = dataTransfers.filter(activity => {
       // Check for large file size
@@ -897,17 +897,17 @@ export class RecommendationEngine {
     
     // Also check for unusual time patterns
     activities.forEach(activity => {
-      let hour = -1;
+    let hour = -1;
       
-      if (activity.timestamp) {
+    if (activity.timestamp) {
         hour = new Date(activity.timestamp).getHours();
-      } else if (activity.time) {
-        const timeParts = activity.time.split(':');
-        if (timeParts.length >= 1) {
-          hour = parseInt(timeParts[0], 10);
-        }
+    } else if (activity.time) {
+      const timeParts = activity.time.split(':');
+      if (timeParts.length >= 1) {
+        hour = parseInt(timeParts[0], 10);
       }
-      
+    }
+    
       // If activity occurred during unusual hours and isn't already marked as anomaly
       if (hour >= 0 && (hour < 6 || hour > 22) && !anomalies.includes(activity)) {
         anomalies.push(activity);
