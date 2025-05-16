@@ -17,34 +17,34 @@ export default function AlertsPage() {
   const [error, setError] = useState<string | null>(null);
   const [tab, setTab] = useState(0);
 
-  const fetchActivities = async () => {
-    try {
-      setLoading(true);
-      // Attempt to get data from API
-      const response = await fetch('/api/activities');
-      if (!response.ok) {
-        throw new Error('Failed to fetch activities data');
-      }
-      const data = await response.json();
-      setActivities(data.activities || []);
-    } catch (err) {
-      console.error('Error loading activities:', err);
-      setError('Failed to load activities data. Please try uploading data from the Upload page.');
-      // Fallback to check localStorage if API fails
+    const fetchActivities = async () => {
       try {
-        const storedData = localStorage.getItem('processedActivityData');
-        if (storedData) {
-          const parsedData = JSON.parse(storedData);
-          setActivities(Array.isArray(parsedData) ? parsedData : []);
-          setError(null);
+        setLoading(true);
+        // Attempt to get data from API
+        const response = await fetch('/api/activities');
+        if (!response.ok) {
+          throw new Error('Failed to fetch activities data');
         }
-      } catch (localErr) {
-        console.error('Error loading from localStorage:', localErr);
+        const data = await response.json();
+        setActivities(data.activities || []);
+      } catch (err) {
+        console.error('Error loading activities:', err);
+        setError('Failed to load activities data. Please try uploading data from the Upload page.');
+        // Fallback to check localStorage if API fails
+        try {
+          const storedData = localStorage.getItem('processedActivityData');
+          if (storedData) {
+            const parsedData = JSON.parse(storedData);
+            setActivities(Array.isArray(parsedData) ? parsedData : []);
+            setError(null);
+          }
+        } catch (localErr) {
+          console.error('Error loading from localStorage:', localErr);
+        }
+      } finally {
+        setLoading(false);
       }
-    } finally {
-      setLoading(false);
-    }
-  };
+    };
 
   useEffect(() => {
     fetchActivities();
@@ -88,13 +88,13 @@ export default function AlertsPage() {
           {tab === 0 && (
             <Paper elevation={3} sx={{ p: 3, mb: 3, background: 'rgba(255,255,255,0.20)', backdropFilter: 'blur(12px)', borderRadius: 4, border: '1px solid #e5e7eb', boxShadow: '0 4px 32px 0 rgba(80,0,120,0.10)' }}>
               <Typography variant="h6" gutterBottom sx={{ color: '#232846', fontFamily: 'Poppins, sans-serif' }}>
-                Recent High-Risk Activities
-              </Typography>
-              <ActivityList 
-                activities={activities.filter(a => a.riskScore >= 70).slice(0, 5)} 
-                policyIcons={policyIcons}
-              />
-            </Paper>
+              Recent High-Risk Activities
+            </Typography>
+            <ActivityList 
+              activities={activities.filter(a => a.riskScore >= 70).slice(0, 5)} 
+              policyIcons={policyIcons}
+            />
+          </Paper>
           )}
           {tab === 1 && (
             <Paper elevation={3} sx={{ p: 3, mb: 3, background: 'rgba(255,255,255,0.20)', backdropFilter: 'blur(12px)', borderRadius: 4, border: '1px solid #e5e7eb', boxShadow: '0 4px 32px 0 rgba(80,0,120,0.10)' }}>
@@ -112,13 +112,13 @@ export default function AlertsPage() {
           {tab === 2 && (
             <Paper elevation={3} sx={{ p: 3, mb: 3, background: 'rgba(255,255,255,0.20)', backdropFilter: 'blur(12px)', borderRadius: 4, border: '1px solid #e5e7eb', boxShadow: '0 4px 32px 0 rgba(80,0,120,0.10)' }}>
               <Typography variant="h6" gutterBottom sx={{ color: '#232846', fontFamily: 'Poppins, sans-serif' }}>
-                All Activities
-              </Typography>
-              <ActivityList 
-                activities={activities} 
-                policyIcons={policyIcons}
-              />
-            </Paper>
+              All Activities
+            </Typography>
+            <ActivityList 
+              activities={activities} 
+              policyIcons={policyIcons}
+            />
+          </Paper>
           )}
           {tab === 3 && (
             <Paper elevation={3} sx={{ p: 3, mb: 3, background: 'rgba(255,255,255,0.20)', backdropFilter: 'blur(12px)', borderRadius: 4, border: '1px solid #e5e7eb', boxShadow: '0 4px 32px 0 rgba(80,0,120,0.10)' }}>

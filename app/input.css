@@ -46,19 +46,19 @@ body {
 
 /* Left Sidebar Navigation Hover Effect */
 .left-sidebar a {
-  padding: 0.75rem 1.5rem;
-  color: #2d3748;
-  text-decoration: none;
-  font-weight: 500;
-  border-radius: 0.375rem;
-  transition: background 0.25s ease, color 0.25s ease;
-  margin: 0.25rem 0;
+  /* padding: 0.75rem 1.5rem; */
+  /* color: #2d3748; */ /* REMOVE this line to allow Tailwind to control color */
+  /* text-decoration: none; */
+  /* font-weight: 500; */
+  /* border-radius: 0.375rem; */
+  /* transition: background 0.25s ease, color 0.25s ease; */
+  /* margin: 0.25rem 0; */
 }
 
 .left-sidebar a:hover,
 .left-sidebar a:focus {
-  background: #1da1f2;
-  color: #fff;
+  /* background: #1da1f2; */
+  /* color: #fff; */
 }
 
 .sidebar-alert-badge {
