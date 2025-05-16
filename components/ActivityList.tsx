@@ -21,6 +21,18 @@ interface ActivityListProps {
 }
 
 /**
+ * Returns a background color based on risk score
+ * @param score - Risk score value
+ * @returns - CSS color value
+ */
+const getRiskColor = (score: number): string => {
+  if (score >= 90) return 'rgba(255, 0, 0, 0.08)';  // High risk
+  if (score >= 70) return 'rgba(255, 165, 0, 0.08)'; // Medium-high risk
+  if (score >= 40) return 'rgba(255, 255, 0, 0.08)'; // Medium risk
+  return 'transparent'; // Low risk
+};
+
+/**
  * Component that displays a list of user activities with policy breach indicators
  */
 export const ActivityList: React.FC<ActivityListProps> = ({ 
@@ -39,7 +51,7 @@ export const ActivityList: React.FC<ActivityListProps> = ({
    */
   const formatBreaches = (breaches: Record<string, any> | null | undefined) => {
     if (!breaches) {
-      return <Typography variant="body2">No policy breaches</Typography>;
+      return <span className="text-xs text-gray-400">No policy breaches</span>;
     }
     
     // Get categories that have breaches
@@ -50,50 +62,39 @@ export const ActivityList: React.FC<ActivityListProps> = ({
     });
     
     if (categories.length === 0) {
-      return <Typography variant="body2">No policy breaches</Typography>;
+      return <span className="text-xs text-gray-400">No policy breaches</span>;
     }
     
     return (
-      <Box sx={{ display: 'flex', gap: 0.5, flexWrap: 'wrap' }}>
+      <div className="flex flex-wrap gap-1">
         {categories.map(category => {
           if (typeof category !== 'string') return null;
           if (Array.isArray(breaches[category])) {
             return breaches[category].map((breach: string, index: number) => (
-              <Chip
+              <span
                 key={`${category}-${index}`}
-                icon={policyIcons[breach] ? <span>{policyIcons[breach]}</span> : undefined}
-                label={breach}
-                size="small"
-                color="error"
-                variant="outlined"
-                sx={{
-                  m: 0.5,
-                  borderRadius: 9999,
-                  background: 'rgba(255,255,255,0.25)',
-                  backdropFilter: 'blur(4px)',
-                  fontWeight: 600,
-                  fontFamily: 'Poppins, sans-serif',
-                  color: '#e11d48',
-                  border: '1.5px solid #e11d48',
-                  px: 1.5,
-                  py: 0.5,
-                }}
-              />
+                className="inline-flex items-center gap-1 bg-[#2A1E3C] border border-[#7E22CE] text-purple-300 text-xs px-2 py-1 rounded-full font-poppins"
+              >
+                {policyIcons[breach] && (
+                  <span className="h-4 w-4 flex items-center justify-center">{policyIcons[breach]}</span>
+                )}
+                {breach}
+              </span>
             ));
           }
           return (
-            <Chip
+            <span
               key={category}
-              icon={policyIcons[category] ? <span>{policyIcons[category]}</span> : undefined}
-              label={category}
-              size="small"
-              color="error"
-              variant="outlined"
-              sx={{ m: 0.5 }}
-            />
+              className="inline-flex items-center gap-1 bg-[#2A1E3C] border border-[#7E22CE] text-purple-300 text-xs px-2 py-1 rounded-full font-poppins"
+            >
+              {policyIcons[category] && (
+                <span className="h-4 w-4 flex items-center justify-center">{policyIcons[category]}</span>
+              )}
+              {category}
+            </span>
           );
         })}
-      </Box>
+      </div>
     );
   };
 
@@ -134,55 +135,37 @@ export const ActivityList: React.FC<ActivityListProps> = ({
   };
 
   return (
-    <TableContainer component={Paper} sx={{ maxHeight: 440 }}>
-      <Table stickyHeader size="small">
-        <TableHead>
-          <TableRow>
-            <TableCell>User</TableCell>
-            <TableCell>Date/Time</TableCell>
-            <TableCell>Activity</TableCell>
-            <TableCell>Integration</TableCell>
-            <TableCell>Risk Score</TableCell>
-            <TableCell>Policy Breaches</TableCell>
-          </TableRow>
-        </TableHead>
-        <TableBody>
-          {activities.map((activity) => (
-            <TableRow 
-              key={activity.id} 
-              hover
-              onClick={() => onActivitySelect && onActivitySelect(activity)}
-              sx={{ 
-                cursor: onActivitySelect ? 'pointer' : 'default',
-                backgroundColor: getRiskColor(activity.riskScore)
-              }}
+    <div className="bg-[#1E1E2F] rounded-xl shadow-[inset_-4px_-4px_6px_#2a2a40,inset_4px_4px_6px_#0e0e1e] overflow-x-auto font-poppins">
+      <table className="min-w-full text-left text-sm">
+        <thead>
+          <tr className="bg-[#151524] text-gray-300 uppercase font-semibold">
+            <th className="px-4 py-3">User</th>
+            <th className="px-4 py-3">Date/Time</th>
+            <th className="px-4 py-3">Activity</th>
+            <th className="px-4 py-3">Integration</th>
+            <th className="px-4 py-3">Risk Score</th>
+            <th className="px-4 py-3">Policy Breaches</th>
+          </tr>
+        </thead>
+        <tbody>
+          {activities.map((activity, idx) => (
+            <tr
+              key={activity.id}
+              className={`odd:bg-[#24243A] even:bg-[#1E1E2F] hover:bg-[#312E51] transition-colors duration-200 border-b border-[#2E2E4A]`}
             >
-              <TableCell>{getUserDisplayName(activity)}</TableCell>
-              <TableCell>
-                {activity.date || activity.timestamp?.split('T')[0]}
-                {' '}
+              <td className="px-4 py-3 leading-relaxed text-gray-100">{getUserDisplayName(activity)}</td>
+              <td className="px-4 py-3 leading-relaxed text-gray-100">
+                {activity.date || activity.timestamp?.split('T')[0]}{' '}
                 {activity.time || activity.timestamp?.split('T')[1]?.split('.')[0]}
-              </TableCell>
-              <TableCell>{truncateText(activity.activity)}</TableCell>
-              <TableCell>{activity.integration}</TableCell>
-              <TableCell>{activity.riskScore}</TableCell>
-              <TableCell>{formatBreaches(activity.policiesBreached)}</TableCell>
-            </TableRow>
+              </td>
+              <td className="px-4 py-3 leading-relaxed text-gray-100">{truncateText(activity.activity)}</td>
+              <td className="px-4 py-3 leading-relaxed text-gray-100">{activity.integration}</td>
+              <td className="px-4 py-3 leading-relaxed text-purple-400 font-semibold">{activity.riskScore}</td>
+              <td className="px-4 py-3 leading-relaxed">{formatBreaches(activity.policiesBreached)}</td>
+            </tr>
           ))}
-        </TableBody>
-      </Table>
-    </TableContainer>
+        </tbody>
+      </table>
+    </div>
   );
-};
-
-/**
- * Returns a background color based on risk score
- * @param score - Risk score value
- * @returns - CSS color value
- */
-const getRiskColor = (score: number): string => {
-  if (score >= 90) return 'rgba(255, 0, 0, 0.08)';  // High risk
-  if (score >= 70) return 'rgba(255, 165, 0, 0.08)'; // Medium-high risk
-  if (score >= 40) return 'rgba(255, 255, 0, 0.08)'; // Medium risk
-  return 'transparent'; // Low risk
 }; 
