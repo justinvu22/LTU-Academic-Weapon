@@ -11,6 +11,7 @@ import {
 import { ActivityList } from '../components/ActivityList';
 import { policyIcons } from '../constants/policyIcons';
 import { UserActivity, MLRecommendation } from '../types/activity';
+import { generateStatistics, RISK_THRESHOLDS } from '../utils/dataProcessor';
 import Link from 'next/link';
 
 export default function Page() {
@@ -89,6 +90,12 @@ export default function Page() {
         const data = await response.json();
         
         if (data.activities && data.activities.length > 0) {
+          console.log(`Loaded ${data.activities.length} activities`);
+          // Check sample activity to ensure fields are present
+          if (data.activities.length > 0) {
+            console.log('Sample activity:', data.activities[0]);
+          }
+          
           setActivities(data.activities);
           processAllData(data.activities);
           
@@ -109,6 +116,7 @@ export default function Page() {
           if (storedData) {
             const parsedData = JSON.parse(storedData);
             if (Array.isArray(parsedData) && parsedData.length > 0) {
+              console.log(`Loaded ${parsedData.length} activities from localStorage`);
               setActivities(parsedData);
               processAllData(parsedData);
               setError(null);
@@ -132,39 +140,17 @@ export default function Page() {
       return;
     }
     
-    // Basic stats
-    const total = activities.length;
-    setTotalActivities(total);
+    // Use our data processor to calculate statistics
+    const statistics = generateStatistics(activities);
     
-    // High risk activities (risk score >= 70)
-    const highRisk = activities.filter(a => (a.riskScore || 0) >= 70).length;
-    setHighRiskActivities(highRisk);
+    // Update state with statistics
+    setTotalActivities(statistics.totalActivities);
+    setHighRiskActivities(statistics.highRiskActivities);
+    setPolicyBreaches(statistics.totalPolicyBreaches);
+    setUsersAtRisk(statistics.usersAtRisk);
+    setAverageRiskScore(statistics.averageRiskScore);
     
-    // Count unique users with any risk
-    const uniqueUsers = new Set(activities.map(a => a.username || a.userId || 'unknown'));
-    setUsersAtRisk(uniqueUsers.size);
-    
-    // Count policy breaches
-    let breachCount = 0;
-    activities.forEach(activity => {
-      if (activity.policiesBreached) {
-        Object.keys(activity.policiesBreached).forEach(category => {
-          const breaches = activity.policiesBreached[category];
-          if (Array.isArray(breaches)) {
-            breachCount += breaches.length;
-          } else if (breaches) {
-            breachCount += 1;
-          }
-        });
-      }
-    });
-    setPolicyBreaches(breachCount);
-    
-    // Calculate average risk score
-    const totalRisk = activities.reduce((sum, activity) => sum + (activity.riskScore || 0), 0);
-    setAverageRiskScore(Math.round(totalRisk / total));
-    
-    // Risk distribution - using proper thresholds based on csvProcessor
+    // Risk distribution
     const riskCounts = {
       low: 0,
       medium: 0,
@@ -174,9 +160,9 @@ export default function Page() {
     
     activities.forEach(activity => {
       const score = activity.riskScore || 0;
-      if (score < 1000) riskCounts.low++;
-      else if (score < 1500) riskCounts.medium++;
-      else if (score < 2000) riskCounts.high++;
+      if (score < RISK_THRESHOLDS.LOW) riskCounts.low++;
+      else if (score < RISK_THRESHOLDS.MEDIUM) riskCounts.medium++;
+      else if (score < RISK_THRESHOLDS.HIGH) riskCounts.high++;
       else riskCounts.critical++;
     });
     
@@ -187,32 +173,9 @@ export default function Page() {
       { name: 'Critical', count: riskCounts.critical, color: COLORS.risk.critical }
     ]);
     
-    // Integration distribution - handle 'si-' prefix for integrations
-    const integrationCounts: Record<string, number> = {
-      email: 0,
-      cloud: 0,
-      usb: 0,
-      application: 0
-    };
-    
-    activities.forEach(activity => {
-      if (!activity.integration) return;
-      
-      // Remove 'si-' prefix if present
-      let integration = activity.integration.toLowerCase();
-      if (integration.startsWith('si-')) {
-        integration = integration.substring(3);
-      }
-      
-      // Map to one of our valid categories
-      if (integration === 'email' || integration === 'cloud' || 
-          integration === 'usb' || integration === 'application') {
-        integrationCounts[integration]++;
-      }
-    });
-    
+    // Integration distribution 
     setIntegrationDistribution(
-      Object.entries(integrationCounts).map(([name, count]) => {
+      Object.entries(statistics.integrationDistribution).map(([name, count]) => {
         let color = '#9e9e9e'; // default
         if (name === 'email') color = COLORS.integration.email;
         else if (name === 'cloud') color = COLORS.integration.cloud;
@@ -231,29 +194,13 @@ export default function Page() {
       nonConcern: 0
     };
     
-    // Similar to normalizeStatus function in csvProcessor.ts
-    const normalizeStatus = (status: string): string => {
-      if (!status) return 'underReview';
-      
-      const normalized = status.trim().toLowerCase();
-      
-      // Check for common variations and normalize
-      if (/under.*review/i.test(normalized)) return 'underReview';
-      if (/trust/i.test(normalized)) return 'trusted';
-      if (/concern/i.test(normalized) && /non/i.test(normalized)) return 'nonConcern';
-      if (/concern/i.test(normalized)) return 'concern';
-      
-      // If no match, check if it's already one of our allowed values
-      const allowedStatuses = ['underReview', 'trusted', 'concern', 'nonConcern'];
-      if (allowedStatuses.includes(normalized)) return normalized;
-      
-      // Default fallback
-      return 'underReview';
-    };
-    
     activities.forEach(activity => {
-      const status = normalizeStatus(activity.status || '');
-      statusCounts[status as keyof typeof statusCounts]++;
+      const status = activity.status || 'underReview';
+      if (status in statusCounts) {
+        statusCounts[status as keyof typeof statusCounts]++;
+      } else {
+        statusCounts.underReview++;
+      }
     });
     
     setStatusDistribution(
@@ -283,45 +230,14 @@ export default function Page() {
     );
     
     // Time distribution
-    const timeCounts = {
-      morning: 0,
-      afternoon: 0,
-      evening: 0
-    };
-    
-    activities.forEach(activity => {
-      let hour = -1;
-      
-      // Try to get hour from timestamp
-      if (activity.timestamp) {
-        const date = new Date(activity.timestamp);
-        hour = date.getHours();
-      } 
-      // Try to get hour from time field (format: "HH:MM")
-      else if (activity.time) {
-        const timeParts = activity.time.split(':');
-        if (timeParts.length >= 1) {
-          hour = parseInt(timeParts[0], 10);
-        }
-      }
-      
-      // Skip if we couldn't parse the hour
-      if (hour < 0) return;
-      
-      // Use same hour ranges as in csvProcessor.ts
-      if (hour < 12) timeCounts.morning++;
-      else if (hour < 17) timeCounts.afternoon++;
-      else timeCounts.evening++;
-    });
-    
     setTimeDistribution([
-      { name: 'Morning', count: timeCounts.morning, color: COLORS.time.morning },
-      { name: 'Afternoon', count: timeCounts.afternoon, color: COLORS.time.afternoon },
-      { name: 'Evening', count: timeCounts.evening, color: COLORS.time.evening }
+      { name: 'Morning', count: statistics.timeDistribution.morning, color: COLORS.time.morning },
+      { name: 'Afternoon', count: statistics.timeDistribution.afternoon, color: COLORS.time.afternoon },
+      { name: 'Evening', count: statistics.timeDistribution.evening, color: COLORS.time.evening }
     ]);
     
     // Process data for existing charts
-    setRiskTrendData(calculateActivityOverTime(activities, 7));
+    setRiskTrendData(calculateActivityOverTime(activities));
     setSeverityTrendData(calculateSeverityTrend(activities));
     setPolicyBreachData(calculatePolicyBreaches(activities));
     setIntegrationData(calculateIntegrationBreakdown(activities));
@@ -687,72 +603,59 @@ export default function Page() {
   );
 }
 
-// Calculate activity data over time
-function calculateActivityOverTime(activities: UserActivity[], days: number) {
+// Calculate activity data over time - simplified version that relies on processed dates
+function calculateActivityOverTime(activities: UserActivity[]) {
   if (!activities || activities.length === 0) {
     return [];
   }
+
+  // Find date range in activities
+  const dateMap = new Map<string, { count: number, totalRisk: number }>();
   
-  // Get dates for the specified days
-  const today = new Date();
-  const dates: { date: string, dateObj: Date }[] = [];
+  activities.forEach(activity => {
+    let dateStr = '';
+    
+    // Try to get date from activity
+    if (activity.date) {
+      dateStr = activity.date;
+    } else if (activity.timestamp) {
+      // Extract date from timestamp
+      const date = new Date(activity.timestamp);
+      dateStr = date.toLocaleDateString('en-GB', { day: '2-digit', month: 'short' });
+    }
+    
+    // Skip if no date available
+    if (!dateStr) return;
+    
+    // Update or initialize the date entry
+    if (!dateMap.has(dateStr)) {
+      dateMap.set(dateStr, { count: 0, totalRisk: 0 });
+    }
+    
+    const entry = dateMap.get(dateStr)!;
+    entry.count++;
+    entry.totalRisk += activity.riskScore || 0;
+  });
   
-  for (let i = days - 1; i >= 0; i--) {
-    const date = new Date();
-    date.setDate(today.getDate() - i);
-    dates.push({ 
-      date: date.toLocaleDateString('en-GB', { day: '2-digit', month: 'short' }), 
-      dateObj: date 
-    });
-  }
-  
-  // Initialize counts for each date
-  const timeData = dates.map(d => ({ 
-    date: d.date, 
-    count: 0,
-    risk: 0 
+  // Convert to array and sort by date
+  const result = Array.from(dateMap.entries()).map(([date, data]) => ({
+    date,
+    count: data.count,
+    risk: Math.round(data.totalRisk / data.count)
   }));
   
-  // Count activities for each date
-  activities.forEach(activity => {
-    // Try to get date from timestamp or date property
-    let activityDate: Date | null = null;
-    
-    if (activity.timestamp) {
-      activityDate = new Date(activity.timestamp);
-    } else if (activity.date) {
-      // Handle dates in format DD/MM/YYYY
-      const parts = activity.date.split('/');
-      if (parts.length === 3) {
-        // Convert to YYYY-MM-DD format for Date constructor
-        activityDate = new Date(`${parts[2]}-${parts[1]}-${parts[0]}`);
-      }
-    }
-    
-    // Skip if we couldn't parse the date
-    if (!activityDate) return;
-    
-    // Check if activity date is within the range
-    dates.forEach((d, i) => {
-      if (
-        activityDate!.getDate() === d.dateObj.getDate() &&
-        activityDate!.getMonth() === d.dateObj.getMonth() &&
-        activityDate!.getFullYear() === d.dateObj.getFullYear()
-      ) {
-        timeData[i].count++;
-        timeData[i].risk += activity.riskScore || 0;
-      }
-    });
-  });
-  
-  // Calculate average risk for each day
-  timeData.forEach(day => {
-    if (day.count > 0) {
-      day.risk = Math.round(day.risk / day.count);
+  // Sort by date
+  return result.sort((a, b) => {
+    // Try to compare dates
+    try {
+      const dateA = new Date(a.date);
+      const dateB = new Date(b.date);
+      return dateA.getTime() - dateB.getTime();
+    } catch (e) {
+      // Fallback to string comparison if date parsing fails
+      return a.date.localeCompare(b.date);
     }
   });
-  
-  return timeData;
 }
 
 // Calculate severity trend over time
@@ -761,70 +664,62 @@ function calculateSeverityTrend(activities: UserActivity[]) {
     return [];
   }
   
-  // Get dates for the last 7 days
-  const today = new Date();
-  const dates: { date: string, dateObj: Date }[] = [];
+  // Group by date and count severity levels
+  const dateMap = new Map<string, { critical: number, high: number, medium: number, low: number }>();
   
-  for (let i = 6; i >= 0; i--) {
-    const date = new Date();
-    date.setDate(today.getDate() - i);
-    dates.push({ 
-      date: date.toLocaleDateString('en-GB', { day: '2-digit', month: 'short' }), 
-      dateObj: date 
-    });
-  }
-  
-  // Initialize severity counts for each date
-  const severityData = dates.map(d => ({ 
-    date: d.date, 
-    critical: 0,
-    high: 0,
-    medium: 0,
-    low: 0
-  }));
-  
-  // Count activities by severity for each date
   activities.forEach(activity => {
-    // Try to get date from timestamp or date property
-    let activityDate: Date | null = null;
+    let dateStr = '';
     
-    if (activity.timestamp) {
-      activityDate = new Date(activity.timestamp);
-    } else if (activity.date) {
-      // Handle dates in format DD/MM/YYYY
-      const parts = activity.date.split('/');
-      if (parts.length === 3) {
-        // Convert to YYYY-MM-DD format for Date constructor
-        activityDate = new Date(`${parts[2]}-${parts[1]}-${parts[0]}`);
-      }
+    // Try to get date from activity
+    if (activity.date) {
+      dateStr = activity.date;
+    } else if (activity.timestamp) {
+      // Extract date from timestamp
+      const date = new Date(activity.timestamp);
+      dateStr = date.toLocaleDateString('en-GB', { day: '2-digit', month: 'short' });
     }
     
-    // Skip if we couldn't parse the date
-    if (!activityDate) return;
+    // Skip if no date available
+    if (!dateStr) return;
     
-    // Check if activity date is within the last 7 days and categorize by severity
-    dates.forEach((d, i) => {
-      if (
-        activityDate!.getDate() === d.dateObj.getDate() &&
-        activityDate!.getMonth() === d.dateObj.getMonth() &&
-        activityDate!.getFullYear() === d.dateObj.getFullYear()
-      ) {
-        const riskScore = activity.riskScore || 0;
-        
-        if (riskScore >= 90) {
-          severityData[i].critical++;
-        } else if (riskScore >= 70) {
-          severityData[i].high++;
-        } else if (riskScore >= 40) {
-          severityData[i].medium++;
-        } else {
-          severityData[i].low++;
-        }
-      }
-    });
+    // Initialize entry if needed
+    if (!dateMap.has(dateStr)) {
+      dateMap.set(dateStr, { critical: 0, high: 0, medium: 0, low: 0 });
+    }
+    
+    // Get severity from risk score
+    const entry = dateMap.get(dateStr)!;
+    const riskScore = activity.riskScore || 0;
+    
+    if (riskScore >= RISK_THRESHOLDS.CRITICAL) {
+      entry.critical++;
+    } else if (riskScore >= RISK_THRESHOLDS.HIGH) {
+      entry.high++;
+    } else if (riskScore >= RISK_THRESHOLDS.MEDIUM) {
+      entry.medium++;
+    } else {
+      entry.low++;
+    }
   });
   
-  return severityData;
+  // Convert to array and sort by date
+  const result = Array.from(dateMap.entries()).map(([date, data]) => ({
+    date,
+    ...data
+  }));
+  
+  // Sort by date
+  return result.sort((a, b) => {
+    // Try to compare dates
+    try {
+      const dateA = new Date(a.date);
+      const dateB = new Date(b.date);
+      return dateA.getTime() - dateB.getTime();
+    } catch (e) {
+      // Fallback to string comparison if date parsing fails
+      return a.date.localeCompare(b.date);
+    }
+  });
 }
 
 // Calculate policy breach categories
@@ -907,8 +802,12 @@ function calculateUsersAtRisk(activities: UserActivity[]) {
   
   const userMap = new Map();
   
+  // Debug log to check the activities
+  console.log('Processing activities for users at risk:', activities.length);
+  
   activities.forEach(activity => {
-    const username = activity.username || activity.userId || 'Unknown User';
+    // Try to get username from various properties and normalize to lowercase
+    const username = (activity.username || activity.userId || activity.user || 'Unknown User').toLowerCase();
     
     if (!userMap.has(username)) {
       userMap.set(username, {
@@ -924,24 +823,40 @@ function calculateUsersAtRisk(activities: UserActivity[]) {
     const user = userMap.get(username);
     const riskScore = activity.riskScore || 0;
     
-    if (riskScore >= 70) {
+    // Count high and critical risk activities for sorting
+    if (riskScore >= RISK_THRESHOLDS.HIGH) {
       user.highRisk++;
     }
     
-    if (riskScore >= 90) {
+    // Count activities by severity category - use explicit range checks
+    if (riskScore >= RISK_THRESHOLDS.CRITICAL) {
       user.criticalCount++;
-    } else if (riskScore >= 70) {
+      // Log critical activities for debugging
+      console.log(`Critical activity found for ${username}:`, riskScore);
+    } else if (riskScore >= RISK_THRESHOLDS.HIGH && riskScore < RISK_THRESHOLDS.CRITICAL) {
       user.highCount++;
-    } else if (riskScore >= 40) {
+    } else if (riskScore >= RISK_THRESHOLDS.MEDIUM && riskScore < RISK_THRESHOLDS.HIGH) {
       user.mediumCount++;
     } else {
       user.lowCount++;
     }
   });
   
-  // Get users with high risk activities, sorted by count
-  return Array.from(userMap.values())
-    .filter(user => user.highRisk > 0)
-    .sort((a, b) => b.highRisk - a.highRisk)
+  // Get users with high risk activities, sorted by critical count first, then high risk count
+  const result = Array.from(userMap.values())
+    .filter(user => user.highRisk > 0 || user.criticalCount > 0) // Include users with any high or critical activities
+    .sort((a, b) => {
+      // Sort by critical count first
+      if (b.criticalCount !== a.criticalCount) {
+        return b.criticalCount - a.criticalCount;
+      }
+      // If critical count is the same, sort by high count
+      return b.highCount - a.highCount;
+    })
     .slice(0, 5); // Top 5 users
+  
+  // Debug log the result
+  console.log('Users at risk result:', result);
+  
+  return result;
 }
