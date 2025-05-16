@@ -37,42 +37,42 @@ const TrustedActivitiesPage = () => {
   const removeRule = (idx: number) => setRules(rules.filter((_, i) => i !== idx));
 
   return (
-    <div className="min-h-screen flex flex-col bg-gray-100 py-8 px-6 font-['Poppins',sans-serif]">
+    <div className="min-h-screen flex flex-col bg-gradient-to-b from-[#0F172A] to-[#7928CA] py-8 px-6 font-['Poppins',sans-serif]">
       {/* Info Banner */}
       <div className="mb-6">
-        <div className="flex items-center gap-3 bg-blue-100 text-blue-800 rounded-xl px-4 py-3 shadow w-full">
+        <div className="flex items-center gap-3 bg-white/10 text-blue-200 rounded-xl px-4 py-3 shadow backdrop-blur-md border border-blue-400/20 w-full">
           <FaInfoCircle className="text-xl" />
           <span className="text-sm">Trusted Activities are known good activities you want to exclude from any alerts.</span>
         </div>
       </div>
-      {/* Glassy Card */}
-      <div className="w-full h-full bg-white/20 backdrop-blur-lg rounded-2xl shadow-lg border border-gray-200 px-4 md:px-8 py-8 flex flex-col gap-6">
+      {/* Neumorphic Card */}
+      <div className="w-full h-full bg-[#1E1E2F] rounded-2xl shadow-[inset_-4px_-4px_12px_#2a2a40,inset_4px_4px_12px_#0e0e1e] border border-[#232846] px-4 md:px-8 py-8 flex flex-col gap-6">
         {/* Activity Name & Description */}
         <div>
-          <label className="block text-gray-700 text-sm font-semibold mb-1">Trusted Activity name</label>
+          <label className="block text-gray-200 text-sm font-semibold mb-1">Trusted Activity name</label>
           <input
-            className="w-full bg-gray-100 border border-gray-300 rounded-lg px-4 py-2 text-gray-900 placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-300 transition"
+            className="w-full bg-[#232846] border border-[#2d2d4d] rounded-lg px-4 py-2 text-white placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-purple-500 transition"
             placeholder="Monthly accounts"
             value={activityName}
             onChange={e => setActivityName(e.target.value)}
           />
         </div>
         <div>
-          <label className="block text-gray-700 text-sm font-semibold mb-1">Description</label>
+          <label className="block text-gray-200 text-sm font-semibold mb-1">Description</label>
           <textarea
-            className="w-full bg-gray-100 border border-gray-300 rounded-lg px-4 py-2 text-gray-900 placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-300 transition min-h-[60px]"
+            className="w-full bg-[#232846] border border-[#2d2d4d] rounded-lg px-4 py-2 text-white placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-purple-500 transition min-h-[60px]"
             placeholder="We send accounts to Hammond Accounting every month, this is expected process."
             value={description}
             onChange={e => setDescription(e.target.value)}
           />
         </div>
         {/* Applies to users */}
-        <div className="flex flex-col md:flex-row md:items-center gap-4 bg-gray-50 rounded-xl p-4 border border-gray-200">
+        <div className="flex flex-col md:flex-row md:items-center gap-4 bg-[#232846] rounded-xl p-4 border border-[#2d2d4d]">
           <div className="flex-1">
-            <label className="block text-gray-700 text-sm font-semibold mb-1">Applies to users</label>
+            <label className="block text-gray-200 text-sm font-semibold mb-1">Applies to users</label>
             <div className="flex flex-wrap gap-2">
               {usersList.map(user => (
-                <span key={user} className={`px-3 py-1 rounded-full text-xs font-semibold border ${selectedUsers.includes(user) ? 'bg-blue-500 text-white border-blue-400' : 'bg-white text-gray-700 border-gray-300'} cursor-pointer transition`}
+                <span key={user} className={`px-3 py-1 rounded-full text-xs font-semibold border ${selectedUsers.includes(user) ? 'bg-gradient-to-r from-purple-500 to-pink-500 text-white border-purple-400' : 'bg-[#1E1E2F] text-gray-300 border-[#2d2d4d]'} cursor-pointer transition`}
                   onClick={() => setSelectedUsers(selectedUsers.includes(user) ? selectedUsers.filter(u => u !== user) : [...selectedUsers, user])}
                 >
                   {user}
@@ -81,9 +81,9 @@ const TrustedActivitiesPage = () => {
             </div>
           </div>
           <div className="flex items-center gap-2 mt-2 md:mt-0">
-            <span className="text-gray-600 text-xs">All users</span>
+            <span className="text-gray-400 text-xs">All users</span>
             <button
-              className={`w-10 h-6 rounded-full border-2 border-blue-400 flex items-center transition ${allUsers ? 'bg-gradient-to-r from-blue-500 via-purple-500 to-pink-400' : 'bg-gray-300'}`}
+              className={`w-10 h-6 rounded-full border-2 border-purple-400 flex items-center transition ${allUsers ? 'bg-gradient-to-r from-blue-500 via-purple-500 to-pink-400' : 'bg-[#232846]'}`}
               onClick={() => setAllUsers(!allUsers)}
               type="button"
             >
@@ -94,10 +94,10 @@ const TrustedActivitiesPage = () => {
         {/* Activity type & Expiry */}
         <div className="flex flex-col md:flex-row gap-4">
           <div className="flex-1">
-            <label className="block text-gray-700 text-sm font-semibold mb-1">Activity type</label>
+            <label className="block text-gray-200 text-sm font-semibold mb-1">Activity type</label>
             <div className="relative">
               <select
-                className="w-full bg-gray-100 border border-gray-300 rounded-lg px-4 py-2 text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-300 appearance-none pr-8"
+                className="w-full bg-[#232846] border border-[#2d2d4d] rounded-lg px-4 py-2 text-white focus:outline-none focus:ring-2 focus:ring-purple-500 appearance-none pr-8"
                 value={activityType}
                 onChange={e => setActivityType(e.target.value)}
               >
@@ -107,11 +107,11 @@ const TrustedActivitiesPage = () => {
             </div>
           </div>
           <div className="flex-1 flex flex-col gap-1">
-            <label className="block text-gray-700 text-sm font-semibold mb-1">Expires</label>
+            <label className="block text-gray-200 text-sm font-semibold mb-1">Expires</label>
             <div className="flex items-center gap-3">
               <input
                 type="date"
-                className="bg-gray-100 border border-gray-300 rounded-lg px-4 py-2 text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-300 disabled:opacity-50"
+                className="bg-[#232846] border border-[#2d2d4d] rounded-lg px-4 py-2 text-white focus:outline-none focus:ring-2 focus:ring-purple-500 disabled:opacity-50"
                 disabled={neverExpires}
               />
               <label className="flex items-center gap-2 cursor-pointer select-none">
@@ -119,9 +119,9 @@ const TrustedActivitiesPage = () => {
                   type="checkbox"
                   checked={neverExpires}
                   onChange={() => setNeverExpires(!neverExpires)}
-                  className="accent-blue-400 w-4 h-4"
+                  className="accent-purple-400 w-4 h-4"
                 />
-                <span className="text-gray-600 text-xs">Never expires</span>
+                <span className="text-gray-400 text-xs">Never expires</span>
               </label>
             </div>
           </div>
@@ -129,11 +129,11 @@ const TrustedActivitiesPage = () => {
         {/* Rule Builder */}
         <div className="flex flex-col gap-4">
           {rules.map((rule, idx) => (
-            <div key={idx} className="flex flex-col md:flex-row md:items-center gap-2 bg-gray-50 rounded-xl p-4 border border-gray-200 relative">
+            <div key={idx} className="flex flex-col md:flex-row md:items-center gap-2 bg-[#232846] rounded-xl p-4 border border-[#2d2d4d] relative">
               {/* Field */}
               <div className="flex-1">
                 <select
-                  className="w-full bg-gray-100 border border-gray-300 rounded-lg px-3 py-2 text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-300 appearance-none"
+                  className="w-full bg-[#1E1E2F] border border-[#2d2d4d] rounded-lg px-3 py-2 text-white focus:outline-none focus:ring-2 focus:ring-purple-500 appearance-none"
                   value={rule.field}
                   onChange={e => {
                     const newRules = [...rules];
@@ -147,7 +147,7 @@ const TrustedActivitiesPage = () => {
               {/* Condition */}
               <div className="flex-1">
                 <select
-                  className="w-full bg-gray-100 border border-gray-300 rounded-lg px-3 py-2 text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-300 appearance-none"
+                  className="w-full bg-[#1E1E2F] border border-[#2d2d4d] rounded-lg px-3 py-2 text-white focus:outline-none focus:ring-2 focus:ring-purple-500 appearance-none"
                   value={rule.condition}
                   onChange={e => {
                     const newRules = [...rules];
@@ -161,7 +161,7 @@ const TrustedActivitiesPage = () => {
               {/* Value */}
               <div className="flex-1">
                 <input
-                  className="w-full bg-gray-100 border border-gray-300 rounded-lg px-3 py-2 text-gray-900 placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-300 transition"
+                  className="w-full bg-[#1E1E2F] border border-[#2d2d4d] rounded-lg px-3 py-2 text-white placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-purple-500 transition"
                   placeholder="Value"
                   value={rule.value}
                   onChange={e => {
@@ -184,7 +184,7 @@ const TrustedActivitiesPage = () => {
           ))}
           {/* Add Rule Button */}
           <button
-            className="flex items-center gap-2 self-start bg-blue-500 hover:bg-blue-600 text-white font-semibold px-4 py-2 rounded-lg shadow transition mt-2"
+            className="flex items-center gap-2 self-start bg-gradient-to-r from-purple-500 to-pink-500 hover:from-purple-600 hover:to-pink-600 text-white font-semibold px-4 py-2 rounded-lg shadow transition mt-2"
             onClick={addRule}
             type="button"
           >
@@ -194,12 +194,12 @@ const TrustedActivitiesPage = () => {
         {/* Action Buttons */}
         <div className="flex justify-between mt-6">
           <Link href="/trusted-activities">
-            <button className="bg-blue-100 hover:bg-blue-200 text-blue-800 font-semibold px-6 py-2 rounded-lg shadow transition-all text-base">
+            <button className="bg-white/10 hover:bg-white/20 text-purple-200 font-semibold px-6 py-2 rounded-lg shadow transition-all text-base">
               Back
             </button>
           </Link>
           <button className="bg-gradient-to-r from-purple-500 via-pink-500 to-cyan-400 hover:from-purple-600 hover:to-cyan-500 text-white font-bold px-8 py-3 rounded-xl shadow-lg transition-all text-lg">
-            Edit Trusted Activity
+            Save Trusted Activity
           </button>
         </div>
       </div>

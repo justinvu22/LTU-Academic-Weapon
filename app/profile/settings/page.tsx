@@ -64,11 +64,11 @@ export default function ProfileSettingsPage() {
   };
 
   return (
-    <div className="font-['Poppins',sans-serif] flex flex-col md:flex-row gap-12 items-start justify-center min-h-[80vh] py-12 px-4 md:px-12 bg-gradient-to-br from-white/80 to-blue-50 transition-all duration-300">
+    <div className="font-['Poppins',sans-serif] flex flex-col md:flex-row gap-12 items-start justify-center min-h-screen py-12 px-4 md:px-12 bg-gradient-to-b from-[#0F172A] to-[#7928CA] transition-all duration-300">
       {/* Profile Card */}
-      <div className="w-full max-w-sm glass-card p-8 flex flex-col items-center shadow-xl rounded-2xl relative">
+      <div className="w-full max-w-sm bg-[#1E1E2F] p-8 flex flex-col items-center shadow-[inset_-4px_-4px_12px_#2a2a40,inset_4px_4px_12px_#0e0e1e] rounded-2xl border border-[#232846] relative">
         <div className="relative mb-4">
-          <div className="w-36 h-36 rounded-full bg-gradient-to-tr from-blue-400/60 to-cyan-400/40 flex items-center justify-center shadow-lg ring-4 ring-blue-200/60">
+          <div className="w-36 h-36 rounded-full bg-gradient-to-tr from-purple-500/60 to-pink-400/40 flex items-center justify-center shadow-lg ring-4 ring-purple-400/40">
             {formData.avatar ? (
               <img src={typeof formData.avatar === 'string' ? formData.avatar : ''} alt="User avatar" className="w-32 h-32 rounded-full object-cover" />
             ) : (
@@ -76,8 +76,8 @@ export default function ProfileSettingsPage() {
             )}
           </div>
         </div>
-        <h2 className="text-2xl font-extrabold text-gray-900">{formData.name}</h2>
-        <p className="text-gray-500 mb-6">{formData.email}</p>
+        <h2 className="text-2xl font-extrabold text-white">{formData.name}</h2>
+        <p className="text-gray-400 mb-6">{formData.email}</p>
         <input 
           type="file" 
           accept="image/*"
@@ -90,7 +90,7 @@ export default function ProfileSettingsPage() {
             if (fileInput) fileInput.click();
           }}
           type="button"
-          className="w-full py-2 rounded-lg bg-gradient-to-r from-blue-500 to-purple-500 text-white font-semibold shadow hover:scale-105 transition"
+          className="w-full py-2 rounded-lg bg-gradient-to-r from-purple-500 to-pink-500 text-white font-semibold shadow hover:scale-105 transition"
         >
           Change Avatar
         </button>
@@ -111,108 +111,108 @@ export default function ProfileSettingsPage() {
           </div>
         )}
         {/* Personal Info */}
-        <div className="glass-card p-6 rounded-2xl shadow-lg border-l-4 border-blue-400">
-          <h3 className="flex items-center gap-2 text-lg font-bold text-blue-600 mb-4">
+        <div className="bg-[#1E1E2F] p-6 rounded-2xl shadow-[inset_-4px_-4px_12px_#2a2a40,inset_4px_4px_12px_#0e0e1e] border-l-4 border-purple-400">
+          <h3 className="flex items-center gap-2 text-lg font-bold text-purple-400 mb-4">
             <FaUser /> Personal Information
           </h3>
           <div className="space-y-4">
             <div>
-              <label htmlFor="name" className="block mb-1 font-medium">Name</label>
+              <label htmlFor="name" className="block mb-1 font-medium text-gray-200">Name</label>
               <input
                 type="text"
                 id="name"
                 name="name"
                 value={formData.name}
                 onChange={handleChange}
-                className="w-full px-4 py-2 rounded bg-white/10 border border-white/20 focus:outline-none focus:ring-2 focus:ring-blue-400"
+                className="w-full px-4 py-2 rounded bg-[#232846] border border-[#2d2d4d] text-white focus:outline-none focus:ring-2 focus:ring-purple-400"
               />
             </div>
             <div>
-              <label htmlFor="email" className="block mb-1 font-medium">Email</label>
+              <label htmlFor="email" className="block mb-1 font-medium text-gray-200">Email</label>
               <input
                 type="email"
                 id="email"
                 name="email"
                 value={formData.email}
                 onChange={handleChange}
-                className="w-full px-4 py-2 rounded bg-white/10 border border-white/20 focus:outline-none focus:ring-2 focus:ring-blue-400"
+                className="w-full px-4 py-2 rounded bg-[#232846] border border-[#2d2d4d] text-white focus:outline-none focus:ring-2 focus:ring-purple-400"
               />
             </div>
           </div>
         </div>
         {/* Security */}
-        <div className="glass-card p-6 rounded-2xl shadow-lg border-l-4 border-purple-400">
-          <h3 className="flex items-center gap-2 text-lg font-bold text-purple-600 mb-4">
+        <div className="bg-[#1E1E2F] p-6 rounded-2xl shadow-[inset_-4px_-4px_12px_#2a2a40,inset_4px_4px_12px_#0e0e1e] border-l-4 border-pink-400">
+          <h3 className="flex items-center gap-2 text-lg font-bold text-pink-400 mb-4">
             <FaLock /> Security
           </h3>
           <div className="space-y-4">
             <div>
-              <label htmlFor="password" className="block mb-1 font-medium">New Password</label>
+              <label htmlFor="password" className="block mb-1 font-medium text-gray-200">New Password</label>
               <input
                 type="password"
                 id="password"
                 name="password"
                 value={formData.password}
                 onChange={handleChange}
-                className="w-full px-4 py-2 rounded bg-white/10 border border-white/20 focus:outline-none focus:ring-2 focus:ring-purple-400"
+                className="w-full px-4 py-2 rounded bg-[#232846] border border-[#2d2d4d] text-white focus:outline-none focus:ring-2 focus:ring-pink-400"
                 placeholder="••••••••"
               />
             </div>
             <div>
-              <label htmlFor="confirmPassword" className="block mb-1 font-medium">Confirm Password</label>
+              <label htmlFor="confirmPassword" className="block mb-1 font-medium text-gray-200">Confirm Password</label>
               <input
                 type="password"
                 id="confirmPassword"
                 name="confirmPassword"
                 value={formData.confirmPassword}
                 onChange={handleChange}
-                className="w-full px-4 py-2 rounded bg-white/10 border border-white/20 focus:outline-none focus:ring-2 focus:ring-purple-400"
+                className="w-full px-4 py-2 rounded bg-[#232846] border border-[#2d2d4d] text-white focus:outline-none focus:ring-2 focus:ring-pink-400"
                 placeholder="••••••••"
               />
             </div>
           </div>
         </div>
         {/* Notifications */}
-        <div className="glass-card p-6 rounded-2xl shadow-lg border-l-4 border-cyan-400">
-          <h3 className="flex items-center gap-2 text-lg font-bold text-cyan-600 mb-4">
+        <div className="bg-[#1E1E2F] p-6 rounded-2xl shadow-[inset_-4px_-4px_12px_#2a2a40,inset_4px_4px_12px_#0e0e1e] border-l-4 border-cyan-400">
+          <h3 className="flex items-center gap-2 text-lg font-bold text-cyan-400 mb-4">
             <FaBell /> Notifications
           </h3>
           <div className="space-y-4">
-            <label className="flex items-center gap-2">
+            <label className="flex items-center gap-2 text-gray-200">
               <input
                 type="checkbox"
                 name="notificationEmail"
                 checked={formData.notificationEmail}
                 onChange={handleChange}
-                className="w-5 h-5 accent-blue-500"
+                className="w-5 h-5 accent-purple-500"
               />
               <span>Email Notifications</span>
             </label>
-            <label className="flex items-center gap-2">
+            <label className="flex items-center gap-2 text-gray-200">
               <input
                 type="checkbox"
                 name="notificationPush"
                 checked={formData.notificationPush}
                 onChange={handleChange}
-                className="w-5 h-5 accent-blue-500"
+                className="w-5 h-5 accent-purple-500"
               />
               <span>Push Notifications</span>
             </label>
-            <label className="flex items-center gap-2">
+            <label className="flex items-center gap-2 text-gray-200">
               <input
                 type="checkbox"
                 name="notificationActivity"
                 checked={formData.notificationActivity}
                 onChange={handleChange}
-                className="w-5 h-5 accent-blue-500"
+                className="w-5 h-5 accent-purple-500"
               />
-              <span>Activity Notifications</span>
+              <span>Activity Alerts</span>
             </label>
           </div>
         </div>
         <button
           type="submit"
-          className="w-full mt-4 py-3 rounded-xl bg-gradient-to-r from-blue-500 to-purple-500 text-white font-bold shadow-lg hover:scale-105 transition flex items-center justify-center gap-2 disabled:opacity-60 disabled:cursor-not-allowed"
+          className="w-full py-3 rounded-xl bg-gradient-to-r from-purple-500 via-pink-500 to-cyan-400 hover:from-purple-600 hover:to-cyan-500 text-white font-bold shadow-lg transition-all text-lg flex items-center justify-center gap-2"
           disabled={saving}
         >
           <FaSave />
