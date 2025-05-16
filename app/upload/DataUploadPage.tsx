@@ -122,44 +122,11 @@ export default function DataUploadPage() {
     try {
       setIsProcessing(true);
       
-      // Format the data to match the expected UserActivity structure
-      const formattedActivities = fileContent.map((row: any) => {
-        // Handle policiesBreached - ensure it's in the correct format
-        let policiesBreached = row.policiesBreached;
-        if (typeof policiesBreached === 'string') {
-          try {
-            policiesBreached = JSON.parse(policiesBreached);
-          } catch (e) {
-            policiesBreached = {}; // Default if parsing fails
-          }
-        }
-        
-        // Handle values - ensure it's in the correct format
-        let values = row.values;
-        if (typeof values === 'string') {
-          try {
-            values = JSON.parse(values);
-          } catch (e) {
-            values = {}; // Default if parsing fails
-          }
-        }
-        
-        // Ensure riskScore is a number
-        let riskScore = row.riskScore;
-        if (typeof riskScore === 'string') {
-          riskScore = parseInt(riskScore) || 0;
-        }
-        
-        return {
-          ...row,
-          policiesBreached,
-          values,
-          riskScore
-        };
-      });
+      // Simply pass the raw data to the API - the processing will happen there
+      // This maintains the separation of concerns
       
-      // Store the data in localStorage (in a real app this would be saved to a database or API)
-      localStorage.setItem('processedActivityData', JSON.stringify(formattedActivities));
+      // Store the raw data in localStorage as backup
+      localStorage.setItem('rawActivityData', JSON.stringify(fileContent));
       
       // Call API to process the data
       const response = await fetch('/api/activities', {
@@ -167,7 +134,7 @@ export default function DataUploadPage() {
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({ activities: formattedActivities }),
+        body: JSON.stringify({ activities: fileContent }),
       });
       
       if (!response.ok) {

@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { UserActivity } from '../../../types/activity';
+import { processActivityData } from '../../../utils/dataProcessor';
 
 /**
  * Parse CSV data into UserActivity objects
@@ -13,38 +14,25 @@ function parseCSV(csvData: string): UserActivity[] {
   const headers = lines[0].split(',').map(h => h.trim());
   
   // Parse data rows
-  return lines.slice(1).map((line, index) => {
+  const rawActivities = lines.slice(1).map((line, index) => {
     const values = line.split(',');
-    const activity: Partial<UserActivity> = {
+    const activity: Record<string, any> = {
       id: index.toString(),
     };
     
-    // Map CSV values to UserActivity properties
+    // Map CSV values to activity properties
     headers.forEach((header, i) => {
       if (i < values.length) {
-        const value = values[i].trim();
-        
-        // Handle special fields
-        if (header === 'policiesBreached' || header === 'values') {
-          try {
-            // @ts-ignore
-            activity[header] = JSON.parse(value);
-          } catch (e) {
-            // @ts-ignore
-            activity[header] = {};
-          }
-        } else if (header === 'riskScore') {
-          // @ts-ignore
-          activity[header] = parseInt(value) || 0;
-        } else {
-          // @ts-ignore
-          activity[header] = value;
-        }
+        // @ts-ignore
+        activity[header] = values[i].trim();
       }
     });
     
-    return activity as UserActivity;
+    return activity;
   });
+  
+  // Process raw activities using our data processor
+  return processActivityData(rawActivities);
 }
 
 /**
@@ -87,8 +75,8 @@ export async function POST(request: Request) {
       // Process CSV string
       activities = parseCSV(data.csv);
     } else if (data.activities && Array.isArray(data.activities)) {
-      // Use provided activities array
-      activities = data.activities;
+      // Use provided activities array but ensure they're properly processed
+      activities = processActivityData(data.activities);
     } else {
       return NextResponse.json(
         { error: 'Invalid request: either csv string or activities array required' },

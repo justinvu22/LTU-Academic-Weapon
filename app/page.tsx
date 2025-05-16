@@ -3,134 +3,16 @@
 
 import { useState, useEffect } from 'react';
 import { FaHome, FaFilter, FaEllipsisV, FaSun, FaCloud, FaUsb, FaRegWindowRestore, FaExclamationTriangle, FaBell } from 'react-icons/fa';
-import { Box, CircularProgress, Typography, Card, CardContent, Grid, Chip, Tooltip as MuiTooltip, Paper } from '@mui/material';
+import { Box, CircularProgress, Typography, Card, CardContent, Grid, Chip, Tooltip as MuiTooltip, Paper, Button } from '@mui/material';
 import { 
   LineChart, Line, BarChart, Bar, PieChart, Pie, Cell, AreaChart, Area,
   XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer 
 } from 'recharts';
 import { ActivityList } from '../components/ActivityList';
 import { policyIcons } from '../constants/policyIcons';
-import { UserActivity } from '../types/activity';
-
-// Interface for ML recommendations
-interface MLRecommendation {
-  id: string;
-  title: string;
-  description: string;
-  severity: 'low' | 'medium' | 'high';
-  confidence: number;
-  affectedUsers: string[];
-  suggestedActions: string[];
-  timestamp: string;
-}
-
-// Simple recommendation engine implemented directly in the component
-const generateRecommendations = (activities: UserActivity[]): MLRecommendation[] => {
-  if (!activities || activities.length === 0) {
-    return [];
-  }
-  
-  const recommendations: MLRecommendation[] = [];
-  const usersMap = new Map<string, UserActivity[]>();
-  
-  // Group activities by user
-  activities.forEach(activity => {
-    const user = activity.username || activity.userId || activity.user || '';
-    if (!user) return;
-    
-    const userActivities = usersMap.get(user) || [];
-    userActivities.push(activity);
-    usersMap.set(user, userActivities);
-  });
-  
-  // Analyze each user's activities
-  usersMap.forEach((userActivities, user) => {
-    // Look for high risk score activities
-    const highRiskActivities = userActivities.filter(a => (a.riskScore || 0) > 1500);
-    if (highRiskActivities.length >= 2) {
-      recommendations.push({
-        id: `${user}_high_risk_${Date.now()}`,
-        title: 'Security Alert: High Risk Activities Detected',
-        description: `User ${user} has performed multiple high-risk activities`,
-        severity: 'high',
-        confidence: 0.85,
-        affectedUsers: [user],
-        suggestedActions: [
-          'Review user access permissions',
-          'Implement additional monitoring',
-          'Schedule security training',
-        ],
-        timestamp: new Date().toISOString()
-      });
-    }
-    
-    // Look for unusual time patterns
-    const nightActivities = userActivities.filter(activity => {
-      let hour = -1;
-      
-      if (activity.timestamp) {
-        const date = new Date(activity.timestamp);
-        hour = date.getHours();
-      } else if (activity.time) {
-        const timeParts = activity.time.split(':');
-        if (timeParts.length >= 1) {
-          hour = parseInt(timeParts[0]);
-        }
-      }
-      
-      return hour >= 0 && (hour < 6 || hour > 22);
-    });
-    
-    if (nightActivities.length >= 2) {
-      recommendations.push({
-        id: `${user}_unusual_time_${Date.now()}`,
-        title: 'Security Alert: Activities During Unusual Hours',
-        description: `User ${user} has been active during non-business hours`,
-        severity: 'medium',
-        confidence: 0.75,
-        affectedUsers: [user],
-        suggestedActions: [
-          'Review access patterns',
-          'Implement time-based restrictions',
-          'Monitor for similar patterns',
-        ],
-        timestamp: new Date().toISOString()
-      });
-    }
-    
-    // Look for policy breaches
-    const sensitiveBreaches = userActivities.filter(activity => {
-      if (!activity.policiesBreached) return false;
-      
-      const policies = activity.policiesBreached;
-      return (
-        (policies.pii && typeof policies.pii !== 'undefined') ||
-        (policies.phi && typeof policies.phi !== 'undefined') ||
-        (policies.sensitive && typeof policies.sensitive !== 'undefined')
-      );
-    });
-    
-    if (sensitiveBreaches.length >= 1) {
-      recommendations.push({
-        id: `${user}_sensitive_data_${Date.now()}`,
-        title: 'Security Alert: Handling of Sensitive Data Detected',
-        description: `User ${user} has accessed or transferred sensitive data`,
-        severity: 'high',
-        confidence: 0.92,
-        affectedUsers: [user],
-        suggestedActions: [
-          'Review data access policies',
-          'Implement data loss prevention',
-          'Conduct compliance audit',
-        ],
-        timestamp: new Date().toISOString()
-      });
-    }
-  });
-  
-  // Sort by confidence score (highest first)
-  return recommendations.sort((a, b) => b.confidence - a.confidence);
-};
+import { UserActivity, MLRecommendation } from '../types/activity';
+import { generateStatistics, RISK_THRESHOLDS } from '../utils/dataProcessor';
+import Link from 'next/link';
 
 export default function Page() {
   const [filters, setFilters] = useState({
@@ -208,17 +90,17 @@ export default function Page() {
         const data = await response.json();
         
         if (data.activities && data.activities.length > 0) {
+          console.log(`Loaded ${data.activities.length} activities`);
+          // Check sample activity to ensure fields are present
+          if (data.activities.length > 0) {
+            console.log('Sample activity:', data.activities[0]);
+          }
+          
           setActivities(data.activities);
           processAllData(data.activities);
           
-          // Generate ML recommendations
-          try {
-            const generatedRecommendations = generateRecommendations(data.activities);
-            setRecommendations(generatedRecommendations);
-          } catch (mlError) {
-            console.error('Error generating ML recommendations:', mlError);
-          }
-          
+          // For ML recommendations, we now direct users to dedicated ML page
+          // This keeps home page focused on overview metrics
           setError(null);
         } else {
           setActivities([]);
@@ -234,17 +116,9 @@ export default function Page() {
           if (storedData) {
             const parsedData = JSON.parse(storedData);
             if (Array.isArray(parsedData) && parsedData.length > 0) {
+              console.log(`Loaded ${parsedData.length} activities from localStorage`);
               setActivities(parsedData);
               processAllData(parsedData);
-              
-              // Generate ML recommendations
-              try {
-                const generatedRecommendations = generateRecommendations(parsedData);
-                setRecommendations(generatedRecommendations);
-              } catch (mlError) {
-                console.error('Error generating ML recommendations:', mlError);
-              }
-              
               setError(null);
             }
           }
@@ -266,39 +140,17 @@ export default function Page() {
       return;
     }
     
-    // Basic stats
-    const total = activities.length;
-    setTotalActivities(total);
+    // Use our data processor to calculate statistics
+    const statistics = generateStatistics(activities);
     
-    // High risk activities (risk score >= 70)
-    const highRisk = activities.filter(a => (a.riskScore || 0) >= 70).length;
-    setHighRiskActivities(highRisk);
+    // Update state with statistics
+    setTotalActivities(statistics.totalActivities);
+    setHighRiskActivities(statistics.highRiskActivities);
+    setPolicyBreaches(statistics.totalPolicyBreaches);
+    setUsersAtRisk(statistics.usersAtRisk);
+    setAverageRiskScore(statistics.averageRiskScore);
     
-    // Count unique users with any risk
-    const uniqueUsers = new Set(activities.map(a => a.username || a.userId || 'unknown'));
-    setUsersAtRisk(uniqueUsers.size);
-    
-    // Count policy breaches
-    let breachCount = 0;
-    activities.forEach(activity => {
-      if (activity.policiesBreached) {
-        Object.keys(activity.policiesBreached).forEach(category => {
-          const breaches = activity.policiesBreached[category];
-          if (Array.isArray(breaches)) {
-            breachCount += breaches.length;
-          } else if (breaches) {
-            breachCount += 1;
-          }
-        });
-      }
-    });
-    setPolicyBreaches(breachCount);
-    
-    // Calculate average risk score
-    const totalRisk = activities.reduce((sum, activity) => sum + (activity.riskScore || 0), 0);
-    setAverageRiskScore(Math.round(totalRisk / total));
-    
-    // Risk distribution - using proper thresholds based on csvProcessor
+    // Risk distribution
     const riskCounts = {
       low: 0,
       medium: 0,
@@ -308,9 +160,9 @@ export default function Page() {
     
     activities.forEach(activity => {
       const score = activity.riskScore || 0;
-      if (score < 1000) riskCounts.low++;
-      else if (score < 1500) riskCounts.medium++;
-      else if (score < 2000) riskCounts.high++;
+      if (score < RISK_THRESHOLDS.LOW) riskCounts.low++;
+      else if (score < RISK_THRESHOLDS.MEDIUM) riskCounts.medium++;
+      else if (score < RISK_THRESHOLDS.HIGH) riskCounts.high++;
       else riskCounts.critical++;
     });
     
@@ -321,32 +173,9 @@ export default function Page() {
       { name: 'Critical', count: riskCounts.critical, color: COLORS.risk.critical }
     ]);
     
-    // Integration distribution - handle 'si-' prefix for integrations
-    const integrationCounts: Record<string, number> = {
-      email: 0,
-      cloud: 0,
-      usb: 0,
-      application: 0
-    };
-    
-    activities.forEach(activity => {
-      if (!activity.integration) return;
-      
-      // Remove 'si-' prefix if present
-      let integration = activity.integration.toLowerCase();
-      if (integration.startsWith('si-')) {
-        integration = integration.substring(3);
-      }
-      
-      // Map to one of our valid categories
-      if (integration === 'email' || integration === 'cloud' || 
-          integration === 'usb' || integration === 'application') {
-        integrationCounts[integration]++;
-      }
-    });
-    
+    // Integration distribution 
     setIntegrationDistribution(
-      Object.entries(integrationCounts).map(([name, count]) => {
+      Object.entries(statistics.integrationDistribution).map(([name, count]) => {
         let color = '#9e9e9e'; // default
         if (name === 'email') color = COLORS.integration.email;
         else if (name === 'cloud') color = COLORS.integration.cloud;
@@ -365,29 +194,13 @@ export default function Page() {
       nonConcern: 0
     };
     
-    // Similar to normalizeStatus function in csvProcessor.ts
-    const normalizeStatus = (status: string): string => {
-      if (!status) return 'underReview';
-      
-      const normalized = status.trim().toLowerCase();
-      
-      // Check for common variations and normalize
-      if (/under.*review/i.test(normalized)) return 'underReview';
-      if (/trust/i.test(normalized)) return 'trusted';
-      if (/concern/i.test(normalized) && /non/i.test(normalized)) return 'nonConcern';
-      if (/concern/i.test(normalized)) return 'concern';
-      
-      // If no match, check if it's already one of our allowed values
-      const allowedStatuses = ['underReview', 'trusted', 'concern', 'nonConcern'];
-      if (allowedStatuses.includes(normalized)) return normalized;
-      
-      // Default fallback
-      return 'underReview';
-    };
-    
     activities.forEach(activity => {
-      const status = normalizeStatus(activity.status || '');
-      statusCounts[status as keyof typeof statusCounts]++;
+      const status = activity.status || 'underReview';
+      if (status in statusCounts) {
+        statusCounts[status as keyof typeof statusCounts]++;
+      } else {
+        statusCounts.underReview++;
+      }
     });
     
     setStatusDistribution(
@@ -417,45 +230,14 @@ export default function Page() {
     );
     
     // Time distribution
-    const timeCounts = {
-      morning: 0,
-      afternoon: 0,
-      evening: 0
-    };
-    
-    activities.forEach(activity => {
-      let hour = -1;
-      
-      // Try to get hour from timestamp
-      if (activity.timestamp) {
-        const date = new Date(activity.timestamp);
-        hour = date.getHours();
-      } 
-      // Try to get hour from time field (format: "HH:MM")
-      else if (activity.time) {
-        const timeParts = activity.time.split(':');
-        if (timeParts.length >= 1) {
-          hour = parseInt(timeParts[0], 10);
-        }
-      }
-      
-      // Skip if we couldn't parse the hour
-      if (hour < 0) return;
-      
-      // Use same hour ranges as in csvProcessor.ts
-      if (hour < 12) timeCounts.morning++;
-      else if (hour < 17) timeCounts.afternoon++;
-      else timeCounts.evening++;
-    });
-    
     setTimeDistribution([
-      { name: 'Morning', count: timeCounts.morning, color: COLORS.time.morning },
-      { name: 'Afternoon', count: timeCounts.afternoon, color: COLORS.time.afternoon },
-      { name: 'Evening', count: timeCounts.evening, color: COLORS.time.evening }
+      { name: 'Morning', count: statistics.timeDistribution.morning, color: COLORS.time.morning },
+      { name: 'Afternoon', count: statistics.timeDistribution.afternoon, color: COLORS.time.afternoon },
+      { name: 'Evening', count: statistics.timeDistribution.evening, color: COLORS.time.evening }
     ]);
     
     // Process data for existing charts
-    setRiskTrendData(calculateActivityOverTime(activities, 7));
+    setRiskTrendData(calculateActivityOverTime(activities));
     setSeverityTrendData(calculateSeverityTrend(activities));
     setPolicyBreachData(calculatePolicyBreaches(activities));
     setIntegrationData(calculateIntegrationBreakdown(activities));
@@ -516,21 +298,6 @@ export default function Page() {
     );
   };
 
-  // Get severity color for recommendations
-  const getSeverityColor = (severity: string): string => {
-    switch (severity) {
-      case 'high': return 'bg-red-100 text-red-800 border-red-300';
-      case 'medium': return 'bg-yellow-100 text-yellow-800 border-yellow-300';
-      case 'low': return 'bg-blue-100 text-blue-800 border-blue-300';
-      default: return 'bg-gray-100 text-gray-800 border-gray-300';
-    }
-  };
-
-  // Format confidence percentage
-  const formatConfidence = (confidence: number): string => {
-    return `${Math.round(confidence * 100)}%`;
-  };
-
   return (
     <div className="w-full min-h-screen bg-[#f8f8f8] text-gray-800 p-6">
       {/* Header */}
@@ -567,63 +334,27 @@ export default function Page() {
             </div>
           </div>
 
-          {/* ML Recommendations Section */}
-          {recommendations.length > 0 && (
-            <div className="mb-6">
-              <div className="bg-white rounded-lg shadow-sm p-4 mb-4">
-                <div className="flex items-center mb-3">
-                  <FaExclamationTriangle className="text-yellow-500 mr-2" />
-                  <h2 className="text-lg font-semibold">Machine Learning Insights</h2>
+          {/* ML Insights Banner */}
+          <div className="mb-6">
+            <div className="bg-gradient-to-r from-indigo-500 to-purple-600 text-white rounded-lg shadow-sm p-6">
+              <div className="flex items-center justify-between">
+                <div>
+                  <h2 className="text-xl font-bold mb-2">AI-Powered Security Insights</h2>
+                  <p className="text-white text-opacity-90">
+                    Get advanced ML-powered recommendations and security insights to protect your data.
+                  </p>
                 </div>
-                <div className="space-y-4">
-                  {recommendations.slice(0, 3).map((rec) => (
-                    <div key={rec.id} className={`border p-4 rounded-md ${getSeverityColor(rec.severity)}`}>
-                      <div className="flex justify-between items-start">
-                        <div className="flex-1">
-                          <h3 className="font-medium text-gray-900">{rec.title}</h3>
-                          <p className="text-sm mt-1">{rec.description}</p>
-                          
-                          <div className="mt-3">
-                            <h4 className="text-xs font-semibold uppercase text-gray-500 mb-1">Recommended Actions:</h4>
-                            <ul className="list-disc pl-5 text-sm">
-                              {rec.suggestedActions.map((action, i) => (
-                                <li key={i}>{action}</li>
-                              ))}
-                            </ul>
-                          </div>
-                          
-                          <div className="mt-3 text-xs text-gray-500">
-                            Affected Users: {rec.affectedUsers.join(', ')}
-                          </div>
-                        </div>
-                        <div className="ml-4 flex flex-col items-end">
-                          <MuiTooltip title="Confidence Score">
-                            <Chip 
-                              label={formatConfidence(rec.confidence)} 
-                              size="small"
-                              className="mb-2"
-                              color={rec.confidence > 0.8 ? "error" : rec.confidence > 0.6 ? "warning" : "info"}
-                            />
-                          </MuiTooltip>
-                          <div className="text-xs text-gray-500">
-                            {new Date(rec.timestamp).toLocaleString()}
-                          </div>
-                        </div>
-                      </div>
-                    </div>
-                  ))}
-                  
-                  {recommendations.length > 3 && (
-                    <div className="text-center pt-2">
-                      <button className="text-blue-600 hover:text-blue-800 text-sm font-medium">
-                        View {recommendations.length - 3} more insights →
-                      </button>
-                    </div>
-                  )}
-                </div>
+                <Link href="/ml" passHref>
+                  <Button 
+                    variant="contained" 
+                    className="bg-white text-indigo-600 hover:bg-gray-100"
+                  >
+                    View ML Insights
+                  </Button>
+                </Link>
               </div>
             </div>
-          )}
+          </div>
 
           {/* Distribution Cards Section */}
           <div className="grid grid-cols-1 md:grid-cols-5 gap-4 mb-6 bg-gray-900 p-4 rounded-lg">
@@ -872,72 +603,59 @@ export default function Page() {
   );
 }
 
-// Calculate activity data over time
-function calculateActivityOverTime(activities: UserActivity[], days: number) {
+// Calculate activity data over time - simplified version that relies on processed dates
+function calculateActivityOverTime(activities: UserActivity[]) {
   if (!activities || activities.length === 0) {
     return [];
   }
+
+  // Find date range in activities
+  const dateMap = new Map<string, { count: number, totalRisk: number }>();
   
-  // Get dates for the specified days
-  const today = new Date();
-  const dates: { date: string, dateObj: Date }[] = [];
+  activities.forEach(activity => {
+    let dateStr = '';
+    
+    // Try to get date from activity
+    if (activity.date) {
+      dateStr = activity.date;
+    } else if (activity.timestamp) {
+      // Extract date from timestamp
+      const date = new Date(activity.timestamp);
+      dateStr = date.toLocaleDateString('en-GB', { day: '2-digit', month: 'short' });
+    }
+    
+    // Skip if no date available
+    if (!dateStr) return;
+    
+    // Update or initialize the date entry
+    if (!dateMap.has(dateStr)) {
+      dateMap.set(dateStr, { count: 0, totalRisk: 0 });
+    }
+    
+    const entry = dateMap.get(dateStr)!;
+    entry.count++;
+    entry.totalRisk += activity.riskScore || 0;
+  });
   
-  for (let i = days - 1; i >= 0; i--) {
-    const date = new Date();
-    date.setDate(today.getDate() - i);
-    dates.push({ 
-      date: date.toLocaleDateString('en-GB', { day: '2-digit', month: 'short' }), 
-      dateObj: date 
-    });
-  }
-  
-  // Initialize counts for each date
-  const timeData = dates.map(d => ({ 
-    date: d.date, 
-    count: 0,
-    risk: 0 
+  // Convert to array and sort by date
+  const result = Array.from(dateMap.entries()).map(([date, data]) => ({
+    date,
+    count: data.count,
+    risk: Math.round(data.totalRisk / data.count)
   }));
   
-  // Count activities for each date
-  activities.forEach(activity => {
-    // Try to get date from timestamp or date property
-    let activityDate: Date | null = null;
-    
-    if (activity.timestamp) {
-      activityDate = new Date(activity.timestamp);
-    } else if (activity.date) {
-      // Handle dates in format DD/MM/YYYY
-      const parts = activity.date.split('/');
-      if (parts.length === 3) {
-        // Convert to YYYY-MM-DD format for Date constructor
-        activityDate = new Date(`${parts[2]}-${parts[1]}-${parts[0]}`);
-      }
-    }
-    
-    // Skip if we couldn't parse the date
-    if (!activityDate) return;
-    
-    // Check if activity date is within the range
-    dates.forEach((d, i) => {
-      if (
-        activityDate!.getDate() === d.dateObj.getDate() &&
-        activityDate!.getMonth() === d.dateObj.getMonth() &&
-        activityDate!.getFullYear() === d.dateObj.getFullYear()
-      ) {
-        timeData[i].count++;
-        timeData[i].risk += activity.riskScore || 0;
-      }
-    });
-  });
-  
-  // Calculate average risk for each day
-  timeData.forEach(day => {
-    if (day.count > 0) {
-      day.risk = Math.round(day.risk / day.count);
+  // Sort by date
+  return result.sort((a, b) => {
+    // Try to compare dates
+    try {
+      const dateA = new Date(a.date);
+      const dateB = new Date(b.date);
+      return dateA.getTime() - dateB.getTime();
+    } catch (e) {
+      // Fallback to string comparison if date parsing fails
+      return a.date.localeCompare(b.date);
     }
   });
-  
-  return timeData;
 }
 
 // Calculate severity trend over time
@@ -946,70 +664,62 @@ function calculateSeverityTrend(activities: UserActivity[]) {
     return [];
   }
   
-  // Get dates for the last 7 days
-  const today = new Date();
-  const dates: { date: string, dateObj: Date }[] = [];
+  // Group by date and count severity levels
+  const dateMap = new Map<string, { critical: number, high: number, medium: number, low: number }>();
   
-  for (let i = 6; i >= 0; i--) {
-    const date = new Date();
-    date.setDate(today.getDate() - i);
-    dates.push({ 
-      date: date.toLocaleDateString('en-GB', { day: '2-digit', month: 'short' }), 
-      dateObj: date 
-    });
-  }
-  
-  // Initialize severity counts for each date
-  const severityData = dates.map(d => ({ 
-    date: d.date, 
-    critical: 0,
-    high: 0,
-    medium: 0,
-    low: 0
-  }));
-  
-  // Count activities by severity for each date
   activities.forEach(activity => {
-    // Try to get date from timestamp or date property
-    let activityDate: Date | null = null;
+    let dateStr = '';
     
-    if (activity.timestamp) {
-      activityDate = new Date(activity.timestamp);
-    } else if (activity.date) {
-      // Handle dates in format DD/MM/YYYY
-      const parts = activity.date.split('/');
-      if (parts.length === 3) {
-        // Convert to YYYY-MM-DD format for Date constructor
-        activityDate = new Date(`${parts[2]}-${parts[1]}-${parts[0]}`);
-      }
+    // Try to get date from activity
+    if (activity.date) {
+      dateStr = activity.date;
+    } else if (activity.timestamp) {
+      // Extract date from timestamp
+      const date = new Date(activity.timestamp);
+      dateStr = date.toLocaleDateString('en-GB', { day: '2-digit', month: 'short' });
     }
     
-    // Skip if we couldn't parse the date
-    if (!activityDate) return;
+    // Skip if no date available
+    if (!dateStr) return;
     
-    // Check if activity date is within the last 7 days and categorize by severity
-    dates.forEach((d, i) => {
-      if (
-        activityDate!.getDate() === d.dateObj.getDate() &&
-        activityDate!.getMonth() === d.dateObj.getMonth() &&
-        activityDate!.getFullYear() === d.dateObj.getFullYear()
-      ) {
-        const riskScore = activity.riskScore || 0;
-        
-        if (riskScore >= 90) {
-          severityData[i].critical++;
-        } else if (riskScore >= 70) {
-          severityData[i].high++;
-        } else if (riskScore >= 40) {
-          severityData[i].medium++;
-        } else {
-          severityData[i].low++;
-        }
-      }
-    });
+    // Initialize entry if needed
+    if (!dateMap.has(dateStr)) {
+      dateMap.set(dateStr, { critical: 0, high: 0, medium: 0, low: 0 });
+    }
+    
+    // Get severity from risk score
+    const entry = dateMap.get(dateStr)!;
+    const riskScore = activity.riskScore || 0;
+    
+    if (riskScore >= RISK_THRESHOLDS.CRITICAL) {
+      entry.critical++;
+    } else if (riskScore >= RISK_THRESHOLDS.HIGH) {
+      entry.high++;
+    } else if (riskScore >= RISK_THRESHOLDS.MEDIUM) {
+      entry.medium++;
+    } else {
+      entry.low++;
+    }
   });
   
-  return severityData;
+  // Convert to array and sort by date
+  const result = Array.from(dateMap.entries()).map(([date, data]) => ({
+    date,
+    ...data
+  }));
+  
+  // Sort by date
+  return result.sort((a, b) => {
+    // Try to compare dates
+    try {
+      const dateA = new Date(a.date);
+      const dateB = new Date(b.date);
+      return dateA.getTime() - dateB.getTime();
+    } catch (e) {
+      // Fallback to string comparison if date parsing fails
+      return a.date.localeCompare(b.date);
+    }
+  });
 }
 
 // Calculate policy breach categories
@@ -1092,8 +802,12 @@ function calculateUsersAtRisk(activities: UserActivity[]) {
   
   const userMap = new Map();
   
+  // Debug log to check the activities
+  console.log('Processing activities for users at risk:', activities.length);
+  
   activities.forEach(activity => {
-    const username = activity.username || activity.userId || 'Unknown User';
+    // Try to get username from various properties and normalize to lowercase
+    const username = (activity.username || activity.userId || activity.user || 'Unknown User').toLowerCase();
     
     if (!userMap.has(username)) {
       userMap.set(username, {
@@ -1109,24 +823,40 @@ function calculateUsersAtRisk(activities: UserActivity[]) {
     const user = userMap.get(username);
     const riskScore = activity.riskScore || 0;
     
-    if (riskScore >= 70) {
+    // Count high and critical risk activities for sorting
+    if (riskScore >= RISK_THRESHOLDS.HIGH) {
       user.highRisk++;
     }
     
-    if (riskScore >= 90) {
+    // Count activities by severity category - use explicit range checks
+    if (riskScore >= RISK_THRESHOLDS.CRITICAL) {
       user.criticalCount++;
-    } else if (riskScore >= 70) {
+      // Log critical activities for debugging
+      console.log(`Critical activity found for ${username}:`, riskScore);
+    } else if (riskScore >= RISK_THRESHOLDS.HIGH && riskScore < RISK_THRESHOLDS.CRITICAL) {
       user.highCount++;
-    } else if (riskScore >= 40) {
+    } else if (riskScore >= RISK_THRESHOLDS.MEDIUM && riskScore < RISK_THRESHOLDS.HIGH) {
       user.mediumCount++;
     } else {
       user.lowCount++;
     }
   });
   
-  // Get users with high risk activities, sorted by count
-  return Array.from(userMap.values())
-    .filter(user => user.highRisk > 0)
-    .sort((a, b) => b.highRisk - a.highRisk)
+  // Get users with high risk activities, sorted by critical count first, then high risk count
+  const result = Array.from(userMap.values())
+    .filter(user => user.highRisk > 0 || user.criticalCount > 0) // Include users with any high or critical activities
+    .sort((a, b) => {
+      // Sort by critical count first
+      if (b.criticalCount !== a.criticalCount) {
+        return b.criticalCount - a.criticalCount;
+      }
+      // If critical count is the same, sort by high count
+      return b.highCount - a.highCount;
+    })
     .slice(0, 5); // Top 5 users
+  
+  // Debug log the result
+  console.log('Users at risk result:', result);
+  
+  return result;
 }
