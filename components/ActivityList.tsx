@@ -135,7 +135,7 @@ export const ActivityList: React.FC<ActivityListProps> = ({
   };
 
   return (
-    <div className="bg-[#1E1E2F] rounded-xl shadow-[inset_-4px_-4px_6px_#2a2a40,inset_4px_4px_6px_#0e0e1e] overflow-x-auto font-poppins">
+    <div className="bg-[#1E1E2F] rounded-xl shadow-[inset_-4px_-4px_6px_#2a2a40,inset_4px_4px_6px_#0e0e1e] overflow-x-auto max-h-[70vh] overflow-y-auto font-poppins">
       <table className="min-w-full text-left text-sm">
         <thead>
           <tr className="bg-[#151524] text-gray-300 uppercase font-semibold">
