@@ -169,9 +169,9 @@ export default function MLPage() {
                     <h2 className="text-xl font-extrabold text-[#EEE] uppercase tracking-wide mb-4 pl-4 border-l-4 border-[#6E5FFE]">{getCategoryName(category)}</h2>
                     <div className="space-y-4">
                       {categoryRecommendations.map((rec) => (
-                        <div key={rec.id} className="bg-[#1F2030] border border-[#333] rounded-xl shadow-lg p-0 flex flex-col md:flex-row">
+                        <div key={rec.id} className="bg-[#1F2030] border border-[#333] rounded-xl shadow-lg p-0 flex flex-col md:flex-row items-stretch min-h-[1px] h-full">
                           {/* Left: Alert Info */}
-                          <div className="flex flex-col h-full w-full md:w-1/2 p-8">
+                          <div className="flex flex-col flex-1 md:w-1/2 p-8 h-auto">
                             <div className="mb-6">
                               <h3 className="font-extrabold text-[#EEE] text-2xl mb-4 tracking-wide leading-snug">{rec.title}</h3>
                               <p className="text-[#A0AEC0] text-base leading-relaxed font-medium">
@@ -198,7 +198,7 @@ export default function MLPage() {
                             </div>
                           </div>
                           {/* Right: Recommendations - edge-to-edge, no padding, no border-radius */}
-                          <div className="flex-1 flex flex-col h-full w-full md:w-1/2 bg-gradient-to-br from-[#232346] to-[#1F2030] border-l-4 border-[#8B5CF6] rounded-r-xl shadow-xl p-8 justify-center">
+                          <div className="flex flex-col flex-1 md:w-1/2 bg-gradient-to-br from-[#232346] to-[#1F2030] border-l-4 border-[#8B5CF6] rounded-r-xl shadow-xl p-8 h-auto">
                             <div className="flex items-center mb-4">
                               <svg className="w-5 h-5 text-[#8B5CF6] mr-2" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path d="M13 16h-1v-4h-1m1-4h.01M12 20a8 8 0 100-16 8 8 0 000 16z"/></svg>
                               <h4 className="text-base font-extrabold uppercase text-[#8B5CF6] tracking-wide">Recommended Actions:</h4>
