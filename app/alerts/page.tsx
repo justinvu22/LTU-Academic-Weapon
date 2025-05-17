@@ -106,49 +106,61 @@ export default function AlertsPage() {
           </button>
         </div>
 
-        <div className="bg-[#191938] border border-[#333] shadow-[0_2px_8px_rgba(110,95,254,0.08)] rounded-xl p-2 mb-8 w-full flex items-center">
-          <Tabs
-            value={tab}
-            onChange={(_, v) => setTab(v)}
-            className="min-h-0 w-full"
-            TabIndicatorProps={{ style: { display: 'none' } }}
-            sx={{
-              width: '100%',
-              '& .MuiTabs-flexContainer': {
-                gap: '0.5rem',
-              },
-              '& .MuiTab-root': {
-                color: '#B9B9E3',
-                textTransform: 'uppercase',
-                fontFamily: "'IBM Plex Sans', Inter, sans-serif",
-                fontWeight: 700,
-                fontSize: '1.08rem',
-                borderRadius: '9999px',
-                minHeight: '44px',
-                minWidth: '140px',
-                px: 3,
-                py: 1.5,
-                letterSpacing: '0.04em',
-                transition: 'background 0.2s, color 0.2s, box-shadow 0.2s',
-                '&:hover': {
-                  background: 'rgba(110,95,254,0.10)',
-                  color: '#fff',
-                  boxShadow: '0 2px 8px 0 #6E5FFE22'
-                },
-                '&.Mui-selected': {
-                  background: 'linear-gradient(90deg, #6E5FFE 0%, #8F7BFF 100%)',
-                  color: '#fff',
-                  fontWeight: 900,
-                  boxShadow: '0 4px 16px 0 #6E5FFE22',
+        <div className="relative z-10 mb-8">
+          <div className="backdrop-blur-md bg-[#1F2030]/70 border border-white/10 rounded-xl shadow-lg px-4 py-2 flex items-center w-fit mx-auto w-full">
+            <Tabs
+              value={tab}
+              onChange={(_, v) => setTab(v)}
+              aria-label="Alerts tabs"
+              TabIndicatorProps={{
+                style: {
+                  height: 6,
+                  borderRadius: 6,
+                  background: 'linear-gradient(90deg, #8B5CF6 0%, #6E5FFE 100%)',
+                  boxShadow: '0 2px 12px #8B5CF655',
+                  transition: 'all 0.3s cubic-bezier(.4,0,.2,1)',
                 }
-              }
-            }}
-          >
-            <Tab label="Immediate review" />
-            <Tab label="Custom alerts" />
-            <Tab label="ALL ACTIVITY" />
-            <Tab label="Closed" />
-          </Tabs>
+              }}
+              sx={{
+                minHeight: 0,
+                width: '100%',
+                '.MuiTabs-flexContainer': { gap: 2 },
+                '.MuiTab-root': {
+                  color: '#BBB',
+                  fontWeight: 700,
+                  fontSize: '1.1rem',
+                  letterSpacing: '0.08em',
+                  textTransform: 'uppercase',
+                  px: 3,
+                  py: 1.5,
+                  borderRadius: '8px',
+                  minHeight: 0,
+                  transition: 'color 0.2s, background 0.2s',
+                  fontFamily: "'IBM Plex Sans', Inter, sans-serif",
+                  '&.Mui-selected': {
+                    color: '#EEE',
+                    textShadow: '0 2px 12px #8B5CF655',
+                    background: 'linear-gradient(90deg, #8B5CF6 0%, #6E5FFE 100%)',
+                    WebkitBackgroundClip: 'text',
+                    WebkitTextFillColor: 'transparent',
+                  },
+                  '&:hover': {
+                    color: '#8B5CF6',
+                    background: 'rgba(139,92,246,0.08)',
+                  },
+                  '&:focus-visible': {
+                    outline: '2px solid #8B5CF6',
+                    outlineOffset: '2px',
+                  },
+                },
+              }}
+            >
+              <Tab label="Immediate review" />
+              <Tab label="Custom alerts" />
+              <Tab label="ALL ACTIVITY" />
+              <Tab label="Closed" />
+            </Tabs>
+          </div>
         </div>
 
         {loading ? (

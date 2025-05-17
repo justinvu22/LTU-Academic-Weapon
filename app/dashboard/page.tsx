@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { 
   Box, 
   Tabs, 
@@ -20,6 +20,8 @@ import { UserActivity } from '../../types/activity';
 import { ActivityList } from '../../components/ActivityList';
 import { policyIcons } from '../../constants/policyIcons';
 import { generateStatistics, RISK_THRESHOLDS } from '../../utils/dataProcessor';
+import { MdOutlineListAlt, MdOutlineGavel, MdOutlinePersonOff } from 'react-icons/md';
+import { FaSkull } from 'react-icons/fa';
 
 /**
  * Tab Panel component for Dashboard tabs
@@ -293,8 +295,79 @@ export default function DashboardPage() {
     setActiveTab(newValue);
   };
 
-  // Render progress bars for distribution data
-  const renderDistributionBars = (data: {name: string, count: number, color: string}[]) => {
+  // Ripple effect helper
+  function useRipple() {
+    const [ripple, setRipple] = React.useState<{x: number, y: number} | null>(null);
+    const timeout = React.useRef<NodeJS.Timeout | null>(null);
+
+    const triggerRipple = (e: React.MouseEvent<HTMLDivElement, MouseEvent>) => {
+      const rect = e.currentTarget.getBoundingClientRect();
+      setRipple({
+        x: e.clientX - rect.left,
+        y: e.clientY - rect.top
+      });
+      if (timeout.current) clearTimeout(timeout.current);
+      timeout.current = setTimeout(() => setRipple(null), 150);
+    };
+
+    const Ripple = ripple ? (
+      <span
+        className="absolute rounded-full pointer-events-none"
+        style={{
+          left: ripple.x - 20,
+          top: ripple.y - 20,
+          width: 40,
+          height: 40,
+          background: 'rgba(255,255,255,0.15)',
+          animation: 'ripple-anim 150ms linear',
+          zIndex: 1,
+        }}
+      />
+    ) : null;
+
+    return { Ripple, triggerRipple };
+  }
+
+  // Tooltip component
+  function BarTooltip({ count }: { count: number }) {
+    return (
+      <div className="absolute left-1/2 -translate-x-1/2 -top-7 z-20 flex flex-col items-center">
+        <div className="bg-[#333] text-white text-xs px-2 py-1 rounded shadow-lg font-medium relative">
+          {count}
+          <span className="absolute left-1/2 -translate-x-1/2 top-full w-3 h-3 bg-[#333] rotate-45" style={{ marginTop: '-6px' }} />
+        </div>
+      </div>
+    );
+  }
+
+  // Filter callback stub
+  function handleDistributionBarClick(type: string, name: string) {
+    // TODO: Implement filter logic
+    // e.g., setFilter({ type, value: name })
+    // For now, just log
+    console.log(`Filter: ${type} = ${name}`);
+  }
+
+  const DistributionBars = ({
+    data,
+    type = ''
+  }: {
+    data: { name: string; count: number; color: string }[];
+    type?: string;
+  }) => {
+    const [hovered, setHovered] = React.useState<number | null>(null);
+    const [animatedWidths, setAnimatedWidths] = React.useState<number[]>(data.map(() => 0));
+    const prevData = React.useRef(data);
+
+    React.useEffect(() => {
+      // Animate widths on data change
+      const total = data.reduce((sum, item) => sum + item.count, 0);
+      setAnimatedWidths(
+        data.map((item) => (total > 0 ? (item.count / total) * 100 : 0))
+      );
+      prevData.current = data;
+    }, [data]);
+
     if (!data || data.length === 0) {
       return (
         <div className="flex flex-col items-center justify-center h-32">
@@ -303,148 +376,261 @@ export default function DashboardPage() {
       );
     }
 
-    const total = data.reduce((sum, item) => sum + item.count, 0);
-    
     return (
-      <div className="space-y-3">
-        {data.map((item, index) => (
-          <div key={index} className="space-y-1">
-            <div className="flex justify-between text-sm">
-              <span>{item.name}</span>
-              <span>({item.count})</span>
-            </div>
-            <div className="w-full bg-gray-200 rounded-full h-2.5">
-              <div 
-                className="h-2.5 rounded-full" 
-                style={{ 
-                  width: `${total > 0 ? (item.count / total) * 100 : 0}%`,
-                  backgroundColor: item.color
+      <div className="space-y-4">
+        {data.map((item, index) => {
+          const { Ripple, triggerRipple } = useRipple();
+          const isHovered = hovered === index;
+          return (
+            <div key={index} className="space-y-2">
+              <div className="flex justify-between items-center">
+                <span
+                  className="font-medium"
+                  style={{
+                    fontFamily: 'IBM Plex Sans, Inter, sans-serif',
+                    fontWeight: 500,
+                    fontSize: '1rem',
+                    color: '#EEE',
+                    letterSpacing: '0.02em',
+                    textShadow: '0 1px 8px #0008',
+                  }}
+                  id={`bar-label-${type}-${index}`}
+                >
+                  {item.name}
+                </span>
+                <span
+                  className="font-semibold"
+                  style={{
+                    fontFamily: 'IBM Plex Sans, Inter, sans-serif',
+                    fontWeight: 600,
+                    fontSize: '1.125rem', // 18px
+                    color: '#EEE',
+                    textShadow: '0 1px 8px #0008',
+                    letterSpacing: '0.02em',
+                    lineHeight: 1.1,
+                    verticalAlign: 'middle',
+                  }}
+                >
+                  {item.count}
+                </span>
+              </div>
+              <div
+                className="relative w-full cursor-pointer select-none"
+                style={{
+                  height: isHovered ? 12 : 10,
+                  transition: 'height 120ms cubic-bezier(.4,0,.2,1), transform 120ms cubic-bezier(.4,0,.2,1)',
+                  transform: isHovered ? 'scale(1.015)' : 'scale(1)',
                 }}
-              ></div>
+                onMouseEnter={() => setHovered(index)}
+                onMouseLeave={() => setHovered(null)}
+                onClick={(e) => {
+                  triggerRipple(e);
+                  handleDistributionBarClick(type, item.name);
+                }}
+                tabIndex={0}
+                role="progressbar"
+                aria-valuenow={item.count}
+                aria-valuemax={data.reduce((sum, d) => sum + d.count, 0)}
+                aria-label={`${item.name} ${type} count`}
+                aria-labelledby={`bar-label-${type}-${index}`}
+              >
+                {/* Track */}
+                <div
+                  className="absolute top-0 left-0 w-full h-full rounded-full"
+                  style={{
+                    background: 'rgba(255,255,255,0.08)',
+                    boxShadow: 'inset 0 1px 4px 0 rgba(110,95,254,0.10)',
+                    borderRadius: 5,
+                  }}
+                />
+                {/* Fill */}
+                <div
+                  className="absolute top-0 left-0 h-full rounded-full transition-all duration-200 ease-out overflow-hidden"
+                  style={{
+                    width: `${animatedWidths[index]}%`,
+                    background: `linear-gradient(90deg, ${item.color} 80%, #fff2 100%)`,
+                    boxShadow: `0 0 8px 0 ${item.color}55`,
+                    borderRadius: 5,
+                    zIndex: 2,
+                    transition: 'width 200ms cubic-bezier(.4,0,.2,1)',
+                    position: 'relative',
+                  }}
+                >
+                  {/* Shine effect on hover */}
+                  {isHovered && (
+                    <span
+                      className="absolute top-0 left-0 h-full"
+                      style={{
+                        width: '100%',
+                        pointerEvents: 'none',
+                        background: 'linear-gradient(120deg, transparent 60%, rgba(255,255,255,0.25) 80%, transparent 100%)',
+                        animation: 'shine-move 900ms linear',
+                        zIndex: 3,
+                      }}
+                    />
+                  )}
+                </div>
+                {/* Ripple */}
+                {Ripple}
+                {/* Tooltip */}
+                {isHovered && <BarTooltip count={item.count} />}
+              </div>
             </div>
-          </div>
-        ))}
+          );
+        })}
       </div>
     );
   };
 
   return (
-    <Container maxWidth="xl">
-      <Box sx={{ py: 4 }}>
-        <Typography variant="h4" component="h1" gutterBottom>
-          Dashboard
-        </Typography>
+    <div className="min-h-screen bg-[#121324] px-6 py-10 font-['IBM_Plex_Sans',Inter,sans-serif] flex flex-col">
+      <div className="w-full bg-[#121324] rounded-2xl border border-[#333] shadow-[0_2px_12px_rgba(110,95,254,0.10)] px-8 py-10 flex flex-col gap-8 mx-auto">
+        <div className="flex items-center mb-8">
+          <h1 className="text-[2rem] font-extrabold tracking-wide text-[#EEE] pl-4 border-l-4 border-[#6E5FFE] uppercase" style={{ fontFamily: "'IBM Plex Sans', Inter, sans-serif", letterSpacing: '0.04em', textShadow: '0 1px 8px #6E5FFE22' }}>Dashboard</h1>
+        </div>
 
         {loading ? (
-          <Box display="flex" justifyContent="center" alignItems="center" minHeight="50vh">
-            <CircularProgress />
-          </Box>
+          <div className="flex justify-center items-center min-h-[50vh] w-full">
+            <CircularProgress sx={{ color: '#8B5CF6' }} />
+          </div>
         ) : error ? (
-          <Alert severity="error" sx={{ mb: 3 }}>
-            {error}
-          </Alert>
+          <div className="bg-[#1F2030] border border-[#333] rounded-xl shadow-[0_2px_8px_rgba(110,95,254,0.08)] p-8 mb-8 w-full">
+            <h2 className="text-lg font-extrabold text-red-400 uppercase mb-2">Error</h2>
+            <p className="text-red-300">{error}</p>
+            <p className="text-gray-400 mt-2">Please upload activity data to get dashboard insights.</p>
+          </div>
         ) : activities.length === 0 ? (
-          <Alert severity="info">
-            No activity data available. Please navigate to the Upload page to provide data for analysis.
-          </Alert>
+          <div className="bg-[#1F2030] border border-[#333] rounded-xl shadow-[0_2px_8px_rgba(110,95,254,0.08)] p-8 mb-8 w-full">
+            <h2 className="text-lg font-extrabold text-purple-300 uppercase mb-2">No Data</h2>
+            <p className="text-gray-400">No activity data available. Please navigate to the Upload page to provide data for analysis.</p>
+          </div>
         ) : (
           <>
             {/* Summary Cards */}
-            <Box sx={{ mb: 4, display: 'flex', flexWrap: 'wrap', gap: 2 }}>
-              <Paper
-                sx={{
-                  p: 3,
-                  bgcolor: '#1e1a3c',
-                  color: 'white',
-                  flex: 1,
-                  minWidth: 200,
-                  textAlign: 'center'
-                }}
-              >
-                <Typography variant="h3">{totalActivities}</Typography>
-                <Typography variant="subtitle1">Total Activities</Typography>
-              </Paper>
-              
-              <Paper
-                sx={{
-                  p: 3,
-                  bgcolor: '#7e3af2',
-                  color: 'white',
-                  flex: 1,
-                  minWidth: 200,
-                  textAlign: 'center'
-                }}
-              >
-                <Typography variant="h3">{highRiskActivities}</Typography>
-                <Typography variant="subtitle1">High Risk Activities</Typography>
-              </Paper>
-              
-              <Paper
-                sx={{
-                  p: 3,
-                  bgcolor: '#ff5a8f',
-                  color: 'white',
-                  flex: 1,
-                  minWidth: 200,
-                  textAlign: 'center'
-                }}
-              >
-                <Typography variant="h3">{policyBreaches}</Typography>
-                <Typography variant="subtitle1">Recent Policy Breaches</Typography>
-              </Paper>
-              
-              <Paper
-                sx={{
-                  p: 3,
-                  bgcolor: '#2d7bf4',
-                  color: 'white',
-                  flex: 1,
-                  minWidth: 200,
-                  textAlign: 'center'
-                }}
-              >
-                <Typography variant="h3">{usersAtRisk}</Typography>
-                <Typography variant="subtitle1">Users at Risk</Typography>
-              </Paper>
-            </Box>
+            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-8 mb-8">
+              {/* Total Activities */}
+              <Box className="flex items-center bg-white rounded-2xl shadow-2xl p-8 hover:shadow-[0_4px_32px_rgba(255,255,255,0.35)] hover:scale-[1.03] transition-all duration-300 min-h-[8.5rem]">
+                <div className="flex items-center justify-center w-16 h-16 rounded-full bg-white shadow-lg mr-6">
+                  <MdOutlineListAlt className="text-4xl text-black drop-shadow" />
+                </div>
+                <div>
+                  <div className="text-6xl font-extrabold text-[#232346] drop-shadow-lg leading-tight">{totalActivities}</div>
+                  <div className="text-sm font-semibold uppercase tracking-widest mt-2 text-[#444] opacity-90" style={{ letterSpacing: '0.12em' }}>Total Activities</div>
+                </div>
+              </Box>
+              {/* High Risk Activities */}
+              <Box className="flex items-center bg-gradient-to-br from-[#FF3B3B] to-[#EC4899] rounded-2xl shadow-2xl p-8 hover:shadow-[0_4px_32px_#FF3B3B44] hover:scale-[1.03] transition-all duration-300 min-h-[8.5rem]">
+                <div className="flex items-center justify-center w-16 h-16 rounded-full bg-gradient-to-br from-[#FF7B7B] to-[#FF3B3B] shadow-lg mr-6">
+                  <FaSkull className="text-4xl text-white drop-shadow" />
+                </div>
+                <div>
+                  <div className="text-6xl font-extrabold text-white drop-shadow-lg leading-tight">{highRiskActivities}</div>
+                  <div className="text-sm font-semibold uppercase tracking-widest mt-2 text-white opacity-90" style={{ letterSpacing: '0.12em' }}>High Risk Activities</div>
+                </div>
+              </Box>
+              {/* Policy Breaches */}
+              <Box className="flex items-center bg-gradient-to-br from-[#7928CA] to-[#8B5CF6] rounded-2xl shadow-2xl p-8 hover:shadow-[0_4px_32px_#7928CA44] hover:scale-[1.03] transition-all duration-300 min-h-[8.5rem]">
+                <div className="flex items-center justify-center w-16 h-16 rounded-full bg-gradient-to-br from-[#A084E8] to-[#8B5CF6] shadow-lg mr-6">
+                  <MdOutlineGavel className="text-4xl text-white drop-shadow" />
+                </div>
+                <div>
+                  <div className="text-6xl font-extrabold text-white drop-shadow-lg leading-tight">{policyBreaches}</div>
+                  <div className="text-sm font-semibold uppercase tracking-widest mt-2 text-white opacity-90" style={{ letterSpacing: '0.12em' }}>Recent Policy Breaches</div>
+                </div>
+              </Box>
+              {/* Users at Risk */}
+              <Box className="flex items-center bg-gradient-to-br from-[#34D399] to-[#10B981] rounded-2xl shadow-2xl p-8 hover:shadow-[0_4px_32px_#10B98144] hover:scale-[1.03] transition-all duration-300 min-h-[8.5rem]">
+                <div className="flex items-center justify-center w-16 h-16 rounded-full bg-gradient-to-br from-[#6EE7B7] to-[#34D399] shadow-lg mr-6">
+                  <MdOutlinePersonOff className="text-4xl text-white drop-shadow" />
+                </div>
+                <div>
+                  <div className="text-6xl font-extrabold text-white drop-shadow-lg leading-tight">{usersAtRisk}</div>
+                  <div className="text-sm font-semibold uppercase tracking-widest mt-2 text-white opacity-90" style={{ letterSpacing: '0.12em' }}>Users at Risk</div>
+                </div>
+              </Box>
+            </div>
 
             {/* Tabs */}
-            <Box sx={{ borderBottom: 1, borderColor: 'divider' }}>
-              <Tabs value={activeTab} onChange={handleTabChange} aria-label="Dashboard tabs">
-                <Tab label="Overview" />
-                <Tab label="Advanced Analytics" />
-              </Tabs>
-            </Box>
+            <div className="relative z-10 mb-8">
+              <div className="backdrop-blur-md bg-[#1F2030]/70 border border-white/10 rounded-xl shadow-lg px-4 py-2 flex items-center w-fit mx-auto">
+                <Tabs
+                  value={activeTab}
+                  onChange={handleTabChange}
+                  aria-label="Dashboard tabs"
+                  TabIndicatorProps={{
+                    style: {
+                      height: 6,
+                      borderRadius: 6,
+                      background: 'linear-gradient(90deg, #8B5CF6 0%, #6E5FFE 100%)',
+                      boxShadow: '0 2px 12px #8B5CF655',
+                      transition: 'all 0.3s cubic-bezier(.4,0,.2,1)',
+                    }
+                  }}
+                  sx={{
+                    minHeight: 0,
+                    '.MuiTabs-flexContainer': { gap: 2 },
+                    '.MuiTab-root': {
+                      color: '#BBB',
+                      fontWeight: 700,
+                      fontSize: '1.1rem',
+                      letterSpacing: '0.08em',
+                      textTransform: 'uppercase',
+                      px: 3,
+                      py: 1.5,
+                      borderRadius: '8px',
+                      minHeight: 0,
+                      transition: 'color 0.2s, background 0.2s',
+                      fontFamily: "'IBM Plex Sans', Inter, sans-serif",
+                      '&.Mui-selected': {
+                        color: '#EEE',
+                        textShadow: '0 2px 12px #8B5CF655',
+                        background: 'linear-gradient(90deg, #8B5CF6 0%, #6E5FFE 100%)',
+                        WebkitBackgroundClip: 'text',
+                        WebkitTextFillColor: 'transparent',
+                      },
+                      '&:hover': {
+                        color: '#8B5CF6',
+                        background: 'rgba(139,92,246,0.08)',
+                      },
+                      '&:focus-visible': {
+                        outline: '2px solid #8B5CF6',
+                        outlineOffset: '2px',
+                      },
+                    },
+                  }}
+                >
+                  <Tab label="Overview" />
+                  <Tab label="Advanced Analytics" />
+                </Tabs>
+              </div>
+            </div>
 
             {/* Tab Panels */}
             <TabPanel value={activeTab} index={0}>
               {/* Distribution Cards Section */}
-              <Box sx={{ mb: 4, display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(240px, 1fr))', gap: 2 }}>
-                <Paper sx={{ p: 2, height: '100%' }}>
-                  <Typography variant="h6" gutterBottom>Risk Distribution</Typography>
-                  {renderDistributionBars(riskDistribution)}
-                </Paper>
-                
-                <Paper sx={{ p: 2, height: '100%' }}>
-                  <Typography variant="h6" gutterBottom>Integration Distribution</Typography>
-                  {renderDistributionBars(integrationDistribution)}
-                </Paper>
-                
-                <Paper sx={{ p: 2, height: '100%' }}>
-                  <Typography variant="h6" gutterBottom>Status Distribution</Typography>
-                  {renderDistributionBars(statusDistribution)}
-                </Paper>
-                
-                <Paper sx={{ p: 2, height: '100%' }}>
-                  <Typography variant="h6" gutterBottom>Time Distribution</Typography>
-                  {renderDistributionBars(timeDistribution)}
-                </Paper>
-              </Box>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
+                <div className="bg-[#1F2030]/70 backdrop-blur-md border border-white/10 rounded-xl shadow-lg p-6">
+                  <h2 className="text-lg font-extrabold text-[#8B5CF6] uppercase tracking-wide mb-2">Risk Distribution</h2>
+                  <DistributionBars data={riskDistribution} type="risk" />
+                </div>
+                <div className="bg-[#1F2030]/70 backdrop-blur-md border border-white/10 rounded-xl shadow-lg p-6">
+                  <h2 className="text-lg font-extrabold text-[#8B5CF6] uppercase tracking-wide mb-2">Integration Distribution</h2>
+                  <DistributionBars data={integrationDistribution} type="integration" />
+                </div>
+                <div className="bg-[#1F2030]/70 backdrop-blur-md border border-white/10 rounded-xl shadow-lg p-6">
+                  <h2 className="text-lg font-extrabold text-[#8B5CF6] uppercase tracking-wide mb-2">Status Distribution</h2>
+                  <DistributionBars data={statusDistribution} type="status" />
+                </div>
+                <div className="bg-[#1F2030]/70 backdrop-blur-md border border-white/10 rounded-xl shadow-lg p-6">
+                  <h2 className="text-lg font-extrabold text-[#8B5CF6] uppercase tracking-wide mb-2">Time Distribution</h2>
+                  <DistributionBars data={timeDistribution} type="time" />
+                </div>
+              </div>
 
               {/* Risk Trend and Severity Trend */}
-              <Box sx={{ mb: 4, display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(500px, 1fr))', gap: 2 }}>
-                <Paper sx={{ p: 2 }}>
-                  <Typography variant="h6" gutterBottom>Risk Trend</Typography>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
+                <div className="bg-[#1F2030] border border-[#333] rounded-xl shadow-lg p-6">
+                  <h2 className="text-lg font-extrabold text-[#8B5CF6] uppercase tracking-wide mb-2">Risk Trend</h2>
                   <Box sx={{ height: 300 }}>
                     {riskTrendData.length > 0 ? (
                       <ResponsiveContainer width="100%" height="100%">
@@ -462,15 +648,14 @@ export default function DashboardPage() {
                         </LineChart>
                       </ResponsiveContainer>
                     ) : (
-                      <Box display="flex" flexDirection="column" alignItems="center" justifyContent="center" height="100%">
-                        <Typography variant="body2" color="textSecondary">Not enough data available</Typography>
-                      </Box>
+                      <div className="flex flex-col items-center justify-center h-[300px]">
+                        <span className="text-gray-400">Not enough data available</span>
+                      </div>
                     )}
                   </Box>
-                </Paper>
-
-                <Paper sx={{ p: 2 }}>
-                  <Typography variant="h6" gutterBottom>Severity Trend</Typography>
+                </div>
+                <div className="bg-[#1F2030] border border-[#333] rounded-xl shadow-lg p-6">
+                  <h2 className="text-lg font-extrabold text-[#8B5CF6] uppercase tracking-wide mb-2">Severity Trend</h2>
                   <Box sx={{ height: 300 }}>
                     {severityTrendData.length > 0 ? (
                       <ResponsiveContainer width="100%" height="100%">
@@ -483,25 +668,25 @@ export default function DashboardPage() {
                           <YAxis />
                           <Tooltip />
                           <Legend />
-                          <Line type="monotone" dataKey="critical" name="Critical" stroke={COLORS.risk.critical} strokeWidth={2} />
-                          <Line type="monotone" dataKey="high" name="High" stroke={COLORS.risk.high} strokeWidth={2} />
-                          <Line type="monotone" dataKey="medium" name="Medium" stroke={COLORS.risk.medium} strokeWidth={2} />
-                          <Line type="monotone" dataKey="low" name="Low" stroke={COLORS.risk.low} strokeWidth={2} />
+                          <Line type="monotone" dataKey="critical" name="Critical" stroke="#f44336" strokeWidth={2} />
+                          <Line type="monotone" dataKey="high" name="High" stroke="#ff9800" strokeWidth={2} />
+                          <Line type="monotone" dataKey="medium" name="Medium" stroke="#2196f3" strokeWidth={2} />
+                          <Line type="monotone" dataKey="low" name="Low" stroke="#4caf50" strokeWidth={2} />
                         </LineChart>
                       </ResponsiveContainer>
                     ) : (
-                      <Box display="flex" flexDirection="column" alignItems="center" justifyContent="center" height="100%">
-                        <Typography variant="body2" color="textSecondary">Not enough data available</Typography>
-                      </Box>
+                      <div className="flex flex-col items-center justify-center h-[300px]">
+                        <span className="text-gray-400">Not enough data available</span>
+                      </div>
                     )}
                   </Box>
-                </Paper>
-              </Box>
+                </div>
+              </div>
 
               {/* Policy Breaches and Integration Breakdown */}
-              <Box sx={{ mb: 4, display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(500px, 1fr))', gap: 2 }}>
-                <Paper sx={{ p: 2 }}>
-                  <Typography variant="h6" gutterBottom>Policy Breaches</Typography>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
+                <div className="bg-[#1F2030] border border-[#333] rounded-xl shadow-lg p-6">
+                  <h2 className="text-lg font-extrabold text-[#8B5CF6] uppercase tracking-wide mb-2">Policy Breaches</h2>
                   <Box sx={{ height: 300 }}>
                     {policyBreachData.length > 0 ? (
                       <ResponsiveContainer width="100%" height="100%">
@@ -518,15 +703,14 @@ export default function DashboardPage() {
                         </AreaChart>
                       </ResponsiveContainer>
                     ) : (
-                      <Box display="flex" flexDirection="column" alignItems="center" justifyContent="center" height="100%">
-                        <Typography variant="body2" color="textSecondary">Not enough data available</Typography>
-                      </Box>
+                      <div className="flex flex-col items-center justify-center h-[300px]">
+                        <span className="text-gray-400">Not enough data available</span>
+                      </div>
                     )}
                   </Box>
-                </Paper>
-
-                <Paper sx={{ p: 2 }}>
-                  <Typography variant="h6" gutterBottom>Integration Breakdown</Typography>
+                </div>
+                <div className="bg-[#1F2030] border border-[#333] rounded-xl shadow-lg p-6">
+                  <h2 className="text-lg font-extrabold text-[#8B5CF6] uppercase tracking-wide mb-2">Integration Breakdown</h2>
                   <Box sx={{ height: 300 }}>
                     {integrationData.length > 0 ? (
                       <ResponsiveContainer width="100%" height="100%">
@@ -543,78 +727,42 @@ export default function DashboardPage() {
                         </BarChart>
                       </ResponsiveContainer>
                     ) : (
-                      <Box display="flex" flexDirection="column" alignItems="center" justifyContent="center" height="100%">
-                        <Typography variant="body2" color="textSecondary">Not enough data available</Typography>
-                      </Box>
+                      <div className="flex flex-col items-center justify-center h-[300px]">
+                        <span className="text-gray-400">Not enough data available</span>
+                      </div>
                     )}
                   </Box>
-                </Paper>
-              </Box>
+                </div>
+              </div>
 
               {/* Users Needing Attention */}
-              <Paper sx={{ p: 2, mb: 4 }}>
-                <Typography variant="h6" gutterBottom>Users Needing Attention</Typography>
+              <div className="bg-[#1F2030] border border-[#333] rounded-xl shadow-lg p-6 mb-8">
+                <h2 className="text-lg font-extrabold text-[#8B5CF6] uppercase tracking-wide mb-2">Users Needing Attention</h2>
                 {usersNeedingAttention.length > 0 ? (
                   <Box>
                     {usersNeedingAttention.map((user, index) => (
-                      <Box key={index} sx={{ 
-                        display: 'flex', 
-                        justifyContent: 'space-between', 
-                        alignItems: 'center', 
-                        py: 1, 
-                        borderBottom: '1px solid rgba(0,0,0,0.1)'
-                      }}>
-                        <Typography variant="body2">{user.username}</Typography>
-                        <Box sx={{ display: 'flex', gap: 1 }}>
-                          <Box sx={{ 
-                            px: 1, 
-                            py: 0.5, 
-                            borderRadius: 1, 
-                            fontSize: '0.75rem', 
-                            bgcolor: user.criticalCount > 0 ? 'rgba(244, 67, 54, 0.1)' : 'rgba(0,0,0,0.1)',
-                            color: user.criticalCount > 0 ? '#f44336' : 'text.disabled'
-                          }}>
-                            {user.criticalCount} C
-                          </Box>
-                          <Box sx={{ 
-                            px: 1, 
-                            py: 0.5, 
-                            borderRadius: 1, 
-                            fontSize: '0.75rem', 
-                            bgcolor: user.highCount > 0 ? 'rgba(255, 152, 0, 0.1)' : 'rgba(0,0,0,0.1)',
-                            color: user.highCount > 0 ? '#ff9800' : 'text.disabled'
-                          }}>
-                            {user.highCount} H
-                          </Box>
-                          <Box sx={{ 
-                            px: 1, 
-                            py: 0.5, 
-                            borderRadius: 1, 
-                            fontSize: '0.75rem', 
-                            bgcolor: user.mediumCount > 0 ? 'rgba(33, 150, 243, 0.1)' : 'rgba(0,0,0,0.1)',
-                            color: user.mediumCount > 0 ? '#2196f3' : 'text.disabled'
-                          }}>
-                            {user.mediumCount} M
-                          </Box>
-                        </Box>
-                      </Box>
+                      <div key={index} className="flex justify-between items-center py-2 border-b border-[#333]">
+                        <span className="text-[#EEE] font-medium">{user.username}</span>
+                        <div className="flex gap-2">
+                          <span className={`px-2 py-1 rounded bg-[#232346] text-xs font-bold ${user.criticalCount > 0 ? 'text-red-400' : 'text-gray-400'}`}>{user.criticalCount} C</span>
+                          <span className={`px-2 py-1 rounded bg-[#232346] text-xs font-bold ${user.highCount > 0 ? 'text-yellow-400' : 'text-gray-400'}`}>{user.highCount} H</span>
+                          <span className={`px-2 py-1 rounded bg-[#232346] text-xs font-bold ${user.mediumCount > 0 ? 'text-blue-400' : 'text-gray-400'}`}>{user.mediumCount} M</span>
+                        </div>
+                      </div>
                     ))}
                   </Box>
                 ) : (
-                  <Box display="flex" flexDirection="column" alignItems="center" justifyContent="center" height={150}>
-                    <Typography variant="body2" color="textSecondary">No users at risk found</Typography>
-                  </Box>
+                  <div className="flex flex-col items-center justify-center h-[150px]">
+                    <span className="text-gray-400">No users at risk found</span>
+                  </div>
                 )}
-              </Paper>
+              </div>
             </TabPanel>
 
             <TabPanel value={activeTab} index={1}>
-              <Typography variant="h6" gutterBottom>
-                Advanced Analytics
-              </Typography>
-              {/* You can add your AdvancedCharts component here if needed */}
-              <Paper sx={{ p: 2, mb: 4 }}>
-                <Typography variant="h6" gutterBottom>Risk Distribution</Typography>
+              <h2 className="text-lg font-extrabold text-[#8B5CF6] uppercase tracking-wide mb-4">Advanced Analytics</h2>
+              <div className="bg-[#1F2030] border border-[#333] rounded-xl shadow-lg p-6 mb-8">
+                <h2 className="text-lg font-extrabold text-[#8B5CF6] uppercase tracking-wide mb-2">Risk Distribution</h2>
                 <Box sx={{ height: 300 }}>
                   {riskDistribution.length > 0 ? (
                     <ResponsiveContainer width="100%" height="100%">
@@ -638,17 +786,17 @@ export default function DashboardPage() {
                       </PieChart>
                     </ResponsiveContainer>
                   ) : (
-                    <Box display="flex" flexDirection="column" alignItems="center" justifyContent="center" height="100%">
-                      <Typography variant="body2" color="textSecondary">Not enough data available</Typography>
-                    </Box>
+                    <div className="flex flex-col items-center justify-center h-[300px]">
+                      <span className="text-gray-400">Not enough data available</span>
+                    </div>
                   )}
                 </Box>
-              </Paper>
+              </div>
             </TabPanel>
           </>
         )}
-      </Box>
-    </Container>
+      </div>
+    </div>
   );
 }
 
