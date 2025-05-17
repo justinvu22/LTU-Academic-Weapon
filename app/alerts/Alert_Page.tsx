@@ -243,7 +243,7 @@ export default function AlertPage() {
             className={`px-6 py-2 rounded-lg flex font-semibold transition-all duration-300 ease-in-out ${selectedTab === 'other' ? 'bg-[#191138] text-purple-200' : 'bg-[#191138] text-gray-300'}`}
             onClick={() => setSelectedTab('other')}
           >
-            All Other Alerts
+            ALL ACTIVITY
           </button>
           <button
             className={`px-6 py-2 rounded-lg flex font-semibold transition-all duration-300 ease-in-out ${selectedTab === 'closed' ? 'bg-[#191138] text-purple-200' : 'bg-[#191138] text-gray-300'}`}
@@ -650,7 +650,7 @@ export default function AlertPage() {
             {selectedTab === 'other' && (
               <div className="bg-white/5 p-6 rounded-xl">
                 <div className="flex justify-between items-center mb-4">
-                  <div className="text-xl font-semibold">All Other Alerts</div>
+                  <div className="text-xl font-semibold">ALL ACTIVITY</div>
                 </div>
                 
                 <div className="flex justify-center items-center h-48 text-xl">

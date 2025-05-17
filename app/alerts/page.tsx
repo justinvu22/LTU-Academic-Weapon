@@ -93,21 +93,20 @@ export default function AlertsPage() {
   const customAlerts: UserActivity[] = [];
 
   return (
-    <div className="min-h-screen bg-gradient-to-b from-[#0F172A] to-[#7928CA] px-4 sm:px-8 md:px-12 py-12 font-poppins">
-      {/* Main content with a small gap from the sidebar */}
-      <div className="ml-6 w-full">
+    <div className="min-h-screen bg-[#121324] px-6 py-10 font-['IBM_Plex_Sans',Inter,sans-serif] flex flex-col">
+      <div className="w-full bg-[#121324] rounded-2xl border border-[#333] shadow-[0_2px_12px_rgba(110,95,254,0.10)] px-8 py-10 flex flex-col gap-8 mx-auto">
         <div className="flex items-center justify-between mb-8 w-full">
-          <h1 className="text-3xl font-bold text-white drop-shadow-lg">Alerts</h1>
+          <h1 className="text-[2rem] font-extrabold tracking-wide text-[#EEE] pl-4 border-l-4 border-[#6E5FFE] uppercase" style={{ fontFamily: "'IBM Plex Sans', Inter, sans-serif", letterSpacing: '0.04em', textShadow: '0 1px 8px #6E5FFE22' }}>Alerts</h1>
           <button
             onClick={fetchActivities}
-            className="inline-flex items-center gap-2 bg-[#1E1E2F] text-white font-semibold px-6 py-3 rounded-full shadow-[inset_-4px_-4px_8px_#2a2a40,inset_4px_4px_8px_#0e0e1e] hover:shadow-lg hover:scale-105 transition-all duration-300"
+            className="inline-flex items-center gap-2 bg-gradient-to-r from-[#6E5FFE] to-[#8F7BFF] text-white font-bold px-7 py-3 rounded-xl shadow-lg hover:from-[#7C6BFF] hover:to-[#A89CFF] hover:scale-105 transition-all duration-150"
           >
             <FaSyncAlt className="text-lg" />
             Refresh Alerts
           </button>
         </div>
 
-        <div className="backdrop-blur-md bg-white/10 border border-white/10 shadow-lg rounded-2xl p-2 mb-8 w-full flex items-center">
+        <div className="bg-[#191938] border border-[#333] shadow-[0_2px_8px_rgba(110,95,254,0.08)] rounded-xl p-2 mb-8 w-full flex items-center">
           <Tabs
             value={tab}
             onChange={(_, v) => setTab(v)}
@@ -119,34 +118,35 @@ export default function AlertsPage() {
                 gap: '0.5rem',
               },
               '& .MuiTab-root': {
-                color: '#c7bfff',
-                textTransform: 'none',
-                fontFamily: 'Poppins, sans-serif',
-                fontWeight: 500,
+                color: '#B9B9E3',
+                textTransform: 'uppercase',
+                fontFamily: "'IBM Plex Sans', Inter, sans-serif",
+                fontWeight: 700,
                 fontSize: '1.08rem',
                 borderRadius: '9999px',
                 minHeight: '44px',
                 minWidth: '140px',
                 px: 3,
                 py: 1.5,
+                letterSpacing: '0.04em',
                 transition: 'background 0.2s, color 0.2s, box-shadow 0.2s',
                 '&:hover': {
-                  background: 'rgba(139,92,246,0.10)',
+                  background: 'rgba(110,95,254,0.10)',
                   color: '#fff',
-                  boxShadow: '0 2px 8px 0 rgba(139,92,246,0.10)'
+                  boxShadow: '0 2px 8px 0 #6E5FFE22'
                 },
                 '&.Mui-selected': {
-                  background: 'linear-gradient(90deg, #8B5CF6 0%, #EC4899 100%)',
+                  background: 'linear-gradient(90deg, #6E5FFE 0%, #8F7BFF 100%)',
                   color: '#fff',
-                  fontWeight: 700,
-                  boxShadow: '0 4px 16px 0 rgba(139,92,246,0.15)',
+                  fontWeight: 900,
+                  boxShadow: '0 4px 16px 0 #6E5FFE22',
                 }
               }
             }}
           >
             <Tab label="Immediate review" />
             <Tab label="Custom alerts" />
-            <Tab label="All other alerts" />
+            <Tab label="ALL ACTIVITY" />
             <Tab label="Closed" />
           </Tabs>
         </div>
@@ -156,14 +156,14 @@ export default function AlertsPage() {
             <CircularProgress sx={{ color: '#8B5CF6' }} />
           </div>
         ) : error ? (
-          <div className="bg-[#1E1E2F] rounded-2xl shadow-[inset_-4px_-4px_8px_#2a2a40,inset_4px_4px_8px_#0e0e1e] p-8 mb-8 w-full">
+          <div className="bg-[#1F2030] rounded-lg border border-[#333] shadow-[0_2px_8px_rgba(110,95,254,0.08)] p-8 mb-8 w-full">
             <p className="text-red-400 font-semibold">{error}</p>
             <p className="text-gray-400 mt-4">
               Please navigate to the Upload page to provide activity data for analysis.
             </p>
           </div>
         ) : activities.length === 0 ? (
-          <div className="bg-[#1E1E2F] rounded-2xl shadow-[inset_-4px_-4px_8px_#2a2a40,inset_4px_4px_8px_#0e0e1e] p-8 mb-8 w-full">
+          <div className="bg-[#1F2030] rounded-lg border border-[#333] shadow-[0_2px_8px_rgba(110,95,254,0.08)] p-8 mb-8 w-full">
             <p className="text-gray-400">
               No activity data available. Please navigate to the Upload page to provide data for analysis.
             </p>
@@ -171,8 +171,8 @@ export default function AlertsPage() {
         ) : (
           <>
             {tab === 0 && (
-              <div className="bg-[#1E1E2F] rounded-2xl shadow-[inset_-4px_-4px_8px_#2a2a40,inset_4px_4px_8px_#0e0e1e] p-8 mb-8 w-full">
-                <h2 className="text-xl font-semibold text-white mb-6">Recent High-Risk Activities</h2>
+              <div className="bg-[#1F2030] rounded-lg border border-[#333] shadow-[0_2px_8px_rgba(110,95,254,0.08)] p-8 mb-8 w-full">
+                <h2 className="text-[1.15rem] font-extrabold tracking-wide text-[#EEE] pl-4 border-l-4 border-[#6E5FFE] mb-6 uppercase" style={{ fontFamily: "'IBM Plex Sans', Inter, sans-serif", letterSpacing: '0.04em', textShadow: '0 1px 8px #6E5FFE22' }}>Recent High-Risk Activities</h2>
                 <ActivityList 
                   activities={activities.filter(a => a.riskScore >= 70).slice(0, 5)} 
                   policyIcons={policyIcons}
@@ -180,8 +180,8 @@ export default function AlertsPage() {
               </div>
             )}
             {tab === 1 && (
-              <div className="bg-[#1E1E2F] rounded-2xl shadow-[inset_-4px_-4px_8px_#2a2a40,inset_4px_4px_8px_#0e0e1e] p-8 mb-8 w-full">
-                <h2 className="text-xl font-semibold text-white mb-6">Custom Alerts</h2>
+              <div className="bg-[#1F2030] rounded-lg border border-[#333] shadow-[0_2px_8px_rgba(110,95,254,0.08)] p-8 mb-8 w-full">
+                <h2 className="text-[1.15rem] font-extrabold tracking-wide text-[#EEE] pl-4 border-l-4 border-[#6E5FFE] mb-6 uppercase" style={{ fontFamily: "'IBM Plex Sans', Inter, sans-serif", letterSpacing: '0.04em', textShadow: '0 1px 8px #6E5FFE22' }}>Custom Alerts</h2>
                 {customAlerts.length === 0 ? (
                   <p className="text-gray-400">No custom alerts yet. Alerts saved from the Custom Alerts page will appear here.</p>
                 ) : (
@@ -190,8 +190,8 @@ export default function AlertsPage() {
               </div>
             )}
             {tab === 2 && (
-              <div className="bg-[#1E1E2F] rounded-2xl shadow-[inset_-4px_-4px_8px_#2a2a40,inset_4px_4px_8px_#0e0e1e] p-8 mb-8 h-[calc(100vh-280px)] flex flex-col w-full">
-                <h2 className="text-xl font-semibold text-white mb-6">All Activities</h2>
+              <div className="bg-[#1F2030] rounded-lg border border-[#333] shadow-[0_2px_8px_rgba(110,95,254,0.08)] p-8 mb-8 h-[calc(100vh-280px)] flex flex-col w-full">
+                <h2 className="text-[1.15rem] font-extrabold tracking-wide text-[#EEE] pl-4 border-l-4 border-[#6E5FFE] mb-6 uppercase" style={{ fontFamily: "'IBM Plex Sans', Inter, sans-serif", letterSpacing: '0.04em', textShadow: '0 1px 8px #6E5FFE22' }}>All Activities</h2>
                 <div className="flex-1 overflow-hidden">
                   <FullHeightActivityList 
                     activities={activities} 
@@ -201,9 +201,12 @@ export default function AlertsPage() {
               </div>
             )}
             {tab === 3 && (
-              <div className="bg-[#1E1E2F] rounded-2xl shadow-[inset_-4px_-4px_8px_#2a2a40,inset_4px_4px_8px_#0e0e1e] p-8 mb-8 w-full">
-                <h2 className="text-xl font-semibold text-white mb-6">Closed Alerts</h2>
-                <p className="text-gray-400">Coming soon.</p>
+              <div className="bg-[#1F2030] rounded-lg border border-[#333] shadow-[0_2px_8px_rgba(110,95,254,0.08)] p-8 mb-8 w-full">
+                <h2 className="text-[1.15rem] font-extrabold tracking-wide text-[#EEE] pl-4 border-l-4 border-[#6E5FFE] mb-6 uppercase" style={{ fontFamily: "'IBM Plex Sans', Inter, sans-serif", letterSpacing: '0.04em', textShadow: '0 1px 8px #6E5FFE22' }}>Closed Alerts</h2>
+                <ActivityList 
+                  activities={activities.filter(a => a.status === 'closed')} 
+                  policyIcons={policyIcons}
+                />
               </div>
             )}
           </>
