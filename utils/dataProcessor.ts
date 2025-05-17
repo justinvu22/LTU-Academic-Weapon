@@ -1,4 +1,4 @@
-import { UserActivity, ActivityStatistics, MLRecommendation } from '../types/activity';
+import { UserActivity, ActivityStatistics, MLRecommendation, TimeDistribution } from '../types/activity';
 
 /**
  * Risk level thresholds based on actual data analysis from CSV
@@ -80,6 +80,92 @@ export function processActivityData(rawActivities: any[]): UserActivity[] {
 }
 
 /**
+ * Calculate time distribution from activities
+ */
+export function calculateTimeDistribution(activities: UserActivity[]): TimeDistribution {
+  console.log(`Calculating time distribution for ${activities.length} activities`);
+  
+  // Initialize time periods
+  const distribution: TimeDistribution = {
+    morning: 0,   // 6:00 AM - 11:59 AM
+    afternoon: 0, // 12:00 PM - 5:59 PM
+    evening: 0,   // 6:00 PM - 11:59 PM
+    night: 0      // 12:00 AM - 5:59 AM
+  };
+  
+  // Track how many activities were processed for diagnostics
+  let processedCount = 0;
+  let missingTimeCount = 0;
+  
+  // Process each activity
+  activities.forEach(activity => {
+    try {
+      // If hour is already extracted, use it directly
+      if (activity.hour !== undefined && activity.hour !== null) {
+        // Map hour to time period
+        const hour = activity.hour;
+        if (hour >= 6 && hour < 12) distribution.morning++;
+        else if (hour >= 12 && hour < 18) distribution.afternoon++;
+        else if (hour >= 18 && hour < 24) distribution.evening++;
+        else distribution.night++;
+        
+        processedCount++;
+        return;
+      }
+      
+      // Fall back to parsing the time field if it exists
+      if (activity.time) {
+        // Try to extract hour from time string
+        const timeMatch = /(\d{1,2})[:h]/i.exec(activity.time);
+        if (timeMatch && timeMatch[1]) {
+          const hour = parseInt(timeMatch[1], 10);
+          
+          // Map hour to time period
+          if (hour >= 6 && hour < 12) distribution.morning++;
+          else if (hour >= 12 && hour < 18) distribution.afternoon++;
+          else if (hour >= 18 && hour < 24) distribution.evening++;
+          else distribution.night++;
+          
+          processedCount++;
+          return;
+        }
+      }
+      
+      // Last fallback: try timestamp if present
+      if (activity.timestamp) {
+        try {
+          const hour = new Date(activity.timestamp).getHours();
+          
+          // Map hour to time period
+          if (hour >= 6 && hour < 12) distribution.morning++;
+          else if (hour >= 12 && hour < 18) distribution.afternoon++;
+          else if (hour >= 18 && hour < 24) distribution.evening++;
+          else distribution.night++;
+          
+          processedCount++;
+          return;
+        } catch (e) {
+          // If timestamp parsing fails, proceed to count as missing
+        }
+      }
+      
+      // If we reach here, we couldn't determine the time
+      missingTimeCount++;
+      
+    } catch (error) {
+      console.error('Error calculating time distribution for activity:', error);
+      missingTimeCount++;
+    }
+  });
+  
+  // Log diagnostic info
+  console.log(`Time distribution calculation complete: ${processedCount} processed, ${missingTimeCount} with missing time`);
+  console.log('Distribution results:', distribution);
+  
+  return distribution;
+}
+
+/**
  * Generate statistics from activity data
  * @param activities Processed activity data
  * @returns Statistics object
@@ -101,12 +187,12 @@ export function generateStatistics(activities: UserActivity[]): ActivityStatisti
 
   // Count high risk activities (includes both high and critical)
   const highRiskActivities = activities.filter(a => 
-    (a.riskScore >= RISK_THRESHOLDS.HIGH)
+    (a.riskScore && a.riskScore >= RISK_THRESHOLDS.HIGH) || false
   ).length;
 
   // Count critical risk activities (for reference)
   const criticalRiskActivities = activities.filter(a => 
-    (a.riskScore >= RISK_THRESHOLDS.CRITICAL)
+    (a.riskScore && a.riskScore >= RISK_THRESHOLDS.CRITICAL) || false
   ).length;
   
   console.log(`High risk activities: ${highRiskActivities}, Critical: ${criticalRiskActivities}`);
@@ -135,7 +221,7 @@ export function generateStatistics(activities: UserActivity[]): ActivityStatisti
 
   // Calculate average risk score
   const totalRiskScore = activities.reduce((sum, activity) => sum + (activity.riskScore || 0), 0);
-  const averageRiskScore = Math.round(totalRiskScore / activities.length);
+  const averageRiskScore = activities.length ? Math.round(totalRiskScore / activities.length) : 0;
 
   // Count users at risk (users with any high or critical risk activities)
   const userRiskMap = new Map<string, { high: number, critical: number }>();
@@ -167,7 +253,7 @@ export function generateStatistics(activities: UserActivity[]): ActivityStatisti
   activities.forEach(activity => {
     const user = (activity.username || activity.userId || activity.user || 'unknown').toLowerCase();
     const currentRisk = userRiskScoreMap.get(user) || 0;
-    userRiskScoreMap.set(user, currentRisk + activity.riskScore);
+    userRiskScoreMap.set(user, currentRisk + (activity.riskScore || 0));
   });
 
   const topRiskUsers = Array.from(userRiskScoreMap.entries())
@@ -175,33 +261,8 @@ export function generateStatistics(activities: UserActivity[]): ActivityStatisti
     .slice(0, 5)
     .map(([user]) => user);
 
-  // Calculate time distribution
-  const timeDistribution = {
-    morning: 0,  // 6:00 AM - 11:59 AM
-    afternoon: 0, // 12:00 PM - 5:59 PM
-    evening: 0,   // 6:00 PM - 11:59 PM
-    night: 0      // 12:00 AM - 5:59 AM
-  };
-
-  activities.forEach(activity => {
-    let hour = -1;
-    
-    if (activity.timestamp) {
-      hour = new Date(activity.timestamp).getHours();
-    } else if (activity.time) {
-      const timeParts = activity.time.split(':');
-      if (timeParts.length >= 1) {
-        hour = parseInt(timeParts[0], 10);
-      }
-    }
-    
-    if (hour >= 0) {
-      if (hour >= 6 && hour < 12) timeDistribution.morning++;
-      else if (hour >= 12 && hour < 18) timeDistribution.afternoon++;
-      else if (hour >= 18 && hour < 24) timeDistribution.evening++;
-      else timeDistribution.night++;
-    }
-  });
+  // Calculate time distribution using our dedicated function
+  const timeDistribution = calculateTimeDistribution(activities);
 
   // Calculate integration distribution
   const integrationDistribution: Record<string, number> = {};
@@ -256,17 +317,49 @@ function normalizeDateTime(activity: any): { timestamp: string, date?: string, t
     date = activity.date;
     time = activity.time || '00:00';
     
-    // Try to parse date in format DD/MM/YYYY
-    if (typeof date === 'string' && date.includes('/')) {
-      const parts = date.split('/');
-      if (parts.length === 3) {
-        // Convert to YYYY-MM-DD format for Date constructor
-        const isoDate = `${parts[2]}-${parts[1]}-${parts[0]}`;
-        const timeString = time || '00:00';
-        
-        // Create ISO timestamp
-        timestamp = `${isoDate}T${timeString}:00`;
+    // Try to parse date in format DD/MM/YYYY or any other common format
+    try {
+      let isoDate = date;
+      
+      // Handle DD/MM/YYYY format
+      if (typeof date === 'string' && date.includes('/')) {
+        const parts = date.split('/');
+        if (parts.length === 3) {
+          // Convert to YYYY-MM-DD format for Date constructor
+          isoDate = `${parts[2]}-${parts[1].padStart(2, '0')}-${parts[0].padStart(2, '0')}`;
+        }
+      } 
+      // Handle YYYY-MM-DD format
+      else if (typeof date === 'string' && date.includes('-')) {
+        // Already in ISO format, keep as is
+        isoDate = date;
       }
+      
+      // Format time properly
+      let timeString = '00:00';
+      if (time) {
+        if (typeof time === 'string' && time.includes(':')) {
+          timeString = time;
+        } else if (typeof time === 'number') {
+          // If time is a number like 13.5, convert to "13:30"
+          const hours = Math.floor(time);
+          const minutes = Math.round((time - hours) * 60);
+          timeString = `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}`;
+        }
+      }
+      
+      // Create ISO timestamp
+      timestamp = `${isoDate}T${timeString}:00`;
+      
+      // Validate the timestamp
+      const testDate = new Date(timestamp);
+      if (isNaN(testDate.getTime())) {
+        console.warn(`Invalid date/time combination: ${date} ${time}, fallback to current time`);
+        timestamp = new Date().toISOString();
+      }
+    } catch (e) {
+      console.warn(`Error parsing date/time: ${date} ${time}`, e);
+      timestamp = new Date().toISOString();
     }
   }
 
@@ -327,23 +420,46 @@ function normalizeStatus(status: any): string {
 /**
  * Normalize policy breaches object
  */
-function normalizePolicyBreaches(policiesBreached: any): Record<string, any> {
+function normalizePolicyBreaches(policiesBreached: any): Record<string, boolean | string[] | number> {
   if (!policiesBreached) return {};
   
   // If it's a string, try to parse it as JSON
   if (typeof policiesBreached === 'string') {
     try {
-      return JSON.parse(policiesBreached);
+      const parsed = JSON.parse(policiesBreached);
+      console.log('Parsed policiesBreached from string:', parsed);
+      return parsed;
     } catch (e) {
+      console.warn('Failed to parse policiesBreached JSON string:', e);
       return {};
     }
   }
   
-  // If it's already an object, return it
+  // If it's already an object, normalize to ensure consistent structure
   if (typeof policiesBreached === 'object' && policiesBreached !== null) {
-    return policiesBreached;
+    // Deep copy to avoid reference issues
+    const normalized: Record<string, boolean | string[] | number> = {};
+    
+    // Ensure each entry has the correct type
+    Object.entries(policiesBreached).forEach(([key, value]) => {
+      if (Array.isArray(value)) {
+        normalized[key] = [...value]; // Copy array
+      } else if (typeof value === 'boolean') {
+        normalized[key] = value;
+      } else if (typeof value === 'number') {
+        normalized[key] = value;
+      } else if (value) {
+        // Convert other truthy values to boolean true
+        normalized[key] = true;
+      }
+    });
+    
+    console.log('Normalized policiesBreached:', normalized, 
+      'Keys:', Object.keys(normalized).length);
+    return normalized;
   }
   
+  console.warn('Invalid policiesBreached type:', typeof policiesBreached);
   return {};
 }
 
@@ -410,4 +526,14 @@ export function processCSVData(csvData: any[]) {
     recommendations,
     processingTime: Date.now(),
   };
+}
+
+/**
+ * Calculate statistics from an array of activities
+ * @param activities Array of user activities
+ * @returns Statistics object
+ */
+export async function calculateStatistics(activities: UserActivity[]): Promise<ActivityStatistics> {
+  // Use the existing generateStatistics function
+  return generateStatistics(activities);
 } 

@@ -130,3 +130,42 @@ For any questions or support, please contact the ShadowSight team.
 ## License
 
 This project is proprietary and confidential.
+
+## Recent Updates
+
+### Large Dataset Optimization (May 2023)
+- Optimized CSV parser to efficiently handle large files (5MB+) with 16,000+ activities
+- Implemented chunked processing to prevent UI freezing during data analysis
+- Added intelligent sampling for ML processing of large datasets
+- Enhanced error handling for date/time parsing in various formats
+- Fixed heatmap visualization for large activity files with improved integration categorization
+
+### UI Improvements
+- Simplified activity list by removing unnecessary columns (Activity and Integration)
+- Reorganized activity list columns for better information hierarchy
+- Improved policy breach visualization with better error handling
+- Added automatic time detection from multiple data formats (timestamp, date/time fields, hour)
+
+### Data Processing Enhancements
+- Added intelligent field detection to automatically identify user, date, and time columns
+- Improved risk score calculation and normalization
+- Enhanced policy breach detection and categorization
+- Fixed issues with sequence pattern analysis
+- Implemented better error boundaries to prevent analysis failures
+
+### Code Quality Improvements
+- Fixed TypeScript errors in ML components for better code stability
+- Added proper null/undefined checks for timestamps and risk scores
+- Improved ESLint configuration for better code quality enforcement
+- Added custom logger utility to manage console logs properly
+
+### Feature Enhancements
+- Implemented Custom Alerts UI in alerts page
+- Added synthetic policy breach generation based on risk scores
+- Enhanced time distribution calculation with better hour extraction
+
+### Developer Experience
+- Enhanced error handling in data processing components
+- Improved documentation throughout the codebase
+- Added diagnostic logging for easier troubleshooting
+- Optimized memory usage for large dataset processing

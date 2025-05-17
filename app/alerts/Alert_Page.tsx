@@ -2,28 +2,39 @@
 
 import { useState, useEffect } from "react";
 import { 
-  FaDatabase, 
   FaEdit, 
-  FaEnvelope, 
-  FaExclamationTriangle, 
-  FaFile, 
-  FaKey, 
-  FaLaptop, 
-  FaLock, 
-  FaMoneyBill, 
   FaPlus, 
   FaSave, 
-  FaSignInAlt, 
   FaSync, 
   FaTimes, 
   FaTrash, 
-  FaUser, 
-  FaUsb 
 } from "react-icons/fa";
-import { ActivityList } from "../../../Functions/src/components/ActivityList";
-import { ActivityDetail } from "../../../Functions/src/components/ActivityDetail";
-import { ActivityStats } from "../../../Functions/src/components/ActivityStats";
-import { UserActivity, UserActivityStats } from "../../../Functions/src/types/UserActivityType";
+import { ActivityList } from "../../components/ActivityList";
+import { ActivityDetail } from "../../components/ActivityDetail";
+import { ActivityStats } from "../../components/ActivityStats";
+import { UserActivity } from "../../types/activity";
+import { policyIcons as globalPolicyIcons } from "../../constants/policyIcons";
+
+// Define UserActivityStats interface matching the one in ActivityStats component
+interface UserActivityStats {
+  totalActivities: number;
+  averageRiskScore: number;
+  riskScoreDistribution: {
+    low: number;
+    medium: number;
+    high: number;
+    critical: number;
+  };
+  integrationBreakdown: Record<string, number>;
+  statusBreakdown: Record<string, number>;
+  breachCategories: Record<string, number>;
+  timeDistribution: {
+    morning: number;
+    afternoon: number;
+    evening: number;
+    night?: number;
+  };
+}
 
 interface AlertRule {
   id: string;
@@ -34,23 +45,6 @@ interface AlertRule {
   severity: "low" | "medium" | "high" | "critical";
   notifyVia: string[];
 }
-
-// Policy icon mapping
-const policyIcons: Record<string, React.ReactNode> = {
-  dataLeakage: <FaFile title="Data Leakage" className="text-lg" />,
-  pii: <FaUser title="PII" className="text-lg" />,
-  phi: <FaExclamationTriangle title="PHI" className="text-lg" />,
-  financial: <FaMoneyBill title="Financial" className="text-lg" />,
-  sensitive: <FaLock title="Sensitive" className="text-lg" />,
-  userAtRisk: <FaUser title="User At Risk" className="text-lg" />,
-  fraud: <FaExclamationTriangle title="Fraud" className="text-lg" />,
-  pci: <FaMoneyBill title="PCI" className="text-lg" />,
-  access: <FaKey title="Access" className="text-lg" />,
-  email: <FaEnvelope title="Email" className="text-lg" />,
-  usb: <FaUsb title="USB" className="text-lg" />,
-  cloud: <FaDatabase title="Cloud" className="text-lg" />,
-  application: <FaLaptop title="Application" className="text-lg" />
-};
 
 export default function AlertPage() {
   const [alertRules, setAlertRules] = useState<AlertRule[]>([]);
@@ -288,6 +282,7 @@ export default function AlertPage() {
                         <ActivityList 
                           activities={activities} 
                           onActivitySelect={handleActivitySelect}
+                          policyIcons={globalPolicyIcons}
                         />
                       )}
                     </>

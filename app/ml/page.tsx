@@ -2,79 +2,194 @@
 "use client";
 
 import React, { useState, useEffect } from 'react';
-import { Box, CircularProgress, Typography, Card, CardContent, Chip, Tooltip as MuiTooltip } from '@mui/material';
-import { FaExclamationTriangle } from 'react-icons/fa';
+import { Box, CircularProgress, Typography, Card, CardContent, Chip, Tooltip as MuiTooltip, LinearProgress, Button } from '@mui/material';
+import { FaExclamationTriangle, FaLightbulb } from 'react-icons/fa';
 import { RecommendationEngine } from '../../ml/recommendationEngine';
 import { UserActivity, MLRecommendation } from '../../types/activity';
+import { useAdaptiveProcessing } from '../../hooks/useAdaptiveProcessing';
+import threatLearner from '../../utils/threatLearner';
+import adaptiveConfig from '../../utils/adaptiveConfig';
+import Link from 'next/link';
 
 export default function MLPage() {
-  const [activities, setActivities] = useState<UserActivity[]>([]);
+  // State for loading stored activities
+  const [storedActivities, setStoredActivities] = useState<UserActivity[] | null>(null);
+  const [isLoadingData, setIsLoadingData] = useState(true);
+  const [dataError, setDataError] = useState<string | null>(null);
+  
+  // Use adaptive processing hook for optimized data loading
+  const {
+    activities,
+    normalizedCount,
+    isProcessing,
+    error: dataLoadError,
+    performanceMetrics,
+    mlResults,
+    mlProgress,
+    mlIsProcessing,
+    mlError
+  } = useAdaptiveProcessing(storedActivities); // Pass stored activities once loaded
+  
   const [recommendations, setRecommendations] = useState<MLRecommendation[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-
+  const [processingPhase, setProcessingPhase] = useState('initializing');
+  const [learnedPatterns, setLearnedPatterns] = useState(0);
+  const [processingComplete, setProcessingComplete] = useState(false);
+  
+  // Load activities data from storage on component mount
   useEffect(() => {
-    const fetchActivities = async () => {
+    const loadActivitiesData = async () => {
       try {
-        setLoading(true);
-        // Attempt to get data from API
-        const response = await fetch('/api/activities');
+        setIsLoadingData(true);
+        setProcessingPhase('loading-data');
         
-        if (!response.ok) {
-          throw new Error('Failed to fetch activities data');
-        }
+        // Load activities from IndexedDB only
+        const { getActivitiesFromIndexedDB } = await import('../../utils/storage');
         
-        const data = await response.json();
-        
-        if (data.activities && data.activities.length > 0) {
-          setActivities(data.activities);
+        try {
+          const activitiesData = await getActivitiesFromIndexedDB();
+          console.log(`Loaded ${activitiesData.length} activities from storage for ML analysis`);
           
-          // Use our ML recommendation engine
-          const engine = new RecommendationEngine({
-            sensitivityLevel: 'medium',
-            confidenceThreshold: 0.65,
-            maxRecommendations: 20,
-            useAdvancedAnalysis: true,
-          });
+          if (activitiesData.length === 0) {
+            setDataError('No activity data available. Please upload data from the Upload page first.');
+            setIsLoadingData(false);
+            setLoading(false);
+            return;
+          }
           
-          const mlRecommendations = engine.generateRecommendations(data.activities);
-          setRecommendations(mlRecommendations);
-          
-          setError(null);
-        } else {
-          setActivities([]);
-          setError('No activity data found');
+          // Set the loaded activities to state to trigger processing
+          setStoredActivities(activitiesData);
+          setIsLoadingData(false);
+        } catch (storageError) {
+          console.error('Error accessing IndexedDB:', storageError);
+          setDataError('Error accessing data storage. Please try uploading data again.');
+          setIsLoadingData(false);
+          setLoading(false);
         }
       } catch (err) {
-        console.error('Error loading activities:', err);
-        setError('Failed to load activities data');
-        
-        // Fallback to check localStorage if API fails
-        try {
-          const storedData = localStorage.getItem('processedActivityData');
-          if (storedData) {
-            const parsedData = JSON.parse(storedData);
-            if (Array.isArray(parsedData) && parsedData.length > 0) {
-              setActivities(parsedData);
-              
-              // Use our ML recommendation engine
-              const engine = new RecommendationEngine();
-              const mlRecommendations = engine.generateRecommendations(parsedData);
-              setRecommendations(mlRecommendations);
-              
-              setError(null);
-            }
-          }
-        } catch (localErr) {
-          console.error('Error loading from localStorage:', localErr);
-        }
-      } finally {
+        console.error('Error loading activities data:', err);
+        setDataError('Error loading activity data. Please try refreshing the page.');
+        setIsLoadingData(false);
         setLoading(false);
       }
     };
-
-    fetchActivities();
+    
+    loadActivitiesData();
   }, []);
+  
+  // Enhanced ML processing with performance tracking and caching
+  useEffect(() => {
+    const processMLInsights = async () => {
+      try {
+        if (!activities || activities.length === 0) {
+          // Don't try to process if we don't have activities
+          if (!isProcessing && !isLoadingData) {
+            setLoading(false);
+            setError(dataLoadError || dataError || 'No activity data available. Please upload data first.');
+          }
+          return;
+        }
+        
+        setLoading(true);
+        setProcessingPhase('analyzing-data');
+        
+        // Check if we have cached recommendations in localStorage
+        const activityHash = hashActivities(activities);
+        const cachedRecommendationsKey = `ml_recommendations_${activityHash}`;
+        const cachedResults = localStorage.getItem(cachedRecommendationsKey);
+        
+        if (cachedResults) {
+          try {
+            const parsedCache = JSON.parse(cachedResults);
+            if (parsedCache && Array.isArray(parsedCache) && parsedCache.length > 0) {
+              console.log('Using cached ML recommendations');
+              setRecommendations(parsedCache);
+              setProcessingPhase('using-cached-results');
+              setLoading(false);
+              setProcessingComplete(true);
+              return;
+            }
+          } catch (cacheError) {
+            console.warn('Error parsing cached recommendations:', cacheError);
+          }
+        }
+        
+        // If no cache, go through full processing
+        setProcessingPhase('analyzing-patterns');
+        
+        // Use our threat learner to discover new patterns
+        const newPatterns = threatLearner.learnPatternsFromActivities(activities);
+        setLearnedPatterns(newPatterns);
+        
+        // Analyze activities with threat learner
+        const threatAnalysis = threatLearner.analyzeActivities(activities);
+        console.log('Threat analysis complete:', threatAnalysis.summary);
+        
+        // Progress update
+        setProcessingPhase('generating-recommendations');
+        
+        // Configure the recommendation engine with optimal settings based on device
+        await adaptiveConfig.initialize();
+        const sensitivityLevel = adaptiveConfig.shouldEnableFeature('highPrecisionML') ? 'high' : 'medium';
+        const useAdvancedAnalysis = adaptiveConfig.shouldEnableFeature('advancedMLAnalysis');
+        
+        console.log(`ML Configuration: sensitivity=${sensitivityLevel}, advanced=${useAdvancedAnalysis}`);
+        
+        // Use our ML recommendation engine with optimized settings
+        const engine = new RecommendationEngine({
+          sensitivityLevel,
+          confidenceThreshold: 0.65,
+          maxRecommendations: 20,
+          useAdvancedAnalysis
+        });
+        
+        setProcessingPhase('processing-recommendations');
+        const mlRecommendations = engine.generateRecommendations(activities);
+        
+        // Store recommendations in cache
+        if (mlRecommendations && mlRecommendations.length > 0) {
+          try {
+            localStorage.setItem(cachedRecommendationsKey, JSON.stringify(mlRecommendations));
+            console.log('Cached ML recommendations for future use');
+          } catch (storageError) {
+            console.warn('Failed to cache recommendations:', storageError);
+          }
+        }
+        
+        setRecommendations(mlRecommendations);
+        setError(null);
+        setProcessingComplete(true);
+      } catch (err) {
+        console.error('Error in ML processing:', err);
+        setError('Failed to generate ML insights: ' + (err instanceof Error ? err.message : String(err)));
+      } finally {
+        setLoading(false);
+        setProcessingPhase('complete');
+      }
+    };
+    
+    // Only process when activities are loaded and not already processing
+    if (!isProcessing && !isLoadingData && activities && activities.length > 0) {
+      processMLInsights();
+    }
+  }, [activities, isProcessing, dataLoadError, dataError, isLoadingData]);
+  
+  // Helper to create a simple hash of activities for caching
+  const hashActivities = (activities: UserActivity[]): string => {
+    try {
+      // Create a signature using activity count, newest timestamp, and data size
+      const count = activities.length;
+      const newest = activities.reduce((latest, act) => {
+        if (!act.timestamp) return latest;
+        const time = new Date(act.timestamp).getTime();
+        return time > latest ? time : latest;
+      }, 0);
+      return `${count}_${newest}_${JSON.stringify(activities).length}`;
+    } catch (e) {
+      return String(activities.length);
+    }
+  };
 
   // Get severity color for recommendations
   const getSeverityColor = (severity: string): string => {
@@ -115,6 +230,36 @@ export default function MLPage() {
       default: return 'Other Insights';
     }
   };
+  
+  // Get loading progress percentage
+  const getLoadingProgress = (): number => {
+    switch (processingPhase) {
+      case 'initializing': return 10;
+      case 'loading-data': return 20;
+      case 'analyzing-data': return 30;
+      case 'using-cached-results': return 90;
+      case 'analyzing-patterns': return 40;
+      case 'generating-recommendations': return 60;
+      case 'processing-recommendations': return 80;
+      case 'complete': return 100;
+      default: return 30;
+    }
+  };
+  
+  // Render loading status message
+  const getLoadingMessage = (): string => {
+    switch (processingPhase) {
+      case 'initializing': return 'Initializing ML engine...';
+      case 'loading-data': return 'Loading activity data...';
+      case 'analyzing-data': return 'Analyzing activity data...';
+      case 'using-cached-results': return 'Loading cached insights...';
+      case 'analyzing-patterns': return 'Analyzing activity patterns...';
+      case 'generating-recommendations': return 'Generating security insights...';
+      case 'processing-recommendations': return 'Finalizing recommendations...';
+      case 'complete': return 'Processing complete!';
+      default: return 'Processing...';
+    }
+  };
 
   return (
     <div className="w-full min-h-screen bg-[#f8f8f8] text-gray-800 p-6">
@@ -122,15 +267,37 @@ export default function MLPage() {
         <h1 className="text-2xl font-semibold">ML-Powered Security Insights</h1>
       </div>
 
-      {loading ? (
-        <div className="flex justify-center items-center h-64">
-          <CircularProgress />
+      {(isProcessing || loading || isLoadingData) ? (
+        <div className="flex flex-col justify-center items-center h-64">
+          <div className="w-64 mb-4">
+            <LinearProgress 
+              variant="determinate" 
+              value={getLoadingProgress()} 
+              color="primary" 
+              className="h-2 rounded-full"
+            />
+          </div>
+          <div className="mt-2 text-gray-600">
+            {getLoadingMessage()}
+          </div>
+          {processingPhase === 'analyzing-patterns' && learnedPatterns > 0 && (
+            <div className="mt-4 text-sm text-green-600 flex items-center">
+              <FaLightbulb className="mr-2" /> Discovered {learnedPatterns} new threat patterns!
+            </div>
+          )}
         </div>
-      ) : error ? (
+      ) : error || dataError ? (
         <div className="bg-red-100 text-red-800 p-4 rounded-md mb-6">
           <h2 className="text-lg font-semibold mb-2">Error</h2>
-          <p>{error}</p>
+          <p>{error || dataError}</p>
           <p className="mt-2">Please upload activity data to get ML insights.</p>
+          <div className="mt-4">
+            <Link href="/upload" passHref>
+              <Button variant="contained" color="primary">
+                Upload Data
+              </Button>
+            </Link>
+          </div>
         </div>
       ) : (
         <div>
@@ -162,6 +329,17 @@ export default function MLPage() {
               <div className="text-sm opacity-80">Categories</div>
             </div>
           </div>
+
+          {/* Learned Patterns Info */}
+          {learnedPatterns > 0 && (
+            <div className="bg-indigo-100 border border-indigo-200 text-indigo-800 p-4 rounded-md mb-6 flex items-center">
+              <FaLightbulb className="text-indigo-500 mr-3 text-xl" />
+              <div>
+                <h3 className="font-medium">Self-Learning System</h3>
+                <p className="text-sm">Our AI discovered {learnedPatterns} new threat patterns based on your data that will improve future detection.</p>
+              </div>
+            </div>
+          )}
 
           {/* ML Recommendations by Category */}
           {recommendations.length > 0 ? (
@@ -219,8 +397,22 @@ export default function MLPage() {
               </div>
               <h2 className="text-xl font-semibold mb-2">No ML Insights Available</h2>
               <p className="text-gray-600">
-                Upload activity data or load pre-existing data to generate ML-powered security insights.
+                Upload activity data from the data upload page to generate ML-powered security insights.
               </p>
+              <div className="mt-4">
+                <Link href="/upload" passHref>
+                  <Button variant="contained" color="primary">
+                    Upload Data
+                  </Button>
+                </Link>
+              </div>
+            </div>
+          )}
+
+          {/* Performance Metrics (if available) */}
+          {processingComplete && performanceMetrics && performanceMetrics.processingTime && (
+            <div className="bg-white rounded-lg shadow-sm p-4 text-xs text-gray-500 mt-8">
+              <p>Processing completed in {performanceMetrics.processingTime.toFixed(2)}s • {normalizedCount} activities analyzed</p>
             </div>
           )}
         </div>

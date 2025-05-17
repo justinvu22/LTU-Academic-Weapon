@@ -3,28 +3,40 @@
  */
 export interface UserActivity {
   id: string;
-  userId: string;
-  username: string;
-  user?: string;  // For backward compatibility with datasets that use 'user' instead of 'username'
-  timestamp: string;
-  time?: string;
+  user?: string;  // Primary user identifier, from 'user' field in CSV
+  username?: string; // For backward compatibility
+  userId?: string; // Optional for compatibility with schema adapter
+  
+  // Date and time fields
   date?: string;
-  integration: string;
-  activity: string;
-  status: string;
-  riskScore: number;
-  values: Record<string, any>;
-  policiesBreached: Record<string, any>;
+  time?: string;
+  hour?: number | null; // Hour of day (0-23) extracted from time field
+  timestamp?: string;
+  
+  // Activity details
+  activityType?: string; // Primary activity type field
+  activity?: string; // For backward compatibility
+  description?: string;
+  duration?: number;
+  
+  // Risk assessment
+  riskScore?: number;
+  severity?: 'low' | 'medium' | 'high' | 'critical';
+  isAnomaly?: boolean;
+  
+  // Additional metadata
+  integration?: string;
+  values?: Record<string, any>;
+  policiesBreached?: Record<string, boolean | string[] | number>;
   department?: string;
   location?: string;
+  status?: string;
   deviceId?: string;
   fileType?: string;
   fileSize?: number;
   destination?: string;
   accessType?: string;
   dataVolume?: number;
-  isAnomaly?: boolean;
-  severity?: 'low' | 'medium' | 'high' | 'critical';
 }
 
 /**

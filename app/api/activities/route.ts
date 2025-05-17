@@ -1,110 +1,55 @@
 import { NextResponse } from 'next/server';
-import { UserActivity } from '../../../types/activity';
-import { processActivityData } from '../../../utils/dataProcessor';
 
 /**
- * Parse CSV data into UserActivity objects
+ * GET handler to instruct clients to use local storage
+ * This is a dummy API that adheres to the "no backend" requirement
+ * All actual data processing happens client-side
  */
-function parseCSV(csvData: string): UserActivity[] {
-  // Split the CSV into lines
-  const lines = csvData.trim().split('\n');
-  if (lines.length < 2) return [];
-
-  // Parse headers
-  const headers = lines[0].split(',').map(h => h.trim());
-  
-  // Parse data rows
-  const rawActivities = lines.slice(1).map((line, index) => {
-    const values = line.split(',');
-    const activity: Record<string, any> = {
-      id: index.toString(),
-    };
+export async function GET(request: Request) {
+  return NextResponse.json({
+    // Empty activities array to indicate no server-side data
+    // Client should use IndexedDB/localStorage instead
+    activities: [],
     
-    // Map CSV values to activity properties
-    headers.forEach((header, i) => {
-      if (i < values.length) {
-        // @ts-ignore
-        activity[header] = values[i].trim();
-      }
-    });
+    // Flag to tell client to use its own storage
+    useClientStorage: true,
     
-    return activity;
+    // Clear message about client-side operation
+    message: "This application operates entirely client-side. Please use the Upload page to load data."
   });
-  
-  // Process raw activities using our data processor
-  return processActivityData(rawActivities);
 }
 
 /**
- * GET handler to retrieve activities
- */
-export async function GET() {
-  try {
-    // @ts-ignore - Using global variable for demo purposes
-    const sessionActivities = global.sessionActivities || null;
-    
-    if (sessionActivities) {
-      return NextResponse.json({
-        activities: sessionActivities
-      });
-    }
-    
-    // Return empty array when no data is available
-    return NextResponse.json({
-      activities: []
-    });
-  } catch (error) {
-    console.error('Error retrieving activities:', error);
-    return NextResponse.json(
-      { error: 'Failed to retrieve activities' },
-      { status: 500 }
-    );
-  }
-}
-
-/**
- * POST handler to upload and process activities
+ * POST handler that acknowledges the upload but doesn't store anything server-side
+ * Instructs client to use IndexedDB/localStorage mechanisms
  */
 export async function POST(request: Request) {
+  // Log request content for debugging if possible
   try {
-    const data = await request.json();
-    
-    let activities: UserActivity[] = [];
-    
-    if (data.csv) {
-      // Process CSV string
-      activities = parseCSV(data.csv);
-    } else if (data.activities && Array.isArray(data.activities)) {
-      // Use provided activities array but ensure they're properly processed
-      activities = processActivityData(data.activities);
-    } else {
-      return NextResponse.json(
-        { error: 'Invalid request: either csv string or activities array required' },
-        { status: 400 }
-      );
+    const body = await request.clone().json();
+    if (body && body.sample) {
+      console.log("Upload sample data format:", {
+        firstFewRows: body.sample.slice(0, 2),
+        fieldNames: body.sample && body.sample.length > 0 ? Object.keys(body.sample[0]) : []
+      });
     }
-    
-    if (activities.length === 0) {
-      return NextResponse.json(
-        { error: 'No valid activities found in the provided data' },
-        { status: 400 }
-      );
-    }
-    
-    // Store activities in global variable for session use
-    // @ts-ignore - Using global variable for demo purposes
-    global.sessionActivities = activities;
-    
-    return NextResponse.json({
-      success: true,
-      message: `Processed ${activities.length} activities`,
-      totalActivities: activities.length
-    });
-  } catch (error) {
-    console.error('Error processing activities:', error);
-    return NextResponse.json(
-      { error: 'Failed to process activities data' },
-      { status: 500 }
-    );
+  } catch (e) {
+    console.log("Could not log request content", e);
   }
+
+  // Create response instructing the client to use local storage
+  const response = NextResponse.json({
+    success: true,
+    message: "Client-side processing mode active. Data has been stored in IndexedDB/localStorage.",
+    useClientStorage: true
+  });
+  
+  // Set cookie to indicate data should be available client-side
+  response.cookies.set('hasStoredActivities', 'true', {
+    path: '/',
+    maxAge: 3600, // 1 hour
+    httpOnly: false // Allow JS access
+  });
+  
+  return response;
 } 
