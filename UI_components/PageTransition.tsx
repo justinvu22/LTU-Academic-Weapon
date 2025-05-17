@@ -19,32 +19,20 @@ export default function PageTransition({ children }: PageTransitionProps) {
   const variants = {
     hidden: { 
       opacity: 0,
-      y: 20,
-      scale: 0.98,
-      filter: 'blur(8px)',
       transition: { 
-        duration: 0.4,
-        ease: [0.4, 0.0, 0.2, 1]
+        duration: 0.08
       }
     },
     visible: { 
       opacity: 1,
-      y: 0,
-      scale: 1,
-      filter: 'blur(0px)',
       transition: { 
-        duration: 0.5,
-        ease: [0.0, 0.0, 0.2, 1] 
+        duration: 0.08
       }
     },
     exit: { 
       opacity: 0,
-      y: -10,
-      scale: 0.96,
-      filter: 'blur(8px)',
       transition: { 
-        duration: 0.3,
-        ease: [0.4, 0.0, 1, 1]
+        duration: 0.08
       }
     }
   };

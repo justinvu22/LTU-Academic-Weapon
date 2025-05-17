@@ -1,10 +1,17 @@
 "use client";
 
 import React, { useEffect, useState } from 'react';
+<<<<<<< HEAD
 import { Typography, Box, Paper, CircularProgress, Tabs, Tab, Button, Table, TableBody, TableCell, TableHead, TableRow } from '@mui/material';
 import { ActivityList } from '../../components/ActivityList';
 import { UserActivity } from '../../types/activity';
 import { policyIcons } from '../../constants/policyIcons';
+=======
+import { Typography, Box, Paper, CircularProgress, Tabs, Tab, Button, TableContainer, Table } from '@mui/material';
+import { ActivityList } from '@components/ActivityList';
+import { UserActivity } from '@types/activity';
+import { policyIcons } from '@constants/policyIcons';
+>>>>>>> 0481816de9b1c248174805c3fca29620f4a87b5c
 import '@fontsource/poppins/600.css';
 import { FaSyncAlt } from 'react-icons/fa';
 import { useSearchParams } from 'next/navigation';
@@ -384,6 +391,7 @@ export default function AlertsPage() {
   };
 
   return (
+<<<<<<< HEAD
     <Box sx={{ p: 3, minHeight: '100vh', bgcolor: '#f3f4f6', fontFamily: 'Poppins, sans-serif' }}>
       <Box display="flex" alignItems="center" justifyContent="space-between" mb={3}>
         <Tabs value={tab} onChange={(_, v) => setTab(v)} textColor="primary" indicatorColor="primary" sx={{ minHeight: 0, background: 'rgba(255,255,255,0.15)', borderRadius: 2, backdropFilter: 'blur(8px)' }}>
@@ -478,21 +486,139 @@ export default function AlertsPage() {
               <Box sx={{ flex: 1, overflow: 'hidden' }}>
                 <VirtualizedActivityList 
                   activities={activities} 
+=======
+    <div className="min-h-screen bg-[#121324] px-6 py-10 font-['IBM_Plex_Sans',Inter,sans-serif] flex flex-col">
+      <div className="w-full bg-[#121324] rounded-2xl border border-[#333] shadow-[0_2px_12px_rgba(110,95,254,0.10)] px-8 py-10 flex flex-col gap-8 mx-auto">
+        <div className="flex items-center justify-between mb-8 w-full">
+          <h1 className="text-[2rem] font-extrabold tracking-wide text-[#EEE] pl-4 border-l-4 border-[#6E5FFE] uppercase" style={{ fontFamily: "'IBM Plex Sans', Inter, sans-serif", letterSpacing: '0.04em', textShadow: '0 1px 8px #6E5FFE22' }}>Alerts</h1>
+          <button
+            onClick={fetchActivities}
+            className="inline-flex items-center gap-2 bg-gradient-to-r from-[#6E5FFE] to-[#8F7BFF] text-white font-bold px-7 py-3 rounded-xl shadow-lg hover:from-[#7C6BFF] hover:to-[#A89CFF] hover:scale-105 transition-all duration-150"
+          >
+            <FaSyncAlt className="text-lg" />
+            Refresh Alerts
+          </button>
+        </div>
+
+        <div className="relative z-10 mb-8">
+          <div className="backdrop-blur-md bg-[#1F2030]/70 border border-white/10 rounded-xl shadow-lg px-4 py-2 flex items-center w-fit mx-auto w-full">
+            <Tabs
+              value={tab}
+              onChange={(_, v) => setTab(v)}
+              aria-label="Alerts tabs"
+              TabIndicatorProps={{
+                style: {
+                  height: 6,
+                  borderRadius: 6,
+                  background: 'linear-gradient(90deg, #8B5CF6 0%, #6E5FFE 100%)',
+                  boxShadow: '0 2px 12px #8B5CF655',
+                  transition: 'all 0.3s cubic-bezier(.4,0,.2,1)',
+                }
+              }}
+              sx={{
+                minHeight: 0,
+                width: '100%',
+                '.MuiTabs-flexContainer': { gap: 2 },
+                '.MuiTab-root': {
+                  color: '#BBB',
+                  fontWeight: 700,
+                  fontSize: '1.1rem',
+                  letterSpacing: '0.08em',
+                  textTransform: 'uppercase',
+                  px: 3,
+                  py: 1.5,
+                  borderRadius: '8px',
+                  minHeight: 0,
+                  transition: 'color 0.2s, background 0.2s',
+                  fontFamily: "'IBM Plex Sans', Inter, sans-serif",
+                  '&.Mui-selected': {
+                    color: '#EEE',
+                    textShadow: '0 2px 12px #8B5CF655',
+                    background: 'linear-gradient(90deg, #8B5CF6 0%, #6E5FFE 100%)',
+                    WebkitBackgroundClip: 'text',
+                    WebkitTextFillColor: 'transparent',
+                  },
+                  '&:hover': {
+                    color: '#8B5CF6',
+                    background: 'rgba(139,92,246,0.08)',
+                  },
+                  '&:focus-visible': {
+                    outline: '2px solid #8B5CF6',
+                    outlineOffset: '2px',
+                  },
+                },
+              }}
+            >
+              <Tab label="Immediate review" />
+              <Tab label="Custom alerts" />
+              <Tab label="ALL ACTIVITY" />
+              <Tab label="Closed" />
+            </Tabs>
+          </div>
+        </div>
+
+        {loading ? (
+          <div className="flex justify-center items-center min-h-[50vh] w-full">
+            <CircularProgress sx={{ color: '#8B5CF6' }} />
+          </div>
+        ) : error ? (
+          <div className="bg-[#1F2030] rounded-lg border border-[#333] shadow-[0_2px_8px_rgba(110,95,254,0.08)] p-8 mb-8 w-full">
+            <p className="text-red-400 font-semibold">{error}</p>
+            <p className="text-gray-400 mt-4">
+              Please navigate to the Upload page to provide activity data for analysis.
+            </p>
+          </div>
+        ) : activities.length === 0 ? (
+          <div className="bg-[#1F2030] rounded-lg border border-[#333] shadow-[0_2px_8px_rgba(110,95,254,0.08)] p-8 mb-8 w-full">
+            <p className="text-gray-400">
+              No activity data available. Please navigate to the Upload page to provide data for analysis.
+            </p>
+          </div>
+        ) : (
+          <>
+            {tab === 0 && (
+              <div className="bg-[#1F2030] rounded-lg border border-[#333] shadow-[0_2px_8px_rgba(110,95,254,0.08)] p-8 mb-8 w-full">
+                <h2 className="text-[1.15rem] font-extrabold tracking-wide text-[#EEE] pl-4 border-l-4 border-[#6E5FFE] mb-6 uppercase" style={{ fontFamily: "'IBM Plex Sans', Inter, sans-serif", letterSpacing: '0.04em', textShadow: '0 1px 8px #6E5FFE22' }}>Recent High-Risk Activities</h2>
+                <ActivityList 
+                  activities={activities.filter(a => a.riskScore >= 70).slice(0, 5)} 
+>>>>>>> 0481816de9b1c248174805c3fca29620f4a87b5c
                   policyIcons={policyIcons}
                 />
-              </Box>
-            </Paper>
-          )}
-          {tab === 3 && (
-            <Paper elevation={3} sx={{ p: 3, mb: 3, background: 'rgba(255,255,255,0.20)', backdropFilter: 'blur(12px)', borderRadius: 4, border: '1px solid #e5e7eb', boxShadow: '0 4px 32px 0 rgba(80,0,120,0.10)' }}>
-              <Typography variant="h6" gutterBottom sx={{ color: '#232846', fontFamily: 'Poppins, sans-serif' }}>
-                Closed Alerts
-              </Typography>
-              <Typography sx={{ fontFamily: 'Poppins, sans-serif' }}>Coming soon.</Typography>
-            </Paper>
-          )}
-        </>
-      )}
-    </Box>
+              </div>
+            )}
+            {tab === 1 && (
+              <div className="bg-[#1F2030] rounded-lg border border-[#333] shadow-[0_2px_8px_rgba(110,95,254,0.08)] p-8 mb-8 w-full">
+                <h2 className="text-[1.15rem] font-extrabold tracking-wide text-[#EEE] pl-4 border-l-4 border-[#6E5FFE] mb-6 uppercase" style={{ fontFamily: "'IBM Plex Sans', Inter, sans-serif", letterSpacing: '0.04em', textShadow: '0 1px 8px #6E5FFE22' }}>Custom Alerts</h2>
+                {customAlerts.length === 0 ? (
+                  <p className="text-gray-400">No custom alerts yet. Alerts saved from the Custom Alerts page will appear here.</p>
+                ) : (
+                  <ActivityList activities={customAlerts} policyIcons={policyIcons} />
+                )}
+              </div>
+            )}
+            {tab === 2 && (
+              <div className="bg-[#1F2030] rounded-lg border border-[#333] shadow-[0_2px_8px_rgba(110,95,254,0.08)] p-8 mb-8 h-[calc(100vh-280px)] flex flex-col w-full">
+                <h2 className="text-[1.15rem] font-extrabold tracking-wide text-[#EEE] pl-4 border-l-4 border-[#6E5FFE] mb-6 uppercase" style={{ fontFamily: "'IBM Plex Sans', Inter, sans-serif", letterSpacing: '0.04em', textShadow: '0 1px 8px #6E5FFE22' }}>All Activities</h2>
+                <div className="flex-1 overflow-hidden">
+                  <FullHeightActivityList 
+                    activities={activities} 
+                    policyIcons={policyIcons}
+                  />
+                </div>
+              </div>
+            )}
+            {tab === 3 && (
+              <div className="bg-[#1F2030] rounded-lg border border-[#333] shadow-[0_2px_8px_rgba(110,95,254,0.08)] p-8 mb-8 w-full">
+                <h2 className="text-[1.15rem] font-extrabold tracking-wide text-[#EEE] pl-4 border-l-4 border-[#6E5FFE] mb-6 uppercase" style={{ fontFamily: "'IBM Plex Sans', Inter, sans-serif", letterSpacing: '0.04em', textShadow: '0 1px 8px #6E5FFE22' }}>Closed Alerts</h2>
+                <ActivityList 
+                  activities={activities.filter(a => a.status === 'closed')} 
+                  policyIcons={policyIcons}
+                />
+              </div>
+            )}
+          </>
+        )}
+      </div>
+    </div>
   );
 }

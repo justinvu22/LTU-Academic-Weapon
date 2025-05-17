@@ -54,7 +54,6 @@ const LeftSidebar: React.FC<LeftSidebarProps> = ({ activeLink, alertCount = 0, c
         border-r-0
         transition-all duration-300
         overflow-hidden
-        rounded-tr-3xl rounded-br-3xl
       `}
     >
       <div className={`flex flex-col flex-1`}>
@@ -109,6 +108,7 @@ const LeftSidebar: React.FC<LeftSidebarProps> = ({ activeLink, alertCount = 0, c
               </Link>
             ))}
           </div>
+          {/* Analysis Engine Section */}
           {!collapsed && (
             <>
               <div className="mx-2 my-6">
@@ -170,6 +170,7 @@ const LeftSidebar: React.FC<LeftSidebarProps> = ({ activeLink, alertCount = 0, c
             </>
           )}
         </nav>
+        {/* Bottom Section */}
         <div className={`mt-auto ${collapsed ? 'p-2' : 'p-4'} border-t border-t-gray-700 bg-transparent`}>
           <nav>
             <div className={`flex flex-col ${collapsed ? 'gap-0' : 'gap-3'}`}>
