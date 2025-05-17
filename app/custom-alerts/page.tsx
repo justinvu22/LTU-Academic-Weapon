@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState } from "react";
-import { FaInfoCircle, FaPlus, FaMinus, FaChevronDown, FaEnvelope, FaFileAlt, FaSignInAlt } from "react-icons/fa";
+import { FaInfoCircle, FaPlus, FaMinus, FaChevronDown, FaEnvelope, FaFileAlt, FaSignInAlt, FaArrowLeft } from "react-icons/fa";
 import Tooltip from '@mui/material/Tooltip';
 import '@fontsource/ibm-plex-sans/400.css';
 import '@fontsource/ibm-plex-sans/500.css';
@@ -9,6 +9,7 @@ import '@fontsource/ibm-plex-sans/600.css';
 import ComboBox, { ComboBoxOption } from '../../components/ComboBox';
 import TextField from '@mui/material/TextField';
 import Switch from '@mui/material/Switch';
+import Link from 'next/link';
 
 const usersList = [
   "caleb.ross@zenith.com",
@@ -551,11 +552,17 @@ const CustomAlertsPage = () => {
         </div>
 
         {/* Save Button */}
-        <div className="flex justify-end">
-          <button
-            className="bg-gradient-to-r from-[#6E5FFE] to-[#8F7BFF] hover:from-[#7C6BFF] hover:to-[#A89CFF] text-white font-bold text-[18px] px-10 py-4 rounded-xl shadow-lg transition-all duration-150 transform hover:scale-105 focus:outline-none focus:ring-2 focus:ring-[#6E5FFE] focus:ring-offset-2"
-            style={{ letterSpacing: 0.5 }}
-          >
+        <div className="flex items-center justify-between mt-6 w-full">
+          <Link href="/custom-alerts">
+            <button
+              className="flex items-center justify-center w-12 h-12 rounded-full border border-[#6E5FFE] text-[#6E5FFE] bg-[#191938] hover:bg-[#232346] hover:text-white transition-all duration-150 focus:outline-none shadow-lg"
+              aria-label="Back"
+              title="Back"
+            >
+              <FaArrowLeft style={{ width: 22, height: 22 }} />
+            </button>
+          </Link>
+          <button className="bg-gradient-to-r from-[#6E5FFE] to-[#8B5CF6] hover:from-[#7C6BFF] hover:to-[#A89CFF] text-white font-bold text-[18px] px-10 py-4 rounded-xl shadow-lg transition-all duration-150 transform hover:scale-105 focus:outline-none focus:ring-2 focus:ring-[#6E5FFE] focus:ring-offset-2">
             Save Alert
           </button>
         </div>
