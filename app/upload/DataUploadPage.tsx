@@ -20,6 +20,7 @@ export default function DataUploadPage() {
   const [uploadComplete, setUploadComplete] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [uploadStats, setUploadStats] = useState<{ rows: number } | null>(null);
+  const [isUploadHovered, setIsUploadHovered] = useState(false);
 
   const onDrop = useCallback((acceptedFiles: File[]) => {
     setErrorMessage(null);
@@ -161,13 +162,13 @@ export default function DataUploadPage() {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-b from-[#0F172A] to-[#7928CA] px-4 sm:px-6 py-12 font-poppins">
-      <div className="max-w-7xl w-full mx-auto">
-        <h1 className="text-white text-3xl font-bold drop-shadow-lg mb-8">Upload CSV</h1>
+    <div className="min-h-screen bg-[#121324] px-6 py-10 font-['IBM_Plex_Sans',Inter,sans-serif] flex flex-col">
+      <div className="w-full bg-[#121324] rounded-2xl border border-[#333] shadow-[0_2px_12px_rgba(110,95,254,0.10)] px-8 py-10 flex flex-col gap-8 mx-auto">
+        <h1 className="text-[2rem] font-extrabold tracking-wide text-[#EEE] pl-4 border-l-4 border-[#6E5FFE] uppercase mb-8" style={{ fontFamily: "'IBM Plex Sans', Inter, sans-serif", letterSpacing: '0.04em', textShadow: '0 1px 8px #6E5FFE22' }}>Upload CSV</h1>
 
         {/* Upload Form Card */}
-        <div className="bg-[#1E1E2F] rounded-2xl shadow-[inset_-4px_-4px_8px_#2a2a40,inset_4px_4px_8px_#0e0e1e] p-8 mb-10 animate-fadeIn transition-all duration-300 w-full">
-          <h2 className="text-xl font-semibold text-white mb-4">Upload Activity Data CSV</h2>
+        <div className="bg-[#1F2030] border border-[#333] rounded-xl shadow-[0_2px_8px_rgba(110,95,254,0.08)] p-8 mb-10 animate-fadeIn transition-all duration-300 w-full overflow-hidden">
+          <h2 className="text-xl font-extrabold text-[#EEE] uppercase tracking-wide mb-4">Upload Activity Data CSV</h2>
           <p className="text-gray-300 mb-6 leading-relaxed">Upload a CSV file containing user activity data to analyze for policy breaches and security risks. The CSV should include columns for user ID, timestamp, activity type, and potential policy breaches.</p>
           {errorMessage && (
             <div className="w-full mb-3 p-3 rounded-xl bg-red-500/10 text-red-400 text-center font-semibold shadow transition-all duration-300">
@@ -180,13 +181,13 @@ export default function DataUploadPage() {
             {...getRootProps()} 
             className={`border-2 border-dashed rounded-xl p-8 mb-6 transition-all duration-300 cursor-pointer
               ${isDragActive 
-                ? 'border-[#3B82F6] bg-[#3B82F6]/10' 
-                : 'border-gray-600 hover:border-[#3B82F6] hover:bg-[#3B82F6]/5'
+                ? 'border-[#8B5CF6] bg-[#8B5CF6]/10' 
+                : 'border-gray-600 hover:border-[#8B5CF6] hover:bg-[#8B5CF6]/5'
               }`}
           >
             <input {...getInputProps()} />
             <div className="flex flex-col items-center justify-center text-center">
-              <UploadFile className={`w-12 h-12 mb-4 ${isDragActive ? 'text-[#3B82F6]' : 'text-gray-400'}`} />
+              <UploadFile className={`w-12 h-12 mb-4 ${isDragActive ? 'text-[#8B5CF6]' : 'text-gray-400'}`} />
               <p className="text-lg font-medium text-white mb-2">
                 {isDragActive ? 'Drop your CSV file here' : 'Drag & drop your CSV file here'}
               </p>
@@ -202,8 +203,11 @@ export default function DataUploadPage() {
                 type="button"
                 onClick={handleUpload}
                 disabled={!file || isUploading || uploadComplete}
-                className={`inline-flex items-center gap-2 bg-gradient-to-r from-[#8B5CF6] to-[#EC4899] text-white font-semibold px-6 py-3 rounded-full shadow-lg hover:scale-105 hover:shadow-xl transition-all duration-300 w-full disabled:opacity-60 disabled:cursor-not-allowed`}
+                className={`inline-flex items-center justify-center gap-2 bg-gradient-to-r from-[#8B5CF6] to-[#EC4899] text-white font-semibold px-6 py-3 rounded-full shadow-lg hover:shadow-xl transition-all duration-300 w-full disabled:opacity-60 disabled:cursor-not-allowed`}
                 aria-label="Upload File"
+                onMouseEnter={() => setIsUploadHovered(true)}
+                onMouseLeave={() => setIsUploadHovered(false)}
+                style={{ transform: isUploadHovered ? 'scale(1.02)' : 'scale(1)' }}
               >
                 {isUploading ? (
                   <>
@@ -229,8 +233,8 @@ export default function DataUploadPage() {
 
         {/* Process Data Card */}
         {uploadComplete && (
-          <div className="bg-[#1E1E2F] rounded-2xl shadow-[inset_-4px_-4px_8px_#2a2a40,inset_4px_4px_8px_#0e0e1e] p-8 mb-10 animate-fadeIn transition-all duration-300 w-full">
-            <h2 className="text-lg font-semibold text-white mb-4">Process Data</h2>
+          <div className="bg-[#1F2030] border border-[#333] rounded-xl shadow-[0_2px_8px_rgba(110,95,254,0.08)] p-8 mb-10 animate-fadeIn transition-all duration-300 w-full">
+            <h2 className="text-lg font-extrabold text-[#EEE] uppercase tracking-wide mb-4">Process Data</h2>
             <p className="text-gray-300 mb-6 leading-relaxed">Your data has been uploaded successfully. Click the button below to process the data and generate analytics on the alerts dashboard.</p>
             <button
               type="button"
@@ -250,8 +254,8 @@ export default function DataUploadPage() {
         )}
 
         {/* CSV Format Requirements Card */}
-        <div className="bg-[#1E1E2F] rounded-2xl shadow-[inset_-4px_-4px_8px_#2a2a40,inset_4px_4px_8px_#0e0e1e] p-8 mb-10 animate-fadeIn transition-all duration-300 w-full">
-          <h2 className="text-lg font-semibold text-white mb-4">CSV Format Requirements</h2>
+        <div className="bg-[#1F2030] border border-[#333] rounded-xl shadow-[0_2px_8px_rgba(110,95,254,0.08)] p-8 mb-10 animate-fadeIn transition-all duration-300 w-full">
+          <h2 className="text-lg font-extrabold text-[#EEE] uppercase tracking-wide mb-4">CSV Format Requirements</h2>
           <ul className="list-disc list-inside space-y-2 text-gray-300 leading-relaxed">
             <li><span className="font-bold text-white">id</span> - Unique identifier for the activity</li>
             <li><span className="font-bold text-white">userId</span> - User identifier</li>
