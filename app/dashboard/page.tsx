@@ -145,6 +145,14 @@ export default function DashboardPage() {
     }
   };
 
+  const DISTRIBUTION_TABS = [
+    { label: 'Status', key: 'status', data: statusDistribution },
+    { label: 'Time', key: 'time', data: timeDistribution },
+    { label: 'Risk', key: 'risk', data: riskDistribution },
+    { label: 'Integration', key: 'integration', data: integrationDistribution },
+  ];
+  const [selectedDistributionTab, setSelectedDistributionTab] = useState('status');
+
   const fetchActivities = async () => {
     try {
       console.log('Fetching activities data...');
@@ -1169,22 +1177,28 @@ export default function DashboardPage() {
             {/* Tab Panels */}
             <TabPanel value={activeTab} index={0}>
               {/* Distribution Cards Section */}
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
-                <div className="bg-[#1F2030]/70 backdrop-blur-md border border-white/10 rounded-xl shadow-lg p-6">
-                  <h2 className="text-lg font-extrabold text-[#8B5CF6] uppercase tracking-wide mb-2">Risk Distribution</h2>
-                  <DistributionBars data={riskDistribution} type="risk" />
-                </div>
-                <div className="bg-[#1F2030]/70 backdrop-blur-md border border-white/10 rounded-xl shadow-lg p-6">
-                  <h2 className="text-lg font-extrabold text-[#8B5CF6] uppercase tracking-wide mb-2">Integration Distribution</h2>
-                  <DistributionBars data={integrationDistribution} type="integration" />
-                </div>
-                <div className="bg-[#1F2030]/70 backdrop-blur-md border border-white/10 rounded-xl shadow-lg p-6">
-                  <h2 className="text-lg font-extrabold text-[#8B5CF6] uppercase tracking-wide mb-2">Status Distribution</h2>
-                  <DistributionBars data={statusDistribution} type="status" />
-                </div>
-                <div className="bg-[#1F2030]/70 backdrop-blur-md border border-white/10 rounded-xl shadow-lg p-6">
-                  <h2 className="text-lg font-extrabold text-[#8B5CF6] uppercase tracking-wide mb-2">Time Distribution</h2>
-                  <DistributionBars data={timeDistribution} type="time" />
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-8 w-full mb-8">
+                <div className="lg:col-span-2 bg-[#1F2030]/70 backdrop-blur-md border border-white/10 rounded-xl shadow-lg p-6 flex flex-col justify-between">
+                  <div className="flex mb-4">
+                    {DISTRIBUTION_TABS.map(tab => (
+                      <button
+                        key={tab.key}
+                        className={`px-4 py-2 font-bold uppercase tracking-wide rounded-t transition-colors duration-200 ${selectedDistributionTab === tab.key ? 'text-[#8B5CF6] border-b-4 border-[#8B5CF6] bg-[#232346]/60' : 'text-gray-300 hover:text-[#8B5CF6] border-b-4 border-transparent'}`}
+                        onClick={() => setSelectedDistributionTab(tab.key)}
+                      >
+                        {tab.label} Distribution
+                      </button>
+                    ))}
+                  </div>
+                  <div className="mt-2 min-h-[220px] flex items-start w-full">
+                    {DISTRIBUTION_TABS.map(tab => (
+                      selectedDistributionTab === tab.key && (
+                        <div className="w-full">
+                          <DistributionBars key={tab.key} data={tab.data} type={tab.key} />
+                        </div>
+                      )
+                    ))}
+                  </div>
                 </div>
               </div>
 
