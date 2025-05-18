@@ -1343,7 +1343,7 @@ export default function DashboardPage() {
                               <span
                                 className="px-4 py-1 rounded-full font-semibold text-sm shadow-md transition-transform duration-150 border"
                                 style={{
-                                  background: `linear-gradient(90deg, ${(POLICY_COLORS[entry.category] || Object.values(COLORS.risk)[idx % 4])} 80%, #fff2 100%)`,
+                                  background: `${POLICY_COLORS[entry.category] || Object.values(COLORS.risk)[idx % 4]}`,
                                   color: '#fff',
                                   boxShadow: '0 2px 8px rgba(0,0,0,0.10)',
                                   border: `1.5px solid ${(POLICY_COLORS[entry.category] || Object.values(COLORS.risk)[idx % 4])}`,
@@ -1354,6 +1354,8 @@ export default function DashboardPage() {
                                   borderRadius: 9999,
                                   marginLeft: 4,
                                   cursor: 'pointer',
+                                  backgroundImage: 'linear-gradient(0deg, rgba(255,255,255,0.08), rgba(255,255,255,0.02))',
+                                  backdropFilter: 'blur(2px)',
                                 }}
                                 onMouseOver={e => e.currentTarget.style.transform = 'scale(1.06)'}
                                 onMouseOut={e => e.currentTarget.style.transform = 'scale(1)'}
