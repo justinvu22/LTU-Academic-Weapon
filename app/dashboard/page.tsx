@@ -165,6 +165,13 @@ export default function DashboardPage() {
   ];
   const [selectedDistributionTab, setSelectedDistributionTab] = useState('status');
 
+  // Add hoveredBar state for hover animation
+  const [hoveredBar, setHoveredBar] = React.useState<number | null>(null);
+  const maxBarHeight = 120;
+  const minBarHeight = 32;
+  const barBaseHeight = (count: number) => Math.max(minBarHeight, Math.min(maxBarHeight, (count / Math.max(...statusDistribution.map(e => e.count))) * maxBarHeight));
+  const barHoverHeight = (count: number) => barBaseHeight(count) + 28;
+
   const fetchActivities = async () => {
     try {
       console.log('Fetching activities data...');
@@ -476,8 +483,8 @@ export default function DashboardPage() {
                   className="font-medium"
                   style={{
                     fontFamily: 'IBM Plex Sans, Inter, sans-serif',
-                    fontWeight: 500,
-                    fontSize: '1rem',
+                    fontWeight: 600,
+                    fontSize: '1.25rem', // 20px, bigger
                     color: '#EEE',
                     letterSpacing: '0.02em',
                     textShadow: '0 1px 8px #0008',
@@ -487,11 +494,11 @@ export default function DashboardPage() {
                   {item.name}
                 </span>
                 <span
-                  className="font-semibold"
+                  className="font-extrabold"
                   style={{
                     fontFamily: 'IBM Plex Sans, Inter, sans-serif',
-                    fontWeight: 600,
-                    fontSize: '1.125rem', // 18px
+                    fontWeight: 800,
+                    fontSize: '1.5rem', // 24px, bigger
                     color: '#EEE',
                     textShadow: '0 1px 8px #0008',
                     letterSpacing: '0.02em',
@@ -505,7 +512,7 @@ export default function DashboardPage() {
               <div
                 className="relative w-full cursor-pointer select-none"
                 style={{
-                  height: isHovered ? 12 : 10,
+                  height: isHovered ? 18 : 16, // bigger bar height
                   transition: 'height 120ms cubic-bezier(.4,0,.2,1), transform 120ms cubic-bezier(.4,0,.2,1)',
                   transform: isHovered ? 'scale(1.015)' : 'scale(1)',
                 }}
@@ -1206,23 +1213,24 @@ export default function DashboardPage() {
             <TabPanel value={activeTab} index={0}>
               {/* --- SECTION 1: Top Row --- */}
               <div className="w-full mb-10" style={{ display: 'grid', gridTemplateColumns: '30% 70%', gridTemplateRows: 'minmax(400px, auto)', gap: '2rem', alignItems: 'stretch' }}>
-                {/* Left column: Policy Breach 1 & 2 */}
-                <div style={{ display: 'flex', flexDirection: 'row', height: '100%', gap: '1.5rem' }}>
-                  {/* Policy Breach 1 */}
-                  <div className="rounded-2xl shadow-[0_4px_32px_#9c7bed22] bg-[#1f1f2e] border border-[#2d2e44] p-8 flex flex-col items-center justify-center h-full" style={{ maxWidth: 280, width: '100%', boxSizing: 'border-box' }}>
-                    <h2 className="text-lg font-extrabold text-[#A084E8] uppercase tracking-wide mb-4">Policy Breach 1</h2>
-                    {policyBreachData.length > 0 ? (
-                      <div className="flex flex-col items-center w-full justify-center">
-                        {/* Donut chart */}
-                        <div className="relative flex items-center justify-center w-full" style={{ width: 220, height: 220, maxWidth: '100%' }}>
-                          <ResponsiveContainer width={220} height={220}>
+                {/* Unified Policy Breach Card */}
+                <div style={{ height: '100%' }}>
+                  <div
+                    className="backdrop-blur-md bg-[#232346cc] border border-[#6E5FFE33] shadow-[0_4px_32px_#8B5CF655] rounded-3xl flex flex-row items-center h-full px-10 py-8 gap-8"
+                    style={{ minHeight: 340, boxSizing: 'border-box', position: 'relative' }}
+                  >
+                    {/* Donut Chart - larger, right side compact, divider restored */}
+                    <div className="flex flex-col items-center justify-center" style={{ minWidth: 300, maxWidth: 340, flex: '0 0 300px' }}>
+                      {policyBreachData.length > 0 ? (
+                        <div className="relative flex items-center justify-center w-full" style={{ width: 300, height: 300, maxWidth: '100%' }}>
+                          <ResponsiveContainer width={300} height={300}>
                             <PieChart>
                               <Pie
                                 data={policyBreachData}
                                 cx="50%"
                                 cy="50%"
-                                innerRadius={70}
-                                outerRadius={100}
+                                innerRadius={105}
+                                outerRadius={140}
                                 paddingAngle={2}
                                 dataKey="count"
                                 startAngle={90}
@@ -1230,7 +1238,7 @@ export default function DashboardPage() {
                                 stroke="none"
                               >
                                 {policyBreachData.map((entry, idx) => (
-                                  <Cell key={`cell-${idx}`} fill={POLICY_COLORS[entry.category] || COLORS.risk[idx % 4 === 0 ? 'critical' : idx % 4 === 1 ? 'high' : idx % 4 === 2 ? 'medium' : 'low']} />
+                                  <Cell key={`cell-${idx}`} fill={POLICY_COLORS[entry.category] || Object.values(COLORS.risk)[idx % 4]} />
                                 ))}
                               </Pie>
                             </PieChart>
@@ -1240,10 +1248,10 @@ export default function DashboardPage() {
                             {(() => {
                               const total = policyBreachData.reduce((a, b) => a + b.count, 0);
                               const numDigits = String(total).length;
-                              let fontSize = 38;
-                              if (numDigits >= 7) fontSize = 24;
-                              else if (numDigits >= 5) fontSize = 30;
-                              else if (numDigits >= 3) fontSize = 34;
+                              let fontSize = 48;
+                              if (numDigits >= 7) fontSize = 32;
+                              else if (numDigits >= 5) fontSize = 38;
+                              else if (numDigits >= 3) fontSize = 44;
                               return (
                                 <>
                                   <span
@@ -1252,7 +1260,7 @@ export default function DashboardPage() {
                                       fontFamily: 'Inter',
                                       lineHeight: 1.1,
                                       fontSize,
-                                      maxWidth: 120,
+                                      maxWidth: 140,
                                       textAlign: 'center',
                                       wordBreak: 'break-word',
                                       letterSpacing: '-0.04em',
@@ -1265,7 +1273,7 @@ export default function DashboardPage() {
                                     style={{
                                       fontFamily: 'Inter',
                                       letterSpacing: '0.08em',
-                                      fontSize: 13,
+                                      fontSize: 14,
                                       textAlign: 'center',
                                       display: 'block',
                                     }}
@@ -1275,34 +1283,33 @@ export default function DashboardPage() {
                                 </>
                               );
                             })()}
-                          </div>
+                </div>
+                </div>
+                      ) : (
+                        <div className="flex flex-col items-center justify-center h-[300px]">
+                          <span className="text-gray-400">No policy breach data available</span>
+                </div>
+                      )}
+                </div>
+                    {/* Divider */}
+                    <div style={{ width: 2, height: 220, background: 'linear-gradient(180deg, #6E5FFE33 0%, #23234600 100%)', borderRadius: 2, margin: '0 2.5rem' }} />
+                    {/* Legend - no header */}
+                    <div className="flex flex-col justify-center gap-4 w-full" style={{ minWidth: 0 }}>
+                      {policyBreachData.length > 0 ? (
+                        <div className="flex flex-col gap-4 w-full items-start justify-center">
+                          {policyBreachData.map((entry, idx) => (
+                            <div key={entry.category} className="flex flex-row items-center gap-3">
+                              <span className="font-extrabold text-white text-lg" style={{ fontFamily: 'Inter', minWidth: 38, textAlign: 'right', letterSpacing: '0.01em' }}>{entry.count}</span>
+                              <span className="rounded-full px-2 py-0.5 text-xs font-bold shadow-md" style={{ background: POLICY_COLORS[entry.category] || Object.values(COLORS.risk)[idx % 4], color: '#fff', fontFamily: 'Inter', letterSpacing: '0.04em', fontSize: 12, minWidth: 0, borderRadius: 14, marginLeft: 4 }}>{entry.category}</span>
+              </div>
+                          ))}
                         </div>
-                      </div>
-                    ) : (
-                      <div className="flex flex-col items-center justify-center h-[220px]">
-                        <span className="text-gray-400">No policy breach data available</span>
-                      </div>
-                    )}
-                  </div>
-                  {/* Policy Breach 2 */}
-                  <div className="rounded-2xl shadow-[0_4px_32px_#9c7bed22] bg-[#1f1f2e] border border-[#2d2e44] p-8 flex flex-col items-center justify-center h-full" style={{ maxWidth: 160, width: '100%', boxSizing: 'border-box' }}>
-                    <h2 className="text-base font-extrabold text-[#A084E8] uppercase tracking-wide mb-2">Policy Breach 2</h2>
-                    {policyBreachData.length > 0 ? (
-                      <div className="flex flex-col gap-3 w-full items-center justify-center">
-                        {policyBreachData.map((entry, idx) => (
-                          <div key={entry.category} className="flex flex-row items-center gap-2">
-                            <div className="w-8 h-8 rounded-xl flex items-center justify-center shadow-lg" style={{ background: POLICY_COLORS[entry.category] || COLORS.risk[idx % 4 === 0 ? 'critical' : idx % 4 === 1 ? 'high' : idx % 4 === 2 ? 'medium' : 'low'] }}>
-                              <span className="text-xs font-extrabold text-white" style={{ fontFamily: 'Inter', letterSpacing: '0.01em', wordBreak: 'break-all' }}>{entry.count}</span>
-                            </div>
-                            <span className="text-xs font-semibold text-[#e0e6f0] text-left" style={{ fontFamily: 'Inter', letterSpacing: '0.02em', maxWidth: 60 }}>{entry.category}</span>
-                          </div>
-                        ))}
-                      </div>
-                    ) : (
-                      <div className="flex flex-col items-center justify-center h-[220px]">
-                        <span className="text-gray-400">No policy breach data available</span>
-                      </div>
-                    )}
+                      ) : (
+                        <div className="flex flex-col items-center justify-center h-[300px]">
+                          <span className="text-gray-400">No policy breach data available</span>
+                        </div>
+                      )}
+                    </div>
                   </div>
                 </div>
                 {/* Right column: Risk Trend */}
@@ -1310,10 +1317,10 @@ export default function DashboardPage() {
                   <div className="bg-[#1F2030] border border-[#333] rounded-xl shadow-lg p-8 h-full flex flex-col justify-center items-center" style={{ height: '100%', boxSizing: 'border-box' }}>
                     <h2 className="text-xl font-extrabold text-[#8B5CF6] uppercase tracking-wide mb-4">Risk Trend</h2>
                     <Box sx={{ flex: '1 1 auto', width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: 0, minWidth: 0 }}>
-                      {riskTrendData.length > 0 ? (
+                    {riskTrendData.length > 0 ? (
                         <ResponsiveContainer width="100%" height="100%" minHeight={260} minWidth={320}>
                           <AreaChart
-                            data={riskTrendData}
+                          data={riskTrendData}
                             margin={{ top: 20, right: 30, left: 0, bottom: 0 }}
                           >
                             <defs>
@@ -1383,14 +1390,14 @@ export default function DashboardPage() {
                               }}
                             />
                           </AreaChart>
-                        </ResponsiveContainer>
-                      ) : (
-                        <div className="flex flex-col items-center justify-center h-[300px]">
-                          <span className="text-gray-400">Not enough data available</span>
-                        </div>
-                      )}
-                    </Box>
-                  </div>
+                      </ResponsiveContainer>
+                    ) : (
+                      <div className="flex flex-col items-center justify-center h-[300px]">
+                        <span className="text-gray-400">Not enough data available</span>
+                      </div>
+                    )}
+                  </Box>
+                </div>
                 </div>
               </div>
 
@@ -1399,15 +1406,33 @@ export default function DashboardPage() {
                 {/* Left: Severity Trend, Status Distribution, Activity Status Distribution */}
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '2rem' }}>
                   {/* Severity Trend */}
-                  <div className="bg-[#1F2030] border border-[#333] rounded-xl shadow-lg p-6 flex flex-col">
-                  <h2 className="text-lg font-extrabold text-[#8B5CF6] uppercase tracking-wide mb-2">Severity Trend</h2>
-                  <Box sx={{ height: 300 }}>
-                    {severityTrendData.length > 0 ? (
-                      <ResponsiveContainer width="100%" height="100%">
-                        <LineChart
-                          data={severityTrendData}
+                  <div className="bg-[#1F2030] border border-[#333] rounded-xl shadow-lg p-14 flex flex-col" style={{ height: 540, minHeight: 540, marginBottom: 0 }}>
+                    <h2 className="text-lg font-extrabold text-[#8B5CF6] uppercase tracking-wide mb-2">Severity Trend</h2>
+                    <Box sx={{ height: 440 }}>
+                      {severityTrendData.length > 0 ? (
+                        <ResponsiveContainer width="100%" height="100%">
+                          <LineChart
+                            data={severityTrendData}
                             margin={{ top: 20, right: 30, left: 0, bottom: 0 }}
                           >
+                            <defs>
+                              <linearGradient id="criticalGradient" x1="0" y1="0" x2="0" y2="1">
+                                <stop offset="0%" stopColor="#FF4C4C" stopOpacity={0.35} />
+                                <stop offset="100%" stopColor="#FF4C4C" stopOpacity={0.02} />
+                              </linearGradient>
+                              <linearGradient id="highGradient" x1="0" y1="0" x2="0" y2="1">
+                                <stop offset="0%" stopColor="#FFB84C" stopOpacity={0.35} />
+                                <stop offset="100%" stopColor="#FFB84C" stopOpacity={0.02} />
+                              </linearGradient>
+                              <linearGradient id="mediumGradient" x1="0" y1="0" x2="0" y2="1">
+                                <stop offset="0%" stopColor="#4CBFFF" stopOpacity={0.35} />
+                                <stop offset="100%" stopColor="#4CBFFF" stopOpacity={0.02} />
+                              </linearGradient>
+                              <linearGradient id="lowGradient" x1="0" y1="0" x2="0" y2="1">
+                                <stop offset="0%" stopColor="#4CFF8B" stopOpacity={0.35} />
+                                <stop offset="100%" stopColor="#4CFF8B" stopOpacity={0.02} />
+                              </linearGradient>
+                            </defs>
                             <CartesianGrid strokeDasharray="6 6" stroke="#2d2e44" />
                             <XAxis dataKey="date" tick={{ fill: '#bdbdfc', fontFamily: 'Inter', fontSize: 13 }} axisLine={false} tickLine={false} />
                             <YAxis tick={{ fill: '#bdbdfc', fontFamily: 'Inter', fontSize: 13 }} axisLine={false} tickLine={false} />
@@ -1422,144 +1447,144 @@ export default function DashboardPage() {
                               dataKey="critical"
                               stroke="#FF4C4C"
                               strokeWidth={4}
-                              dot={{
-                                r: 3,
-                                fill: '#FF4C4C',
-                                stroke: 'none',
-                                filter: 'none'
-                              }}
-                              activeDot={{
-                                r: 4,
-                                fill: '#FF4C4C',
-                                stroke: 'none',
-                                filter: 'none'
-                              }}
+                              fill="url(#criticalGradient)"
+                              dot={{ r: 3, fill: '#FF4C4C', stroke: 'none', filter: 'none' }}
+                              activeDot={{ r: 4, fill: '#FF4C4C', stroke: 'none', filter: 'none' }}
                               name="Critical"
+                              isAnimationActive={true}
+                              opacity={0.95}
+                              style={{ filter: 'drop-shadow(0 0 8px #FF4C4C88)' }}
                             />
                             <Line
                               type="monotone"
                               dataKey="high"
                               stroke="#FFB84C"
                               strokeWidth={4}
-                              dot={{
-                                r: 3,
-                                fill: '#FFB84C',
-                                stroke: 'none',
-                                filter: 'none'
-                              }}
-                              activeDot={{
-                                r: 4,
-                                fill: '#FFB84C',
-                                stroke: 'none',
-                                filter: 'none'
-                              }}
+                              fill="url(#highGradient)"
+                              dot={{ r: 3, fill: '#FFB84C', stroke: 'none', filter: 'none' }}
+                              activeDot={{ r: 4, fill: '#FFB84C', stroke: 'none', filter: 'none' }}
                               name="High"
+                              isAnimationActive={true}
+                              opacity={0.95}
+                              style={{ filter: 'drop-shadow(0 0 8px #FFB84C88)' }}
                             />
                             <Line
                               type="monotone"
                               dataKey="medium"
                               stroke="#4CBFFF"
                               strokeWidth={4}
-                              dot={{
-                                r: 3,
-                                fill: '#4CBFFF',
-                                stroke: 'none',
-                                filter: 'none'
-                              }}
-                              activeDot={{
-                                r: 4,
-                                fill: '#4CBFFF',
-                                stroke: 'none',
-                                filter: 'none'
-                              }}
+                              fill="url(#mediumGradient)"
+                              dot={{ r: 3, fill: '#4CBFFF', stroke: 'none', filter: 'none' }}
+                              activeDot={{ r: 4, fill: '#4CBFFF', stroke: 'none', filter: 'none' }}
                               name="Medium"
+                              isAnimationActive={true}
+                              opacity={0.95}
+                              style={{ filter: 'drop-shadow(0 0 8px #4CBFFF88)' }}
                             />
                             <Line
                               type="monotone"
                               dataKey="low"
                               stroke="#4CFF8B"
                               strokeWidth={4}
-                              dot={{
-                                r: 3,
-                                fill: '#4CFF8B',
-                                stroke: 'none',
-                                filter: 'none'
-                              }}
-                              activeDot={{
-                                r: 4,
-                                fill: '#4CFF8B',
-                                stroke: 'none',
-                                filter: 'none'
-                              }}
+                              fill="url(#lowGradient)"
+                              dot={{ r: 3, fill: '#4CFF8B', stroke: 'none', filter: 'none' }}
+                              activeDot={{ r: 4, fill: '#4CFF8B', stroke: 'none', filter: 'none' }}
                               name="Low"
+                              isAnimationActive={true}
+                              opacity={0.95}
+                              style={{ filter: 'drop-shadow(0 0 8px #4CFF8B88)' }}
                             />
                             <Legend
                               iconType="circle"
                               wrapperStyle={{ paddingTop: 16, fontFamily: 'Inter', fontWeight: 700, fontSize: 15 }}
                               formatter={(value) => {
-                                if (value === 'Critical') return <span style={{ color: '#FF4C4C' }}>Critical</span>;
-                                if (value === 'High') return <span style={{ color: '#FFB84C' }}>High</span>;
-                                if (value === 'Medium') return <span style={{ color: '#4CBFFF' }}>Medium</span>;
-                                if (value === 'Low') return <span style={{ color: '#4CFF8B' }}>Low</span>;
+                                if (value === 'critical') return <span style={{ color: '#FF4C4C' }}>Critical</span>;
+                                if (value === 'high') return <span style={{ color: '#FFB84C' }}>High</span>;
+                                if (value === 'medium') return <span style={{ color: '#4CBFFF' }}>Medium</span>;
+                                if (value === 'low') return <span style={{ color: '#4CFF8B' }}>Low</span>;
                                 return value;
                               }}
                             />
-                        </LineChart>
-                      </ResponsiveContainer>
-                    ) : (
-                      <div className="flex flex-col items-center justify-center h-[300px]">
-                        <span className="text-gray-400">Not enough data available</span>
-                      </div>
-                    )}
-                  </Box>
-                </div>
+                          </LineChart>
+                        </ResponsiveContainer>
+                      ) : (
+                        <div className="flex flex-col items-center justify-center h-[440px]">
+                          <span className="text-gray-400">Not enough data available</span>
+                        </div>
+                      )}
+                    </Box>
+                  </div>
                   {/* Risk Distribution */}
                   <div style={{ display: 'flex', flexDirection: 'row', gap: '2rem' }}>
                     {/* Risk Distribution */}
                     <div className="rounded-[12px] shadow-[0_4px_32px_#9c7bed22] bg-[#1f1f2e] p-8 flex flex-col gap-10 w-full" style={{ minWidth: 0, minHeight: 440 }}>
-                      <h2 className="font-['Inter'] text-[18px] font-semibold tracking-wider text-[#9c7bed] mb-2">Risk Distribution</h2>
-                      {/* Distribution Filter Tabs */}
-                      <div className="flex flex-row gap-4 mb-6">
+                      <div className="flex flex-row gap-4 mb-6 px-1 py-2 rounded-lg border border-[#444] bg-transparent w-fit mt-2" style={{ boxShadow: '0 1px 8px #6E5FFE11' }}>
                         {DISTRIBUTION_TABS.map(tab => (
                           <button
                             key={tab.key}
-                            className={`px-4 py-1.5 rounded-lg font-semibold text-sm transition-all duration-150 ${selectedDistributionTab === tab.key ? 'bg-[#8B5CF6] text-white shadow' : 'bg-[#232346] text-[#bdbdfc] hover:bg-[#2d2e44]'}`}
+                            className={`relative px-7 py-2 rounded-md font-extrabold text-base tracking-widest uppercase transition-all duration-200
+                              ${selectedDistributionTab === tab.key
+                                ? 'text-[#A084E8] border-none outline-none'
+                                : 'text-[#bdbdfc] border-none outline-none hover:text-[#A084E8]'}
+                            `}
+                            style={{
+                              fontFamily: 'Inter',
+                              letterSpacing: '0.08em',
+                              background: 'transparent',
+                              boxShadow: 'none',
+                              border: 'none',
+                              position: 'relative',
+                            }}
                             onClick={() => setSelectedDistributionTab(tab.key)}
-                            style={{ fontFamily: 'Inter', letterSpacing: '0.04em' }}
                           >
                             {tab.label}
+                            {selectedDistributionTab === tab.key && (
+                              <span
+                                className="absolute left-1/2 -translate-x-1/2 bottom-0 h-1 rounded-full"
+                                style={{
+                                  width: '70%',
+                                  background: 'linear-gradient(90deg, #A084E8 0%, #6E5FFE 100%)',
+                                  boxShadow: '0 2px 8px #A084E855',
+                                  transition: 'all 0.25s cubic-bezier(.4,0,.2,1)',
+                                }}
+                              />
+                            )}
                           </button>
                         ))}
                       </div>
                       {/* Show the selected distribution's bars */}
                       <DistributionBars data={DISTRIBUTION_TABS.find(tab => tab.key === selectedDistributionTab)?.data || riskDistribution} type={selectedDistributionTab} />
                 </div>
-                    {/* Activity Status Distribution */}
-                    <div className="rounded-[12px] shadow-[0_4px_32px_#9c7bed22] bg-[#1f1f2e] p-8 flex flex-col gap-10 w-full" style={{ minWidth: 0, minHeight: 440 }}>
-                      <h2 className="font-['Inter'] text-[18px] font-semibold tracking-wider text-[#9c7bed] mb-2">Activity Status Distribution</h2>
-                      <div className="flex flex-row gap-1 items-end w-full justify-center">
+                    {/* Activity Status Distribution - Premium Redesign */}
+                    <div className="rounded-[18px] shadow-[0_4px_32px_#9c7bed22] bg-[#1f1f2e] border border-[#2d2e44] p-10 flex flex-col w-full h-full" style={{ minWidth: 0, minHeight: 440, boxSizing: 'border-box' }}>
+                      <div className="flex flex-row items-end justify-evenly w-full h-full gap-10 md:gap-10 sm:gap-6 mt-6" style={{ minHeight: 260, gap: '2.5rem' }}>
                         {statusDistribution.map((entry, idx) => {
-                          const percent = totalStatus > 0 ? (entry.count / totalStatus) : 0;
+                          const color = entry.color;
+                          const isHovered = hoveredBar === idx;
                           return (
-                            <div key={entry.name} className="flex flex-col items-center w-1/6">
-                              <div className="flex flex-col items-center">
-                                <div className="w-10 h-48 flex items-end">
-                                  <div
-                                    className="w-10 transition-all duration-200 rounded-t-xl shadow-[0_4px_24px_0_rgba(110,95,254,0.18)] hover:scale-105 hover:shadow-[0_8px_32px_0_rgba(110,95,254,0.28)] cursor-pointer"
-                                    style={{
-                                      height: `${Math.max(20, percent * 192)}px`,
-                                      background: `linear-gradient(180deg, ${entry.color} 80%, ${entry.color}33 100%)`,
-                                      boxShadow: `0 2px 16px 0 ${entry.color}44, 0 1.5px 0 0 #fff2 inset`,
-                                      borderTopLeftRadius: 12,
-                                      borderTopRightRadius: 12,
-                                      borderBottomLeftRadius: 6,
-                                      borderBottomRightRadius: 6,
-                                    }}
-                                  ></div>
-                                </div>
-                                <span className="mt-3 text-[18px] font-extrabold text-white drop-shadow-[0_2px_8px_#000A] font-['Inter'] tracking-wide" style={{ letterSpacing: '0.01em', textShadow: '0 2px 8px #0008' }}>{entry.count}</span>
+                            <div key={entry.name} className="flex flex-col items-center justify-end" style={{ minWidth: 90 }}>
+                              {/* Count */}
+                              <span className="font-extrabold text-white mb-3" style={{ fontSize: 32, textShadow: '0 2px 12px #0008', letterSpacing: '0.01em', fontFamily: 'Inter' }}>{entry.count}</span>
+                              {/* Bar with hover animation */}
+                              <div className="w-12 mb-3 flex items-end justify-center" style={{ height: 140 }}>
+                                <div
+                                  className="w-12 cursor-pointer"
+                                  style={{
+                                    height: isHovered ? barHoverHeight(entry.count) : barBaseHeight(entry.count),
+                                    background: `linear-gradient(180deg, ${color} 80%, ${color}33 100%)`,
+                                    borderRadius: 24,
+                                    boxShadow: isHovered
+                                      ? `0 8px 32px 0 ${color}88, 0 2px 0 0 #fff2 inset`
+                                      : `0 4px 24px 0 ${color}44, 0 1.5px 0 0 #fff2 inset`,
+                                    transition: 'height 0.35s cubic-bezier(.4,0,.2,1), box-shadow 0.35s cubic-bezier(.4,0,.2,1)',
+                                    opacity: 1,
+                                  }}
+                                  onMouseEnter={() => setHoveredBar(idx)}
+                                  onMouseLeave={() => setHoveredBar(null)}
+                                ></div>
                               </div>
-                              <span className="mt-1 text-sm font-semibold" style={{ color: entry.color, fontFamily: 'Inter', letterSpacing: '0.04em', textShadow: '0 1px 6px #0006' }}>{entry.name}</span>
+                              {/* Label */}
+                              <span className="mt-1 font-semibold" style={{ color, fontFamily: 'Inter', fontSize: 16, letterSpacing: '0.04em', textShadow: '0 1px 6px #0006' }}>{entry.name}</span>
                             </div>
                           );
                         })}
