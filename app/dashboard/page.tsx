@@ -1102,6 +1102,14 @@ export default function DashboardPage() {
     });
   }, [statusDistribution, totalStatus]);
 
+  // Dynamic sizing for multi-ring donut chart
+  const ringCount = Math.min(policyBreachData.length, 5);
+  const chartSize = 300;
+  const padding = 10;
+  const maxOuterRadius = (chartSize / 2) - padding; // e.g., 140
+  const minInnerRadius = 80; // enough for text
+  const ringThickness = (maxOuterRadius - minInnerRadius) / ringCount;
+
   return (
     <div className="min-h-screen bg-[#121324] px-6 py-10 font-['IBM_Plex_Sans',Inter,sans-serif] flex flex-col">
       <div className="w-full bg-[#121324] rounded-2xl border border-[#333] shadow-[0_2px_12px_rgba(110,95,254,0.10)] px-8 py-10 flex flex-col gap-8 mx-auto">
@@ -1238,25 +1246,41 @@ export default function DashboardPage() {
                     {/* Donut Chart - larger, right side compact, divider restored */}
                     <div className="flex flex-col items-center justify-center" style={{ minWidth: 300, maxWidth: 340, flex: '0 0 300px' }}>
                       {policyBreachData.length > 0 ? (
-                        <div className="relative flex items-center justify-center w-full" style={{ width: 300, height: 300, maxWidth: '100%' }}>
+                        <div className="relative flex items-center justify-center w-full shadow-[0_4px_32px_#8B5CF622] rounded-full" style={{ width: 300, height: 300, maxWidth: '100%', background: 'rgba(35,35,70,0.10)' }}>
+                          <svg width="0" height="0">
+                            {policyBreachData.slice(0, ringCount).map((entry, idx) => (
+                              <defs key={entry.category}>
+                                <linearGradient id={`pb-gradient-${idx}`} x1="0" y1="0" x2="1" y2="1">
+                                  <stop offset="0%" stopColor={POLICY_COLORS[entry.category] || Object.values(COLORS.risk)[idx % 4]} stopOpacity="0.95" />
+                                  <stop offset="100%" stopColor={POLICY_COLORS[entry.category] || Object.values(COLORS.risk)[idx % 4]} stopOpacity="0.65" />
+                                </linearGradient>
+                              </defs>
+                            ))}
+                          </svg>
                           <ResponsiveContainer width={300} height={300}>
                             <PieChart>
-                              <Pie
-                                data={policyBreachData}
-                                cx="50%"
-                                cy="50%"
-                                innerRadius={105}
-                                outerRadius={140}
-                                paddingAngle={2}
-                                dataKey="count"
-                                startAngle={90}
-                                endAngle={-270}
-                                stroke="none"
-                              >
-                                {policyBreachData.map((entry, idx) => (
-                                  <Cell key={`cell-${idx}`} fill={POLICY_COLORS[entry.category] || Object.values(COLORS.risk)[idx % 4]} />
-                                ))}
-                              </Pie>
+                              {policyBreachData.slice(0, 5).map((entry, idx) => (
+                                <Pie
+                                  key={entry.category}
+                                  data={[
+                                    { name: entry.category, value: entry.count },
+                                    { name: 'remainder', value: Math.max(0, policyBreachData.reduce((sum, e) => sum + e.count, 0) - entry.count) }
+                                  ]}
+                                  dataKey="value"
+                                  cx="50%"
+                                  cy="50%"
+                                  startAngle={90}
+                                  endAngle={-270}
+                                  innerRadius={minInnerRadius + idx * ringThickness}
+                                  outerRadius={minInnerRadius + (idx + 1) * ringThickness}
+                                  stroke="none"
+                                  isAnimationActive={true}
+                                  cornerRadius={12}
+                                >
+                                  <Cell fill={`url(#pb-gradient-${idx})`} />
+                                  <Cell fill="rgba(35,35,70,0.18)" />
+                                </Pie>
+                              ))}
                             </PieChart>
                           </ResponsiveContainer>
                           {/* Center content */}
@@ -1316,7 +1340,26 @@ export default function DashboardPage() {
                           {policyBreachData.map((entry, idx) => (
                             <div key={entry.category} className="flex flex-row items-center gap-3">
                               <span className="font-extrabold text-white text-lg" style={{ fontFamily: 'Inter', minWidth: 38, textAlign: 'right', letterSpacing: '0.01em' }}>{entry.count}</span>
-                              <span className="rounded-full px-2 py-0.5 text-xs font-bold shadow-md" style={{ background: POLICY_COLORS[entry.category] || Object.values(COLORS.risk)[idx % 4], color: '#fff', fontFamily: 'Inter', letterSpacing: '0.04em', fontSize: 12, minWidth: 0, borderRadius: 14, marginLeft: 4 }}>{entry.category}</span>
+                              <span
+                                className="px-4 py-1 rounded-full font-semibold text-sm shadow-md transition-transform duration-150 border"
+                                style={{
+                                  background: `linear-gradient(90deg, ${(POLICY_COLORS[entry.category] || Object.values(COLORS.risk)[idx % 4])} 80%, #fff2 100%)`,
+                                  color: '#fff',
+                                  boxShadow: '0 2px 8px rgba(0,0,0,0.10)',
+                                  border: `1.5px solid ${(POLICY_COLORS[entry.category] || Object.values(COLORS.risk)[idx % 4])}`,
+                                  letterSpacing: '0.04em',
+                                  fontFamily: 'Inter',
+                                  fontSize: 13,
+                                  minWidth: 0,
+                                  borderRadius: 9999,
+                                  marginLeft: 4,
+                                  cursor: 'pointer',
+                                }}
+                                onMouseOver={e => e.currentTarget.style.transform = 'scale(1.06)'}
+                                onMouseOut={e => e.currentTarget.style.transform = 'scale(1)'}
+                              >
+                                {entry.category}
+                              </span>
               </div>
                           ))}
                         </div>
