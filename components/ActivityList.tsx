@@ -221,10 +221,10 @@ export const ActivityList: React.FC<ActivityListProps> = ({
         <thead>
           <tr className="bg-[#151524] text-gray-300 uppercase font-semibold">
             <th className="px-4 py-3">User</th>
-            <th className="px-4 py-3">Last Activity</th>
             <th className="px-4 py-3">Integration</th>
             <th className="px-4 py-3">Risk Score</th>
             <th className="px-4 py-3">Policy Breaches</th>
+            <th className="px-4 py-3">Last Activity</th>
           </tr>
         </thead>
         <tbody>
@@ -234,13 +234,13 @@ export const ActivityList: React.FC<ActivityListProps> = ({
               className={`odd:bg-[#24243A] even:bg-[#1E1E2F] hover:bg-[#312E51] transition-colors duration-200 border-b border-[#2E2E4A]`}
             >
               <td className="px-4 py-3 leading-relaxed text-gray-100">{getUserDisplayName(activity)}</td>
+              <td className="px-4 py-3 leading-relaxed text-gray-100">{activity.integration}</td>
+              <td className="px-4 py-3 leading-relaxed text-purple-400 font-semibold">{activity.riskScore}</td>
+              <td className="px-4 py-3 leading-relaxed">{formatBreaches(activity.policiesBreached)}</td>
               <td className="px-4 py-3 leading-relaxed text-gray-100">
                 {activity.date || activity.timestamp?.split('T')[0]}{' '}
                 {activity.time || activity.timestamp?.split('T')[1]?.split('.')[0]}
               </td>
-              <td className="px-4 py-3 leading-relaxed text-gray-100">{activity.integration}</td>
-              <td className="px-4 py-3 leading-relaxed text-purple-400 font-semibold">{activity.riskScore}</td>
-              <td className="px-4 py-3 leading-relaxed">{formatBreaches(activity.policiesBreached)}</td>
             </tr>
           ))}
         </tbody>

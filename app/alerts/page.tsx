@@ -475,11 +475,137 @@ export default function AlertsPage() {
           <>
             {tab === 0 && (
               <div className="bg-[#1F2030] rounded-lg border border-[#333] shadow-[0_2px_8px_rgba(110,95,254,0.08)] p-8 mb-8 w-full">
-                <h2 className="text-[1.15rem] font-extrabold tracking-wide text-[#EEE] pl-4 border-l-4 border-[#6E5FFE] mb-6 uppercase" style={{ fontFamily: "'IBM Plex Sans', Inter, sans-serif", letterSpacing: '0.04em', textShadow: '0 1px 8px #6E5FFE22' }}>Recent High-Risk Activities</h2>
-                <ActivityList 
-                  activities={activities.filter(a => (a.riskScore || 0) >= 70).slice(0, 5)} 
-                  policyIcons={policyIcons}
-                />
+                <h2 className="text-[1.15rem] font-extrabold tracking-wide text-[#EEE] pl-4 border-l-4 border-[#6E5FFE] mb-6 uppercase" style={{ fontFamily: "'IBM Plex Sans', Inter, sans-serif", letterSpacing: '0.04em', textShadow: '0 1px 8px #6E5FFE22' }}>Users Needing Attention</h2>
+                
+                {(() => {
+                  // Track metrics for each user
+                  interface UserMetrics {
+                    userId: string;
+                    criticalCount: number; // "C" value
+                    highRiskCount: number; // "H" value
+                    mediumRiskCount: number; // "M" value
+                    lastActivity?: Date;
+                    lastActivityString: string;
+                  }
+                  
+                  // Calculate metrics for each user
+                  const userMetrics = new Map<string, UserMetrics>();
+                  
+                  activities.forEach(activity => {
+                    const userId = activity.username || activity.user || activity.userId || '';
+                    if (!userId) return;
+                    
+                    // Calculate risk levels
+                    const riskScore = activity.riskScore || 0;
+                    const hasPolicyBreach = activity.policiesBreached && 
+                      (typeof activity.policiesBreached === 'object' ? 
+                        Object.keys(activity.policiesBreached).length > 0 : 
+                        activity.policiesBreached);
+                    
+                    // Determine activity date
+                    let activityDate: Date | undefined;
+                    let formattedDate = '';
+                    
+                    // Extract date from timestamp or date fields
+                    if (activity.timestamp) {
+                      try {
+                        activityDate = new Date(activity.timestamp);
+                        if (!isNaN(activityDate.getTime())) {
+                          formattedDate = activity.timestamp.split('T')[0]; // Get YYYY-MM-DD part
+                        }
+                      } catch (e) {
+                        // Skip invalid dates
+                      }
+                    } else if (activity.date) {
+                      // Try to convert DD/MM/YYYY to YYYY-MM-DD if needed
+                      if (activity.date.includes('/')) {
+                        const parts = activity.date.split('/');
+                        if (parts.length === 3) {
+                          formattedDate = `${parts[2]}-${parts[1].padStart(2, '0')}-${parts[0].padStart(2, '0')}`;
+                        }
+                      } else {
+                        formattedDate = activity.date;
+                      }
+                    }
+                    
+                    // Default to YYYY-MM-DD format if not set
+                    if (!formattedDate) {
+                      formattedDate = new Date().toISOString().split('T')[0];
+                    }
+                    
+                    // Get or create user metrics
+                    const metrics = userMetrics.get(userId) || {
+                      userId,
+                      criticalCount: 0,
+                      highRiskCount: 0,
+                      mediumRiskCount: 0,
+                      lastActivity: undefined,
+                      lastActivityString: formattedDate
+                    };
+                    
+                    // Update last activity if this one is more recent
+                    if (activityDate && (!metrics.lastActivity || activityDate > metrics.lastActivity)) {
+                      metrics.lastActivity = activityDate;
+                      metrics.lastActivityString = formattedDate;
+                    }
+                    
+                    // Count critical activities based on risk score or policy breaches
+                    if (riskScore >= 1000 || hasPolicyBreach) {
+                      metrics.criticalCount++;
+                    }
+                    
+                    // Update metrics
+                    userMetrics.set(userId, metrics);
+                  });
+                  
+                  // Convert to array and sort by critical count (most critical first)
+                  const sortedUsers = Array.from(userMetrics.values())
+                    // Only include users with significant number of critical activities (60 or more)
+                    .filter(metrics => metrics.criticalCount >= 60)
+                    .sort((a, b) => b.criticalCount - a.criticalCount);
+                  
+                  if (sortedUsers.length === 0) {
+                    return <p className="text-gray-400">No users with critical activities requiring immediate attention.</p>;
+                  }
+                  
+                  return (
+                    <div className="bg-[#1E1E2F] rounded-xl shadow-[inset_-4px_-4px_6px_#2a2a40,inset_4px_4px_6px_#0e0e1e] overflow-x-auto font-poppins">
+                      <table className="min-w-full text-left text-sm">
+                        <thead>
+                          <tr className="bg-[#151524] text-gray-300 uppercase font-semibold">
+                            <th className="px-4 py-3">User</th>
+                            <th className="px-4 py-3 text-right">Critical</th>
+                            <th className="px-4 py-3 text-right">High</th>
+                            <th className="px-4 py-3 text-right">Medium</th>
+                            <th className="px-4 py-3 text-right">Last Activity</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {sortedUsers.map((user, idx) => (
+                            <tr
+                              key={user.userId}
+                              className={`odd:bg-[#24243A] even:bg-[#1E1E2F] hover:bg-[#312E51] transition-colors duration-200 border-b border-[#2E2E4A]`}
+                            >
+                              <td className="px-4 py-3 leading-relaxed text-gray-100">{user.userId}</td>
+                              <td className="px-4 py-3 text-right leading-relaxed text-red-400 font-semibold">
+                                {user.criticalCount > 0 ? `${user.criticalCount} C` : ''}
+                              </td>
+                              <td className="px-4 py-3 text-right leading-relaxed text-orange-400 font-semibold">
+                                {user.highRiskCount > 0 ? `${user.highRiskCount} H` : ''}
+                              </td>
+                              <td className="px-4 py-3 text-right leading-relaxed text-yellow-400 font-semibold">
+                                {user.mediumRiskCount > 0 ? `${user.mediumRiskCount} M` : ''}
+                              </td>
+                              <td className="px-4 py-3 text-right leading-relaxed text-gray-100">
+                                {user.lastActivityString}
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  );
+                })()}
               </div>
             )}
             {tab === 1 && (

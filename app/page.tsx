@@ -87,16 +87,13 @@ export default function Page() {
         setUsersAtRisk(statistics.usersAtRisk);
         setAverageRiskScore(statistics.averageRiskScore);
         
-        // Get most recent activities
+        // Sort activities by risk score (highest first)
         const sortedActivities = [...activitiesData].sort((a, b) => {
-          // Sort by timestamp if available
-          if (a.timestamp && b.timestamp) {
-            return new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime();
-          }
-          // Fallback to risk score
+          // Sort by risk score as primary criteria
           return (b.riskScore || 0) - (a.riskScore || 0);
         });
         
+        // Get the 5 activities with highest risk scores
         setRecentActivities(sortedActivities.slice(0, 5));
         
         setLoadingPhase('complete');
@@ -208,9 +205,9 @@ export default function Page() {
               </Link>
             </div>
 
-            {/* Recent Activities Section */}
+            {/* High-Risk Activities Section */}
             <div className="bg-[#23243a] rounded-lg shadow-sm p-6 mb-6">
-              <h2 className="text-xl font-bold mb-4 text-white">Recent Activities</h2>
+              <h2 className="text-xl font-bold mb-4 text-white">High-Risk Activities</h2>
               {recentActivities.length > 0 ? (
                 <ActivityList
                   activities={recentActivities}
@@ -220,7 +217,7 @@ export default function Page() {
                 <div className="text-center py-8 text-gray-500">
                   {error ?
                     `Error loading activities: ${error}` :
-                    'No recent activities found. Try uploading new data.'
+                    'No high-risk activities found. Try uploading new data.'
                   }
                 </div>
               )}

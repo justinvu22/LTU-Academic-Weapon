@@ -14,7 +14,7 @@ import {
 } from '@mui/material';
 import { 
   LineChart, Line, BarChart, Bar, PieChart, Pie, Cell, AreaChart, Area, ScatterChart, Scatter,
-  XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer 
+  XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, ComposedChart
 } from 'recharts';
 import { UserActivity, MLRecommendation, TimeDistribution } from '@/types';
 import { generateStatistics, RISK_THRESHOLDS } from '../../utils/dataProcessor';
@@ -1038,34 +1038,6 @@ export default function DashboardPage() {
               </ScatterChart>
             </ResponsiveContainer>
           </Paper>
-          
-          {/* Risk Distribution (original chart) */}
-          <Paper sx={{ p: 2, height: 300 }}>
-            <Typography variant="h6">Risk Distribution</Typography>
-            <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
-              Distribution of activities by risk level
-            </Typography>
-            <ResponsiveContainer width="100%" height={220}>
-              <PieChart>
-                <Pie
-                  data={riskDistribution}
-                  cx="50%"
-                  cy="50%"
-                  labelLine={false}
-                  outerRadius={80}
-                  fill="#8884d8"
-                  dataKey="count"
-                  label={renderCustomizedLabel}
-                >
-                  {riskDistribution.map((entry, index) => (
-                    <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
-                  ))}
-                </Pie>
-                <Tooltip />
-                <Legend />
-              </PieChart>
-            </ResponsiveContainer>
-          </Paper>
         </Box>
       </Box>
     );
@@ -1272,24 +1244,26 @@ export default function DashboardPage() {
                 </div>
               </div>
 
-              {/* Policy Breaches and Integration Breakdown */}
+              {/* Activity Timeline and Policy Breaches Pie Chart */}
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
                 <div className="bg-[#1F2030] border border-[#333] rounded-xl shadow-lg p-6">
-                  <h2 className="text-lg font-extrabold text-[#8B5CF6] uppercase tracking-wide mb-2">Policy Breaches</h2>
+                  <h2 className="text-lg font-extrabold text-[#8B5CF6] uppercase tracking-wide mb-2">Activity Timeline</h2>
                   <Box sx={{ height: 300 }}>
-                    {policyBreachData.length > 0 ? (
+                    {riskTrendData.length > 0 ? (
                       <ResponsiveContainer width="100%" height="100%">
-                        <AreaChart
-                          data={policyBreachData}
+                        <ComposedChart
+                          data={calculateActivityOverTime(activities)}
                           margin={{ top: 5, right: 30, left: 20, bottom: 5 }}
                         >
                           <CartesianGrid strokeDasharray="3 3" />
-                          <XAxis dataKey="category" />
-                          <YAxis />
+                          <XAxis dataKey="date" />
+                          <YAxis yAxisId="left" />
+                          <YAxis yAxisId="right" orientation="right" />
                           <Tooltip />
                           <Legend />
-                          <Area type="monotone" dataKey="count" name="Breach Count" stroke="#8884d8" fill="#8884d8" fillOpacity={0.3} />
-                        </AreaChart>
+                          <Bar yAxisId="left" dataKey="count" name="Activities" fill="#8884d8" />
+                          <Line yAxisId="right" type="monotone" dataKey="risk" name="Anomaly Score" stroke="#ff9800" />
+                        </ComposedChart>
                       </ResponsiveContainer>
                     ) : (
                       <div className="flex flex-col items-center justify-center h-[300px]">
@@ -1298,6 +1272,42 @@ export default function DashboardPage() {
                     )}
                   </Box>
                 </div>
+                <div className="bg-[#1F2030] border border-[#333] rounded-xl shadow-lg p-6">
+                  <h2 className="text-lg font-extrabold text-[#8B5CF6] uppercase tracking-wide mb-2">Policy Breaches</h2>
+                  <Box sx={{ height: 300 }}>
+                    {policyBreachData.length > 0 ? (
+                      <ResponsiveContainer width="100%" height="100%">
+                        <PieChart>
+                          <Pie
+                            data={policyBreachData}
+                            cx="50%"
+                            cy="50%"
+                            labelLine={false}
+                            outerRadius={80}
+                            fill="#8884d8"
+                            dataKey="count"
+                            nameKey="category"
+                            label={({ name, percent }) => `${name}: ${(percent * 100).toFixed(0)}%`}
+                          >
+                            {policyBreachData.map((entry, index) => (
+                              <Cell key={`cell-${index}`} fill={COLORS.risk[index % 4 === 0 ? 'critical' : index % 4 === 1 ? 'high' : index % 4 === 2 ? 'medium' : 'low']} />
+                            ))}
+                          </Pie>
+                          <Tooltip formatter={(value) => [`${value} breaches`, 'Count']} />
+                          <Legend />
+                        </PieChart>
+                      </ResponsiveContainer>
+                    ) : (
+                      <div className="flex flex-col items-center justify-center h-[300px]">
+                        <span className="text-gray-400">No policy breach data available</span>
+                      </div>
+                    )}
+                  </Box>
+                </div>
+              </div>
+
+              {/* Integration Breakdown and User Risk Distribution */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
                 <div className="bg-[#1F2030] border border-[#333] rounded-xl shadow-lg p-6">
                   <h2 className="text-lg font-extrabold text-[#8B5CF6] uppercase tracking-wide mb-2">Integration Breakdown</h2>
                   <Box sx={{ height: 300 }}>
@@ -1322,29 +1332,38 @@ export default function DashboardPage() {
                     )}
                   </Box>
                 </div>
-              </div>
-
-              {/* Users Needing Attention */}
-              <div className="bg-[#1F2030] border border-[#333] rounded-xl shadow-lg p-6 mb-8">
-                <h2 className="text-lg font-extrabold text-[#8B5CF6] uppercase tracking-wide mb-2">Users Needing Attention</h2>
-                {usersNeedingAttention.length > 0 ? (
-                  <Box>
-                    {usersNeedingAttention.map((user, index) => (
-                      <div key={index} className="flex justify-between items-center py-2 border-b border-[#333]">
-                        <span className="text-[#EEE] font-medium">{user.username}</span>
-                        <div className="flex gap-2">
-                          <span className={`px-2 py-1 rounded bg-[#232346] text-xs font-bold ${user.criticalCount > 0 ? 'text-red-400' : 'text-gray-400'}`}>{user.criticalCount} C</span>
-                          <span className={`px-2 py-1 rounded bg-[#232346] text-xs font-bold ${user.highCount > 0 ? 'text-yellow-400' : 'text-gray-400'}`}>{user.highCount} H</span>
-                          <span className={`px-2 py-1 rounded bg-[#232346] text-xs font-bold ${user.mediumCount > 0 ? 'text-blue-400' : 'text-gray-400'}`}>{user.mediumCount} M</span>
-                        </div>
+                <div className="bg-[#1F2030] border border-[#333] rounded-xl shadow-lg p-6">
+                  <h2 className="text-lg font-extrabold text-[#8B5CF6] uppercase tracking-wide mb-2">Activity Status Distribution</h2>
+                  <Box sx={{ height: 300 }}>
+                    {statusDistribution.length > 0 ? (
+                      <ResponsiveContainer width="100%" height="100%">
+                        <PieChart>
+                          <Pie
+                            data={statusDistribution}
+                            cx="50%"
+                            cy="50%"
+                            labelLine={false}
+                            outerRadius={80}
+                            fill="#8884d8"
+                            dataKey="count"
+                            nameKey="name"
+                            label={({ name, percent }) => `${name}: ${(percent * 100).toFixed(0)}%`}
+                          >
+                            {statusDistribution.map((entry, index) => (
+                              <Cell key={`cell-${index}`} fill={entry.color} />
+                            ))}
+                          </Pie>
+                          <Tooltip formatter={(value) => [`${value} activities`, 'Count']} />
+                          <Legend />
+                        </PieChart>
+                      </ResponsiveContainer>
+                    ) : (
+                      <div className="flex flex-col items-center justify-center h-[300px]">
+                        <span className="text-gray-400">No activity status data available</span>
                       </div>
-                    ))}
+                    )}
                   </Box>
-                ) : (
-                  <div className="flex flex-col items-center justify-center h-[150px]">
-                    <span className="text-gray-400">No users at risk found</span>
-                  </div>
-                )}
+                </div>
               </div>
             </TabPanel>
 
