@@ -142,7 +142,19 @@ export default function DashboardPage() {
       cloud: '#673ab7',
       usb: '#ff5722',
       application: '#009688'
+    },
+    policy: {
+      // This is a placeholder for the new policy color logic
     }
+  };
+
+  // Add at the top of the component, after COLORS:
+  const POLICY_COLORS: { [key: string]: string } = {
+    'Unusual Activity': '#FF4C4C',
+    'Monitoring': '#FFB84C',
+    'Data Security': '#4CBFFF',
+    'Critical Violations': '#4CFF8B',
+    'Access Violation': '#FF4C8B',
   };
 
   const DISTRIBUTION_TABS = [
@@ -1051,6 +1063,22 @@ export default function DashboardPage() {
     );
   }
 
+  const totalStatus = statusDistribution.reduce((a, b) => a + b.count, 0);
+  const [drawnPercents, setDrawnPercents] = React.useState([0, 0, 0, 0]);
+  const [hoveredRing, setHoveredRing] = React.useState<number | null>(null);
+  React.useEffect(() => {
+    statusDistribution.forEach((entry, idx) => {
+      const percent = totalStatus > 0 ? Math.round((entry.count / totalStatus) * 100) : 0;
+      setTimeout(() => {
+        setDrawnPercents(prev => {
+          const next = [...prev];
+          next[idx] = percent;
+          return next;
+        });
+      }, 100 + idx * 120);
+    });
+  }, [statusDistribution, totalStatus]);
+
   return (
     <div className="min-h-screen bg-[#121324] px-6 py-10 font-['IBM_Plex_Sans',Inter,sans-serif] flex flex-col">
       <div className="w-full bg-[#121324] rounded-2xl border border-[#333] shadow-[0_2px_12px_rgba(110,95,254,0.10)] px-8 py-10 flex flex-col gap-8 mx-auto">
@@ -1076,7 +1104,7 @@ export default function DashboardPage() {
         ) : (
           <>
             {/* Summary Cards */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-8 mb-8">
+            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-12 mb-12">
               {/* Total Activities */}
               <Box className="flex items-center bg-white rounded-2xl shadow-2xl p-8 hover:shadow-[0_4px_32px_rgba(255,255,255,0.35)] hover:scale-[1.03] transition-all duration-300 min-h-[8.5rem]">
                 <div className="flex items-center justify-center w-16 h-16 rounded-full bg-white shadow-lg mr-6">
@@ -1176,77 +1204,306 @@ export default function DashboardPage() {
 
             {/* Tab Panels */}
             <TabPanel value={activeTab} index={0}>
-              {/* Distribution Cards Section */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-8 w-full mb-8">
-                <div className="lg:col-span-2 bg-[#1F2030]/70 backdrop-blur-md border border-white/10 rounded-xl shadow-lg p-6 flex flex-col justify-between">
-                  <div className="flex mb-4">
-                    {DISTRIBUTION_TABS.map(tab => (
-                      <button
-                        key={tab.key}
-                        className={`px-4 py-2 font-bold uppercase tracking-wide rounded-t transition-colors duration-200 ${selectedDistributionTab === tab.key ? 'text-[#8B5CF6] border-b-4 border-[#8B5CF6] bg-[#232346]/60' : 'text-gray-300 hover:text-[#8B5CF6] border-b-4 border-transparent'}`}
-                        onClick={() => setSelectedDistributionTab(tab.key)}
-                      >
-                        {tab.label} Distribution
-                      </button>
-                    ))}
-                  </div>
-                  <div className="mt-2 min-h-[220px] flex items-start w-full">
-                    {DISTRIBUTION_TABS.map(tab => (
-                      selectedDistributionTab === tab.key && (
-                        <div className="w-full">
-                          <DistributionBars key={tab.key} data={tab.data} type={tab.key} />
+              {/* --- SECTION 1: Top Row --- */}
+              <div className="w-full mb-10" style={{ display: 'grid', gridTemplateColumns: '30% 70%', gridTemplateRows: 'minmax(400px, auto)', gap: '2rem', alignItems: 'stretch' }}>
+                {/* Left column: Policy Breach 1 & 2 */}
+                <div style={{ display: 'flex', flexDirection: 'row', height: '100%', gap: '1.5rem' }}>
+                  {/* Policy Breach 1 */}
+                  <div className="rounded-2xl shadow-[0_4px_32px_#9c7bed22] bg-[#1f1f2e] border border-[#2d2e44] p-8 flex flex-col items-center justify-center h-full" style={{ maxWidth: 280, width: '100%', boxSizing: 'border-box' }}>
+                    <h2 className="text-lg font-extrabold text-[#A084E8] uppercase tracking-wide mb-4">Policy Breach 1</h2>
+                    {policyBreachData.length > 0 ? (
+                      <div className="flex flex-col items-center w-full justify-center">
+                        {/* Donut chart */}
+                        <div className="relative flex items-center justify-center w-full" style={{ width: 220, height: 220, maxWidth: '100%' }}>
+                          <ResponsiveContainer width={220} height={220}>
+                            <PieChart>
+                              <Pie
+                                data={policyBreachData}
+                                cx="50%"
+                                cy="50%"
+                                innerRadius={70}
+                                outerRadius={100}
+                                paddingAngle={2}
+                                dataKey="count"
+                                startAngle={90}
+                                endAngle={-270}
+                                stroke="none"
+                              >
+                                {policyBreachData.map((entry, idx) => (
+                                  <Cell key={`cell-${idx}`} fill={POLICY_COLORS[entry.category] || COLORS.risk[idx % 4 === 0 ? 'critical' : idx % 4 === 1 ? 'high' : idx % 4 === 2 ? 'medium' : 'low']} />
+                                ))}
+                              </Pie>
+                            </PieChart>
+                          </ResponsiveContainer>
+                          {/* Center content */}
+                          <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 flex flex-col items-center w-full" style={{ pointerEvents: 'none' }}>
+                            {(() => {
+                              const total = policyBreachData.reduce((a, b) => a + b.count, 0);
+                              const numDigits = String(total).length;
+                              let fontSize = 38;
+                              if (numDigits >= 7) fontSize = 24;
+                              else if (numDigits >= 5) fontSize = 30;
+                              else if (numDigits >= 3) fontSize = 34;
+                              return (
+                                <>
+                                  <span
+                                    className="font-extrabold text-white drop-shadow-lg"
+                                    style={{
+                                      fontFamily: 'Inter',
+                                      lineHeight: 1.1,
+                                      fontSize,
+                                      maxWidth: 120,
+                                      textAlign: 'center',
+                                      wordBreak: 'break-word',
+                                      letterSpacing: '-0.04em',
+                                    }}
+                                  >
+                                    {total}
+                                  </span>
+                                  <span
+                                    className="font-semibold text-[#A084E8] mt-1 tracking-widest uppercase"
+                                    style={{
+                                      fontFamily: 'Inter',
+                                      letterSpacing: '0.08em',
+                                      fontSize: 13,
+                                      textAlign: 'center',
+                                      display: 'block',
+                                    }}
+                                  >
+                                    Total Breaches
+                                  </span>
+                                </>
+                              );
+                            })()}
+                          </div>
                         </div>
-                      )
-                    ))}
+                      </div>
+                    ) : (
+                      <div className="flex flex-col items-center justify-center h-[220px]">
+                        <span className="text-gray-400">No policy breach data available</span>
+                      </div>
+                    )}
+                  </div>
+                  {/* Policy Breach 2 */}
+                  <div className="rounded-2xl shadow-[0_4px_32px_#9c7bed22] bg-[#1f1f2e] border border-[#2d2e44] p-8 flex flex-col items-center justify-center h-full" style={{ maxWidth: 160, width: '100%', boxSizing: 'border-box' }}>
+                    <h2 className="text-base font-extrabold text-[#A084E8] uppercase tracking-wide mb-2">Policy Breach 2</h2>
+                    {policyBreachData.length > 0 ? (
+                      <div className="flex flex-col gap-3 w-full items-center justify-center">
+                        {policyBreachData.map((entry, idx) => (
+                          <div key={entry.category} className="flex flex-row items-center gap-2">
+                            <div className="w-8 h-8 rounded-xl flex items-center justify-center shadow-lg" style={{ background: POLICY_COLORS[entry.category] || COLORS.risk[idx % 4 === 0 ? 'critical' : idx % 4 === 1 ? 'high' : idx % 4 === 2 ? 'medium' : 'low'] }}>
+                              <span className="text-xs font-extrabold text-white" style={{ fontFamily: 'Inter', letterSpacing: '0.01em', wordBreak: 'break-all' }}>{entry.count}</span>
+                            </div>
+                            <span className="text-xs font-semibold text-[#e0e6f0] text-left" style={{ fontFamily: 'Inter', letterSpacing: '0.02em', maxWidth: 60 }}>{entry.category}</span>
+                          </div>
+                        ))}
+                      </div>
+                    ) : (
+                      <div className="flex flex-col items-center justify-center h-[220px]">
+                        <span className="text-gray-400">No policy breach data available</span>
+                      </div>
+                    )}
+                  </div>
+                </div>
+                {/* Right column: Risk Trend */}
+                <div style={{ height: '100%' }}>
+                  <div className="bg-[#1F2030] border border-[#333] rounded-xl shadow-lg p-8 h-full flex flex-col justify-center items-center" style={{ height: '100%', boxSizing: 'border-box' }}>
+                    <h2 className="text-xl font-extrabold text-[#8B5CF6] uppercase tracking-wide mb-4">Risk Trend</h2>
+                    <Box sx={{ flex: '1 1 auto', width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: 0, minWidth: 0 }}>
+                      {riskTrendData.length > 0 ? (
+                        <ResponsiveContainer width="100%" height="100%" minHeight={260} minWidth={320}>
+                          <AreaChart
+                            data={riskTrendData}
+                            margin={{ top: 20, right: 30, left: 0, bottom: 0 }}
+                          >
+                            <defs>
+                              <linearGradient id="colorRisk" x1="0" y1="0" x2="0" y2="1">
+                                <stop offset="0%" stopColor="#8B5CF6" stopOpacity={0.35} />
+                                <stop offset="100%" stopColor="#8B5CF6" stopOpacity={0.02} />
+                              </linearGradient>
+                              <linearGradient id="colorActivities" x1="0" y1="0" x2="0" y2="1">
+                                <stop offset="0%" stopColor="#FFB84C" stopOpacity={0.35} />
+                                <stop offset="100%" stopColor="#FFB84C" stopOpacity={0.02} />
+                              </linearGradient>
+                            </defs>
+                            <CartesianGrid strokeDasharray="6 6" stroke="#2d2e44" />
+                            <XAxis dataKey="date" tick={{ fill: '#bdbdfc', fontFamily: 'Inter', fontSize: 13 }} axisLine={false} tickLine={false} />
+                            <YAxis tick={{ fill: '#bdbdfc', fontFamily: 'Inter', fontSize: 13 }} axisLine={false} tickLine={false} />
+                            <Tooltip
+                              contentStyle={{ background: 'rgba(30, 32, 48, 0.95)', border: 'none', borderRadius: 12, boxShadow: '0 4px 24px #7B8BFF55', color: '#fff', fontFamily: 'Inter' }}
+                              labelStyle={{ color: '#7B8BFF', fontWeight: 700, fontFamily: 'Inter' }}
+                              itemStyle={{ fontFamily: 'Inter', fontWeight: 600 }}
+                              cursor={{ stroke: '#7B8BFF', strokeWidth: 2, opacity: 0.2 }}
+                            />
+                            <Area
+                              type="monotone"
+                              dataKey="risk"
+                              stroke="#8B5CF6"
+                              strokeWidth={4}
+                              fill="url(#colorRisk)"
+                              dot={{
+                                r: 3,
+                                fill: '#8B5CF6',
+                                stroke: 'none',
+                                filter: 'none'
+                              }}
+                              activeDot={{
+                                r: 4,
+                                fill: '#8B5CF6',
+                                stroke: 'none',
+                                filter: 'none'
+                              }}
+                            />
+                            <Area
+                              type="monotone"
+                              dataKey="count"
+                              stroke="#FFB84C"
+                              strokeWidth={4}
+                              fill="url(#colorActivities)"
+                              dot={{
+                                r: 3,
+                                fill: '#FFB84C',
+                                stroke: 'none',
+                                filter: 'none'
+                              }}
+                              activeDot={{
+                                r: 4,
+                                fill: '#FFB84C',
+                                stroke: 'none',
+                                filter: 'none'
+                              }}
+                            />
+                            <Legend
+                              iconType="circle"
+                              wrapperStyle={{ paddingTop: 16, fontFamily: 'Inter', fontWeight: 700, fontSize: 15 }}
+                              formatter={(value) => {
+                                if (value === 'risk') return <span style={{ color: '#8B5CF6' }}>Risk Score</span>;
+                                if (value === 'count') return <span style={{ color: '#FFB84C' }}>Activities</span>;
+                                return value;
+                              }}
+                            />
+                          </AreaChart>
+                        </ResponsiveContainer>
+                      ) : (
+                        <div className="flex flex-col items-center justify-center h-[300px]">
+                          <span className="text-gray-400">Not enough data available</span>
+                        </div>
+                      )}
+                    </Box>
                   </div>
                 </div>
               </div>
 
-              {/* Risk Trend and Severity Trend */}
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
-                <div className="bg-[#1F2030] border border-[#333] rounded-xl shadow-lg p-6">
-                  <h2 className="text-lg font-extrabold text-[#8B5CF6] uppercase tracking-wide mb-2">Risk Trend</h2>
-                  <Box sx={{ height: 300 }}>
-                    {riskTrendData.length > 0 ? (
-                      <ResponsiveContainer width="100%" height="100%">
-                        <LineChart
-                          data={riskTrendData}
-                          margin={{ top: 5, right: 30, left: 20, bottom: 5 }}
-                        >
-                          <CartesianGrid strokeDasharray="3 3" />
-                          <XAxis dataKey="date" />
-                          <YAxis />
-                          <Tooltip />
-                          <Legend />
-                          <Line type="monotone" dataKey="count" name="Activities" stroke="#8884d8" activeDot={{ r: 8 }} />
-                          <Line type="monotone" dataKey="risk" name="Risk Score" stroke="#ff9800" activeDot={{ r: 8 }} />
-                        </LineChart>
-                      </ResponsiveContainer>
-                    ) : (
-                      <div className="flex flex-col items-center justify-center h-[300px]">
-                        <span className="text-gray-400">Not enough data available</span>
-                      </div>
-                    )}
-                  </Box>
-                </div>
-                <div className="bg-[#1F2030] border border-[#333] rounded-xl shadow-lg p-6">
+              {/* --- SECTION 2: Middle Cards --- */}
+              <div className="w-full mb-10" style={{ display: 'grid', gridTemplateColumns: '4fr 1fr', gap: '2rem' }}>
+                {/* Left: Severity Trend, Status Distribution, Activity Status Distribution */}
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '2rem' }}>
+                  {/* Severity Trend */}
+                  <div className="bg-[#1F2030] border border-[#333] rounded-xl shadow-lg p-6 flex flex-col">
                   <h2 className="text-lg font-extrabold text-[#8B5CF6] uppercase tracking-wide mb-2">Severity Trend</h2>
                   <Box sx={{ height: 300 }}>
                     {severityTrendData.length > 0 ? (
                       <ResponsiveContainer width="100%" height="100%">
                         <LineChart
                           data={severityTrendData}
-                          margin={{ top: 5, right: 30, left: 20, bottom: 5 }}
-                        >
-                          <CartesianGrid strokeDasharray="3 3" />
-                          <XAxis dataKey="date" />
-                          <YAxis />
-                          <Tooltip />
-                          <Legend />
-                          <Line type="monotone" dataKey="critical" name="Critical" stroke="#f44336" strokeWidth={2} />
-                          <Line type="monotone" dataKey="high" name="High" stroke="#ff9800" strokeWidth={2} />
-                          <Line type="monotone" dataKey="medium" name="Medium" stroke="#2196f3" strokeWidth={2} />
-                          <Line type="monotone" dataKey="low" name="Low" stroke="#4caf50" strokeWidth={2} />
+                            margin={{ top: 20, right: 30, left: 0, bottom: 0 }}
+                          >
+                            <CartesianGrid strokeDasharray="6 6" stroke="#2d2e44" />
+                            <XAxis dataKey="date" tick={{ fill: '#bdbdfc', fontFamily: 'Inter', fontSize: 13 }} axisLine={false} tickLine={false} />
+                            <YAxis tick={{ fill: '#bdbdfc', fontFamily: 'Inter', fontSize: 13 }} axisLine={false} tickLine={false} />
+                            <Tooltip
+                              contentStyle={{ background: 'rgba(30, 32, 48, 0.95)', border: 'none', borderRadius: 12, boxShadow: '0 4px 24px #7B8BFF55', color: '#fff', fontFamily: 'Inter' }}
+                              labelStyle={{ color: '#7B8BFF', fontWeight: 700, fontFamily: 'Inter' }}
+                              itemStyle={{ fontFamily: 'Inter', fontWeight: 600 }}
+                              cursor={{ stroke: '#7B8BFF', strokeWidth: 2, opacity: 0.2 }}
+                            />
+                            <Line
+                              type="monotone"
+                              dataKey="critical"
+                              stroke="#FF4C4C"
+                              strokeWidth={4}
+                              dot={{
+                                r: 3,
+                                fill: '#FF4C4C',
+                                stroke: 'none',
+                                filter: 'none'
+                              }}
+                              activeDot={{
+                                r: 4,
+                                fill: '#FF4C4C',
+                                stroke: 'none',
+                                filter: 'none'
+                              }}
+                              name="Critical"
+                            />
+                            <Line
+                              type="monotone"
+                              dataKey="high"
+                              stroke="#FFB84C"
+                              strokeWidth={4}
+                              dot={{
+                                r: 3,
+                                fill: '#FFB84C',
+                                stroke: 'none',
+                                filter: 'none'
+                              }}
+                              activeDot={{
+                                r: 4,
+                                fill: '#FFB84C',
+                                stroke: 'none',
+                                filter: 'none'
+                              }}
+                              name="High"
+                            />
+                            <Line
+                              type="monotone"
+                              dataKey="medium"
+                              stroke="#4CBFFF"
+                              strokeWidth={4}
+                              dot={{
+                                r: 3,
+                                fill: '#4CBFFF',
+                                stroke: 'none',
+                                filter: 'none'
+                              }}
+                              activeDot={{
+                                r: 4,
+                                fill: '#4CBFFF',
+                                stroke: 'none',
+                                filter: 'none'
+                              }}
+                              name="Medium"
+                            />
+                            <Line
+                              type="monotone"
+                              dataKey="low"
+                              stroke="#4CFF8B"
+                              strokeWidth={4}
+                              dot={{
+                                r: 3,
+                                fill: '#4CFF8B',
+                                stroke: 'none',
+                                filter: 'none'
+                              }}
+                              activeDot={{
+                                r: 4,
+                                fill: '#4CFF8B',
+                                stroke: 'none',
+                                filter: 'none'
+                              }}
+                              name="Low"
+                            />
+                            <Legend
+                              iconType="circle"
+                              wrapperStyle={{ paddingTop: 16, fontFamily: 'Inter', fontWeight: 700, fontSize: 15 }}
+                              formatter={(value) => {
+                                if (value === 'Critical') return <span style={{ color: '#FF4C4C' }}>Critical</span>;
+                                if (value === 'High') return <span style={{ color: '#FFB84C' }}>High</span>;
+                                if (value === 'Medium') return <span style={{ color: '#4CBFFF' }}>Medium</span>;
+                                if (value === 'Low') return <span style={{ color: '#4CFF8B' }}>Low</span>;
+                                return value;
+                              }}
+                            />
                         </LineChart>
                       </ResponsiveContainer>
                     ) : (
@@ -1256,128 +1513,200 @@ export default function DashboardPage() {
                     )}
                   </Box>
                 </div>
+                  {/* Risk Distribution */}
+                  <div style={{ display: 'flex', flexDirection: 'row', gap: '2rem' }}>
+                    {/* Risk Distribution */}
+                    <div className="rounded-[12px] shadow-[0_4px_32px_#9c7bed22] bg-[#1f1f2e] p-8 flex flex-col gap-10 w-full" style={{ minWidth: 0, minHeight: 440 }}>
+                      <h2 className="font-['Inter'] text-[18px] font-semibold tracking-wider text-[#9c7bed] mb-2">Risk Distribution</h2>
+                      {/* Distribution Filter Tabs */}
+                      <div className="flex flex-row gap-4 mb-6">
+                        {DISTRIBUTION_TABS.map(tab => (
+                          <button
+                            key={tab.key}
+                            className={`px-4 py-1.5 rounded-lg font-semibold text-sm transition-all duration-150 ${selectedDistributionTab === tab.key ? 'bg-[#8B5CF6] text-white shadow' : 'bg-[#232346] text-[#bdbdfc] hover:bg-[#2d2e44]'}`}
+                            onClick={() => setSelectedDistributionTab(tab.key)}
+                            style={{ fontFamily: 'Inter', letterSpacing: '0.04em' }}
+                          >
+                            {tab.label}
+                          </button>
+                        ))}
+                      </div>
+                      {/* Show the selected distribution's bars */}
+                      <DistributionBars data={DISTRIBUTION_TABS.find(tab => tab.key === selectedDistributionTab)?.data || riskDistribution} type={selectedDistributionTab} />
+                </div>
+                    {/* Activity Status Distribution */}
+                    <div className="rounded-[12px] shadow-[0_4px_32px_#9c7bed22] bg-[#1f1f2e] p-8 flex flex-col gap-10 w-full" style={{ minWidth: 0, minHeight: 440 }}>
+                      <h2 className="font-['Inter'] text-[18px] font-semibold tracking-wider text-[#9c7bed] mb-2">Activity Status Distribution</h2>
+                      <div className="flex flex-row gap-1 items-end w-full justify-center">
+                        {statusDistribution.map((entry, idx) => {
+                          const percent = totalStatus > 0 ? (entry.count / totalStatus) : 0;
+                          return (
+                            <div key={entry.name} className="flex flex-col items-center w-1/6">
+                              <div className="flex flex-col items-center">
+                                <div className="w-10 h-48 flex items-end">
+                                  <div
+                                    className="w-10 transition-all duration-200 rounded-t-xl shadow-[0_4px_24px_0_rgba(110,95,254,0.18)] hover:scale-105 hover:shadow-[0_8px_32px_0_rgba(110,95,254,0.28)] cursor-pointer"
+                                    style={{
+                                      height: `${Math.max(20, percent * 192)}px`,
+                                      background: `linear-gradient(180deg, ${entry.color} 80%, ${entry.color}33 100%)`,
+                                      boxShadow: `0 2px 16px 0 ${entry.color}44, 0 1.5px 0 0 #fff2 inset`,
+                                      borderTopLeftRadius: 12,
+                                      borderTopRightRadius: 12,
+                                      borderBottomLeftRadius: 6,
+                                      borderBottomRightRadius: 6,
+                                    }}
+                                  ></div>
+                                </div>
+                                <span className="mt-3 text-[18px] font-extrabold text-white drop-shadow-[0_2px_8px_#000A] font-['Inter'] tracking-wide" style={{ letterSpacing: '0.01em', textShadow: '0 2px 8px #0008' }}>{entry.count}</span>
+                              </div>
+                              <span className="mt-1 text-sm font-semibold" style={{ color: entry.color, fontFamily: 'Inter', letterSpacing: '0.04em', textShadow: '0 1px 6px #0006' }}>{entry.name}</span>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+                {/* Right: Status Percentages (with Integration Breakdown) */}
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '2rem', minWidth: 0, maxWidth: '100%' }}>
+                  <div className="rounded-[12px] shadow-[0_4px_32px_#9c7bed22] bg-[#1f1f2e] p-8 flex flex-col gap-10 w-full h-full" style={{ minHeight: 440 }}>
+                    <h2 className="font-['Inter'] text-[18px] font-semibold tracking-wider text-[#9c7bed] mb-2">Status Percentages</h2>
+                    <div className="grid grid-cols-2 gap-10 w-full">
+                      {statusDistribution.map((entry, idx) => {
+                        const percent = totalStatus > 0 ? Math.round((entry.count / totalStatus) * 100) : 0;
+                        const draw = drawnPercents[idx] || 0;
+                        const isHovered = hoveredRing === idx;
+                        return (
+                          <div
+                            key={entry.name}
+                            className="flex flex-col items-center justify-center transition-transform duration-200"
+                            style={{ transform: isHovered ? 'scale(1.05)' : 'scale(1)' }}
+                            onMouseEnter={() => setHoveredRing(idx)}
+                            onMouseLeave={() => setHoveredRing(null)}
+                          >
+                            <div className="relative flex items-center justify-center">
+                              <svg width="128" height="128" viewBox="0 0 128 128">
+                                <circle cx="64" cy="64" r="54" stroke="#2d2e44" strokeWidth="14" fill="none" />
+                                <circle cx="64" cy="64" r="54" stroke={entry.color} strokeWidth="14" fill="none" strokeDasharray={2 * Math.PI * 54} strokeDashoffset={2 * Math.PI * 54 * (1 - draw / 100)} strokeLinecap="round" style={{ transition: 'stroke-dashoffset 1s cubic-bezier(.4,0,.2,1)' }} />
+                              </svg>
+                              <span className="absolute text-[28px] font-extrabold text-white" style={{ left: '50%', top: '50%', transform: 'translate(-50%, -50%)', fontFamily: 'Inter', letterSpacing: '0.01em', width: '60px', textAlign: 'center' }}>{percent}%</span>
+                              {isHovered && (
+                                <div className="absolute left-1/2 top-0 -translate-x-1/2 -translate-y-full bg-[#232346] text-white text-xs rounded px-3 py-1 shadow-lg border border-[#9c7bed] z-10 transition-all duration-200">
+                                  {entry.count} activities
+                      </div>
+                    )}
+                </div>
+                            <span className="mt-2 text-[15px] font-medium text-[#e0e6f0]" style={{ fontFamily: 'Inter', letterSpacing: '0.02em' }}>{entry.name}</span>
+              </div>
+                        );
+                      })}
+                        </div>
+                    {/* Integration Breakdown Section */}
+                    <div className="mt-8">
+                      <h3 className="text-[15px] font-semibold text-[#A084E8] mb-4 uppercase tracking-wide">Integration Breakdown</h3>
+                      <div className="grid grid-cols-2 gap-10 w-full">
+                        {integrationDistribution.map((integration, idx) => {
+                          const total = integrationDistribution.reduce((sum, i) => sum + i.count, 0);
+                          const percent = total > 0 ? Math.round((integration.count / total) * 100) : 0;
+                          const color = integration.color;
+                          return (
+                            <div key={integration.name} className="flex flex-col items-center justify-center">
+                              <div className="relative flex items-center justify-center mb-2">
+                                <svg width="128" height="128" viewBox="0 0 128 128">
+                                  <circle cx="64" cy="64" r="54" stroke="#2d2e44" strokeWidth="14" fill="none" />
+                                  <circle cx="64" cy="64" r="54" stroke={color} strokeWidth="14" fill="none" strokeDasharray={2 * Math.PI * 54} strokeDashoffset={2 * Math.PI * 54 * (1 - percent / 100)} strokeLinecap="round" style={{ transition: 'stroke-dashoffset 1s cubic-bezier(.4,0,.2,1)', filter: `drop-shadow(0 0 12px ${color}66)` }} />
+                                </svg>
+                                <span className="absolute text-[28px] font-extrabold text-white" style={{ left: '50%', top: '50%', transform: 'translate(-50%, -50%)', fontFamily: 'Inter', letterSpacing: '0.01em', width: '60px', textAlign: 'center' }}>{percent}%</span>
+                      </div>
+                              <span className="mt-2 text-[15px] font-medium text-[#e0e6f0] capitalize" style={{ fontFamily: 'Inter', letterSpacing: '0.02em' }}>{integration.name}</span>
+                              <span className="block text-xs text-[#9c7bed] mt-1">{integration.count} activities</span>
+                  </div>
+                          );
+                        })}
+              </div>
+                    </div>
+                  </div>
+                </div>
               </div>
 
-              {/* Activity Timeline and Policy Breaches Pie Chart */}
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
+              {/* --- SECTION 3: Bottom Row --- */}
+              <div className="w-full" style={{ marginBottom: '2rem' }}>
                 <div className="bg-[#1F2030] border border-[#333] rounded-xl shadow-lg p-6">
                   <h2 className="text-lg font-extrabold text-[#8B5CF6] uppercase tracking-wide mb-2">Activity Timeline</h2>
-                  <Box sx={{ height: 300 }}>
+                <Box sx={{ height: 300 }}>
                     {riskTrendData.length > 0 ? (
-                      <ResponsiveContainer width="100%" height="100%">
+                    <ResponsiveContainer width="100%" height="100%">
                         <ComposedChart
                           data={calculateActivityOverTime(activities)}
-                          margin={{ top: 5, right: 30, left: 20, bottom: 5 }}
+                          margin={{ top: 20, right: 30, left: 0, bottom: 0 }}
                         >
-                          <CartesianGrid strokeDasharray="3 3" />
-                          <XAxis dataKey="date" />
-                          <YAxis yAxisId="left" />
-                          <YAxis yAxisId="right" orientation="right" />
-                          <Tooltip />
-                          <Legend />
-                          <Bar yAxisId="left" dataKey="count" name="Activities" fill="#8884d8" />
-                          <Line yAxisId="right" type="monotone" dataKey="risk" name="Anomaly Score" stroke="#ff9800" />
+                          <defs>
+                            <linearGradient id="barGradient" x1="0" y1="0" x2="0" y2="1">
+                              <stop offset="0%" stopColor="#7B8BFF" stopOpacity={0.85} />
+                              <stop offset="100%" stopColor="#7B8BFF" stopOpacity={0.18} />
+                            </linearGradient>
+                          </defs>
+                          <CartesianGrid strokeDasharray="6 6" stroke="#2d2e44" />
+                          <XAxis dataKey="date" tick={{ fill: '#bdbdfc', fontFamily: 'Inter', fontSize: 13 }} axisLine={false} tickLine={false} />
+                          <YAxis yAxisId="left" tick={{ fill: '#bdbdfc', fontFamily: 'Inter', fontSize: 13 }} axisLine={false} tickLine={false} />
+                          <YAxis yAxisId="right" orientation="right" tick={{ fill: '#bdbdfc', fontFamily: 'Inter', fontSize: 13 }} axisLine={false} tickLine={false} />
+                          <Tooltip
+                            contentStyle={{ background: 'rgba(30, 32, 48, 0.95)', border: 'none', borderRadius: 12, boxShadow: '0 4px 24px #7B8BFF55', color: '#fff', fontFamily: 'Inter' }}
+                            labelStyle={{ color: '#7B8BFF', fontWeight: 700, fontFamily: 'Inter' }}
+                            itemStyle={{ fontFamily: 'Inter', fontWeight: 600 }}
+                            cursor={{ stroke: '#7B8BFF', strokeWidth: 2, opacity: 0.2 }}
+                          />
+                          <Bar
+                            yAxisId="left"
+                            dataKey="count"
+                            name="Activities"
+                            fill="url(#barGradient)"
+                            radius={[8, 8, 4, 4]}
+                            barSize={18}
+                            stroke="#A6B6FF"
+                            strokeWidth={1.5}
+                            style={{ filter: 'drop-shadow(0 2px 12px #7B8BFF44)' }}
+                          />
+                          <Line
+                            yAxisId="right"
+                            type="monotone"
+                            dataKey="risk"
+                            name="Anomaly Score"
+                            stroke="#FFB84C"
+                            strokeWidth={4}
+                            dot={{
+                              r: 7,
+                              fill: '#FFB84C',
+                              stroke: '#fff',
+                              strokeWidth: 3,
+                              filter: 'drop-shadow(0 2px 8px #FFB84CAA)'
+                            }}
+                            activeDot={{
+                              r: 10,
+                              fill: '#fff',
+                              stroke: '#FFB84C',
+                              strokeWidth: 5,
+                              filter: 'drop-shadow(0 2px 12px #FFB84CCC)'
+                            }}
+                          />
+                          <Legend
+                            iconType="circle"
+                            wrapperStyle={{ paddingTop: 16, fontFamily: 'Inter', fontWeight: 700, fontSize: 15 }}
+                            formatter={(value) => {
+                              if (value === 'count') return <span style={{ color: '#7B8BFF' }}>Activities</span>;
+                              if (value === 'risk') return <span style={{ color: '#FFB84C' }}>Anomaly Score</span>;
+                              return value;
+                            }}
+                          />
                         </ComposedChart>
-                      </ResponsiveContainer>
-                    ) : (
-                      <div className="flex flex-col items-center justify-center h-[300px]">
-                        <span className="text-gray-400">Not enough data available</span>
-                      </div>
-                    )}
-                  </Box>
-                </div>
-                <div className="bg-[#1F2030] border border-[#333] rounded-xl shadow-lg p-6">
-                  <h2 className="text-lg font-extrabold text-[#8B5CF6] uppercase tracking-wide mb-2">Policy Breaches</h2>
-                  <Box sx={{ height: 300 }}>
-                    {policyBreachData.length > 0 ? (
-                      <ResponsiveContainer width="100%" height="100%">
-                        <PieChart>
-                          <Pie
-                            data={policyBreachData}
-                            cx="50%"
-                            cy="50%"
-                            labelLine={false}
-                            outerRadius={80}
-                            fill="#8884d8"
-                            dataKey="count"
-                            nameKey="category"
-                            label={({ name, percent }) => `${name}: ${(percent * 100).toFixed(0)}%`}
-                          >
-                            {policyBreachData.map((entry, index) => (
-                              <Cell key={`cell-${index}`} fill={COLORS.risk[index % 4 === 0 ? 'critical' : index % 4 === 1 ? 'high' : index % 4 === 2 ? 'medium' : 'low']} />
-                            ))}
-                          </Pie>
-                          <Tooltip formatter={(value) => [`${value} breaches`, 'Count']} />
-                          <Legend />
-                        </PieChart>
-                      </ResponsiveContainer>
-                    ) : (
-                      <div className="flex flex-col items-center justify-center h-[300px]">
-                        <span className="text-gray-400">No policy breach data available</span>
-                      </div>
-                    )}
-                  </Box>
-                </div>
+                    </ResponsiveContainer>
+                  ) : (
+                    <div className="flex flex-col items-center justify-center h-[300px]">
+                      <span className="text-gray-400">Not enough data available</span>
+                    </div>
+                  )}
+                </Box>
               </div>
-
-              {/* Integration Breakdown and User Risk Distribution */}
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
-                <div className="bg-[#1F2030] border border-[#333] rounded-xl shadow-lg p-6">
-                  <h2 className="text-lg font-extrabold text-[#8B5CF6] uppercase tracking-wide mb-2">Integration Breakdown</h2>
-                  <Box sx={{ height: 300 }}>
-                    {integrationData.length > 0 ? (
-                      <ResponsiveContainer width="100%" height="100%">
-                        <BarChart
-                          data={integrationData}
-                          margin={{ top: 5, right: 30, left: 20, bottom: 5 }}
-                        >
-                          <CartesianGrid strokeDasharray="3 3" />
-                          <XAxis dataKey="name" />
-                          <YAxis />
-                          <Tooltip />
-                          <Legend />
-                          <Bar dataKey="value" name="Count" fill="#82ca9d" />
-                        </BarChart>
-                      </ResponsiveContainer>
-                    ) : (
-                      <div className="flex flex-col items-center justify-center h-[300px]">
-                        <span className="text-gray-400">Not enough data available</span>
-                      </div>
-                    )}
-                  </Box>
-                </div>
-                <div className="bg-[#1F2030] border border-[#333] rounded-xl shadow-lg p-6">
-                  <h2 className="text-lg font-extrabold text-[#8B5CF6] uppercase tracking-wide mb-2">Activity Status Distribution</h2>
-                  <Box sx={{ height: 300 }}>
-                    {statusDistribution.length > 0 ? (
-                      <ResponsiveContainer width="100%" height="100%">
-                        <PieChart>
-                          <Pie
-                            data={statusDistribution}
-                            cx="50%"
-                            cy="50%"
-                            labelLine={false}
-                            outerRadius={80}
-                            fill="#8884d8"
-                            dataKey="count"
-                            nameKey="name"
-                            label={({ name, percent }) => `${name}: ${(percent * 100).toFixed(0)}%`}
-                          >
-                            {statusDistribution.map((entry, index) => (
-                              <Cell key={`cell-${index}`} fill={entry.color} />
-                            ))}
-                          </Pie>
-                          <Tooltip formatter={(value) => [`${value} activities`, 'Count']} />
-                          <Legend />
-                        </PieChart>
-                      </ResponsiveContainer>
-                    ) : (
-                      <div className="flex flex-col items-center justify-center h-[300px]">
-                        <span className="text-gray-400">No activity status data available</span>
-                      </div>
-                    )}
-                  </Box>
-                </div>
               </div>
             </TabPanel>
 
