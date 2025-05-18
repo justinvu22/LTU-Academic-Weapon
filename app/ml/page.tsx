@@ -268,73 +268,9 @@ export default function MLPage() {
           <h1 className="text-[2rem] font-extrabold tracking-wide text-[#EEE] pl-4 border-l-4 border-[#6E5FFE] uppercase" style={{ fontFamily: "'IBM Plex Sans', Inter, sans-serif", letterSpacing: '0.04em', textShadow: '0 1px 8px #6E5FFE22' }}>ML-Powered Security Insights</h1>
         </div>
 
-<<<<<<< HEAD
-      {(isProcessing || loading || isLoadingData) ? (
-        <div className="flex flex-col justify-center items-center h-64">
-          <div className="w-64 mb-4">
-            <LinearProgress 
-              variant="determinate" 
-              value={getLoadingProgress()} 
-              color="primary" 
-              className="h-2 rounded-full"
-            />
-          </div>
-          <div className="mt-2 text-gray-600">
-            {getLoadingMessage()}
-          </div>
-          {processingPhase === 'analyzing-patterns' && learnedPatterns > 0 && (
-            <div className="mt-4 text-sm text-green-600 flex items-center">
-              <FaLightbulb className="mr-2" /> Discovered {learnedPatterns} new threat patterns!
-            </div>
-          )}
-        </div>
-      ) : error || dataError ? (
-        <div className="bg-red-100 text-red-800 p-4 rounded-md mb-6">
-          <h2 className="text-lg font-semibold mb-2">Error</h2>
-          <p>{error || dataError}</p>
-          <p className="mt-2">Please upload activity data to get ML insights.</p>
-          <div className="mt-4">
-            <Link href="/upload" passHref>
-              <Button variant="contained" color="primary">
-                Upload Data
-              </Button>
-            </Link>
-          </div>
-        </div>
-      ) : (
-        <div>
-          {/* Summary Stats */}
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
-            <div className="bg-gradient-to-br from-indigo-500 to-blue-600 text-white p-6 rounded-lg shadow-sm">
-              <div className="text-3xl font-bold">{recommendations.length}</div>
-              <div className="text-sm opacity-80">Total Insights</div>
-            </div>
-            
-            <div className="bg-gradient-to-br from-red-500 to-pink-600 text-white p-6 rounded-lg shadow-sm">
-              <div className="text-3xl font-bold">
-                {recommendations.filter(r => r.severity === 'critical' || r.severity === 'high').length}
-              </div>
-              <div className="text-sm opacity-80">High Priority</div>
-            </div>
-            
-            <div className="bg-gradient-to-br from-yellow-400 to-amber-500 text-white p-6 rounded-lg shadow-sm">
-              <div className="text-3xl font-bold">
-                {recommendations.filter(r => r.severity === 'medium').length}
-              </div>
-              <div className="text-sm opacity-80">Medium Priority</div>
-            </div>
-            
-            <div className="bg-gradient-to-br from-green-400 to-emerald-500 text-white p-6 rounded-lg shadow-sm">
-              <div className="text-3xl font-bold">
-                {Object.keys(groupedRecommendations).length}
-              </div>
-              <div className="text-sm opacity-80">Categories</div>
-            </div>
-=======
         {loading ? (
           <div className="flex justify-center items-center min-h-[50vh] w-full">
             <CircularProgress sx={{ color: '#8B5CF6' }} />
->>>>>>> 0481816de9b1c248174805c3fca29620f4a87b5c
           </div>
         ) : error ? (
           <div className="bg-[#1F2030] border border-[#333] rounded-xl shadow-[0_2px_8px_rgba(110,95,254,0.08)] p-8 mb-8 w-full">
@@ -370,42 +306,6 @@ export default function MLPage() {
               </div>
             </div>
 
-<<<<<<< HEAD
-          {/* Learned Patterns Info */}
-          {learnedPatterns > 0 && (
-            <div className="bg-indigo-100 border border-indigo-200 text-indigo-800 p-4 rounded-md mb-6 flex items-center">
-              <FaLightbulb className="text-indigo-500 mr-3 text-xl" />
-              <div>
-                <h3 className="font-medium">Self-Learning System</h3>
-                <p className="text-sm">Our AI discovered {learnedPatterns} new threat patterns based on your data that will improve future detection.</p>
-              </div>
-            </div>
-          )}
-
-          {/* ML Recommendations by Category */}
-          {recommendations.length > 0 ? (
-            <div className="space-y-8">
-              {Object.entries(groupedRecommendations).map(([category, categoryRecommendations]) => (
-                <div key={category} className="mb-8">
-                  <h2 className="text-xl font-semibold mb-4 text-gray-800 border-b pb-2">
-                    {getCategoryName(category)}
-                  </h2>
-                  <div className="space-y-4">
-                    {categoryRecommendations.map((rec) => (
-                      <div key={rec.id} className={`border p-4 rounded-md shadow-sm ${getSeverityColor(rec.severity)}`}>
-                        <div className="flex justify-between items-start">
-                          <div className="flex-1">
-                            <h3 className="font-medium text-gray-900">{rec.title}</h3>
-                            <p className="text-sm mt-1">{rec.description}</p>
-                            
-                            <div className="mt-3">
-                              <h4 className="text-xs font-semibold uppercase text-gray-500 mb-1">Recommended Actions:</h4>
-                              <ul className="list-disc pl-5 text-sm">
-                                {rec.suggestedActions.map((action, i) => (
-                                  <li key={i}>{action}</li>
-                                ))}
-                              </ul>
-=======
             {/* ML Recommendations by Category */}
             {recommendations.length > 0 ? (
               <div className="space-y-8">
@@ -422,7 +322,6 @@ export default function MLPage() {
                               <p className="text-[#A0AEC0] text-base leading-relaxed font-medium">
                                 User <span className="font-semibold text-[#F472B6] text-base">{rec.affectedUsers[0]}</span> has accessed or transferred sensitive data 1 times
                               </p>
->>>>>>> 0481816de9b1c248174805c3fca29620f4a87b5c
                             </div>
                             {/* Affected Users card */}
                             <div className="bg-[#232346] rounded-lg p-5 mb-6 border border-[#333]">
@@ -464,37 +363,12 @@ export default function MLPage() {
                   </div>
                 ))}
               </div>
-<<<<<<< HEAD
-              <h2 className="text-xl font-semibold mb-2">No ML Insights Available</h2>
-              <p className="text-gray-600">
-                Upload activity data from the data upload page to generate ML-powered security insights.
-              </p>
-              <div className="mt-4">
-                <Link href="/upload" passHref>
-                  <Button variant="contained" color="primary">
-                    Upload Data
-                  </Button>
-                </Link>
-              </div>
-            </div>
-          )}
-
-          {/* Performance Metrics (if available) */}
-          {processingComplete && performanceMetrics && performanceMetrics.processingTime && (
-            <div className="bg-white rounded-lg shadow-sm p-4 text-xs text-gray-500 mt-8">
-              <p>Processing completed in {performanceMetrics.processingTime.toFixed(2)}s • {normalizedCount} activities analyzed</p>
-            </div>
-          )}
-        </div>
-      )}
-=======
             ) : (
               <div className="text-center py-8 text-gray-400 text-lg">No ML insights found for the current data.</div>
             )}
           </div>
         )}
       </div>
->>>>>>> 0481816de9b1c248174805c3fca29620f4a87b5c
     </div>
   );
 }

@@ -1,17 +1,10 @@
 "use client";
 
 import React, { useEffect, useState } from 'react';
-<<<<<<< HEAD
-import { Typography, Box, Paper, CircularProgress, Tabs, Tab, Button, Table, TableBody, TableCell, TableHead, TableRow } from '@mui/material';
-import { ActivityList } from '../../components/ActivityList';
-import { UserActivity } from '../../types/activity';
-import { policyIcons } from '../../constants/policyIcons';
-=======
 import { Typography, Box, Paper, CircularProgress, Tabs, Tab, Button, TableContainer, Table } from '@mui/material';
 import { ActivityList } from '@components/ActivityList';
-import { UserActivity } from '@types/activity';
+import { UserActivity } from '../../types/activity';
 import { policyIcons } from '@constants/policyIcons';
->>>>>>> 0481816de9b1c248174805c3fca29620f4a87b5c
 import '@fontsource/poppins/600.css';
 import { FaSyncAlt } from 'react-icons/fa';
 import { useSearchParams } from 'next/navigation';
@@ -391,108 +384,12 @@ export default function AlertsPage() {
   };
 
   return (
-<<<<<<< HEAD
-    <Box sx={{ p: 3, minHeight: '100vh', bgcolor: '#f3f4f6', fontFamily: 'Poppins, sans-serif' }}>
-      <Box display="flex" alignItems="center" justifyContent="space-between" mb={3}>
-        <Tabs value={tab} onChange={(_, v) => setTab(v)} textColor="primary" indicatorColor="primary" sx={{ minHeight: 0, background: 'rgba(255,255,255,0.15)', borderRadius: 2, backdropFilter: 'blur(8px)' }}>
-          <Tab label="Immediate review" sx={{ fontWeight: tab === 0 ? 700 : 400, minHeight: 0, minWidth: 120, color: tab === 0 ? '#232846' : '#6b7280', fontFamily: 'Poppins, sans-serif' }} />
-          <Tab label="Custom alerts" sx={{ fontWeight: tab === 1 ? 700 : 400, minHeight: 0, minWidth: 120, color: tab === 1 ? '#232846' : '#6b7280', fontFamily: 'Poppins, sans-serif' }} />
-          <Tab label="All other alerts" sx={{ fontWeight: tab === 2 ? 700 : 400, minHeight: 0, minWidth: 140, color: tab === 2 ? '#232846' : '#6b7280', fontFamily: 'Poppins, sans-serif' }} />
-          <Tab label="Closed" sx={{ fontWeight: tab === 3 ? 700 : 400, minHeight: 0, minWidth: 100, color: tab === 3 ? '#232846' : '#6b7280', fontFamily: 'Poppins, sans-serif' }} />
-        </Tabs>
-        <Button onClick={handleRefresh} startIcon={<FaSyncAlt />} sx={{ borderRadius: 2, textTransform: 'none', fontWeight: 600, fontFamily: 'Poppins, sans-serif', background: '#e5e7eb', color: '#232846', px: 3, py: 1.5, boxShadow: 1, ':hover': { background: '#d1d5db' } }}>
-          Refresh alerts
-        </Button>
-      </Box>
-      {loading ? (
-        <Box display="flex" justifyContent="center" alignItems="center" minHeight="50vh">
-          <CircularProgress />
-        </Box>
-      ) : error ? (
-        <Paper elevation={3} sx={{ p: 3, mb: 3, background: 'rgba(255,255,255,0.20)', backdropFilter: 'blur(12px)', borderRadius: 4, border: '1px solid #e5e7eb', boxShadow: '0 4px 32px 0 rgba(80,0,120,0.10)' }}>
-          <Typography color="error" sx={{ fontFamily: 'Poppins, sans-serif' }}>{error}</Typography>
-          <Typography variant="body2" mt={2} sx={{ fontFamily: 'Poppins, sans-serif' }}>
-            Please navigate to the Upload page to provide activity data for analysis.
-          </Typography>
-        </Paper>
-      ) : activities.length === 0 ? (
-        <Paper elevation={3} sx={{ p: 3, mb: 3, background: 'rgba(255,255,255,0.20)', backdropFilter: 'blur(12px)', borderRadius: 4, border: '1px solid #e5e7eb', boxShadow: '0 4px 32px 0 rgba(80,0,120,0.10)' }}>
-          <Typography sx={{ fontFamily: 'Poppins, sans-serif' }}>
-            No activity data available. Please navigate to the Upload page to provide data for analysis.
-          </Typography>
-        </Paper>
-      ) : (
-        <>
-          {tab === 0 && (
-            <Paper elevation={3} sx={{ p: 3, mb: 3, background: 'rgba(255,255,255,0.20)', backdropFilter: 'blur(12px)', borderRadius: 4, border: '1px solid #e5e7eb', boxShadow: '0 4px 32px 0 rgba(80,0,120,0.10)' }}>
-              <Typography variant="h6" gutterBottom sx={{ color: '#232846', fontFamily: 'Poppins, sans-serif' }}>
-              Recent High-Risk Activities ({activities.filter(a => (a.riskScore || 0) >= 500).length})
-            </Typography>
-            <ActivityList 
-                activities={activities.filter(a => (a.riskScore || 0) >= 500).slice(0, 5)} 
-              policyIcons={policyIcons}
-            />
-          </Paper>
-          )}
-          {tab === 1 && (
-            <Paper elevation={3} sx={{ p: 3, mb: 3, background: 'rgba(255,255,255,0.20)', backdropFilter: 'blur(12px)', borderRadius: 4, border: '1px solid #e5e7eb', boxShadow: '0 4px 32px 0 rgba(80,0,120,0.10)' }}>
-              <Typography variant="h6" gutterBottom sx={{ color: '#232846', fontFamily: 'Poppins, sans-serif' }}>
-                Custom Alerts
-              </Typography>
-              {customAlerts.length === 0 ? (
-                <Box sx={{ p: 2, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 2 }}>
-                  <Typography sx={{ fontFamily: 'Poppins, sans-serif', mb: 2 }}>
-                    No custom alerts yet. Create alerts based on specific criteria below.
-                  </Typography>
-                  <Button 
-                    variant="contained"
-                    color="primary"
-                    onClick={() => window.location.href = '/custom-alerts'}
-                    sx={{ 
-                      textTransform: 'none', 
-                      borderRadius: 2,
-                      px: 3,
-                      py: 1.5,
-                      background: 'linear-gradient(90deg, #4b286a 0%, #7e3cad 100%)',
-                      '&:hover': {
-                        background: 'linear-gradient(90deg, #3a1d53 0%, #6b3092 100%)',
-                      }
-                    }}
-                  >
-                    Create Custom Alert
-                  </Button>
-                </Box>
-              ) : (
-                <ActivityList activities={customAlerts} policyIcons={policyIcons} />
-              )}
-            </Paper>
-          )}
-          {tab === 2 && (
-            <Paper elevation={3} sx={{ 
-              display: 'flex',
-              flexDirection: 'column',
-              height: 'calc(100vh - 180px)',
-              p: 3, 
-              mb: 3, 
-              background: 'rgba(255,255,255,0.20)', 
-              backdropFilter: 'blur(12px)', 
-              borderRadius: 4, 
-              border: '1px solid #e5e7eb', 
-              boxShadow: '0 4px 32px 0 rgba(80,0,120,0.10)'
-            }}>
-              <Typography variant="h6" gutterBottom sx={{ color: '#232846', fontFamily: 'Poppins, sans-serif' }}>
-                All Activities ({activities.length})
-              </Typography>
-              <Box sx={{ flex: 1, overflow: 'hidden' }}>
-                <VirtualizedActivityList 
-                  activities={activities} 
-=======
     <div className="min-h-screen bg-[#121324] px-6 py-10 font-['IBM_Plex_Sans',Inter,sans-serif] flex flex-col">
       <div className="w-full bg-[#121324] rounded-2xl border border-[#333] shadow-[0_2px_12px_rgba(110,95,254,0.10)] px-8 py-10 flex flex-col gap-8 mx-auto">
         <div className="flex items-center justify-between mb-8 w-full">
           <h1 className="text-[2rem] font-extrabold tracking-wide text-[#EEE] pl-4 border-l-4 border-[#6E5FFE] uppercase" style={{ fontFamily: "'IBM Plex Sans', Inter, sans-serif", letterSpacing: '0.04em', textShadow: '0 1px 8px #6E5FFE22' }}>Alerts</h1>
           <button
-            onClick={fetchActivities}
+            onClick={handleRefresh}
             className="inline-flex items-center gap-2 bg-gradient-to-r from-[#6E5FFE] to-[#8F7BFF] text-white font-bold px-7 py-3 rounded-xl shadow-lg hover:from-[#7C6BFF] hover:to-[#A89CFF] hover:scale-105 transition-all duration-150"
           >
             <FaSyncAlt className="text-lg" />
@@ -580,8 +477,7 @@ export default function AlertsPage() {
               <div className="bg-[#1F2030] rounded-lg border border-[#333] shadow-[0_2px_8px_rgba(110,95,254,0.08)] p-8 mb-8 w-full">
                 <h2 className="text-[1.15rem] font-extrabold tracking-wide text-[#EEE] pl-4 border-l-4 border-[#6E5FFE] mb-6 uppercase" style={{ fontFamily: "'IBM Plex Sans', Inter, sans-serif", letterSpacing: '0.04em', textShadow: '0 1px 8px #6E5FFE22' }}>Recent High-Risk Activities</h2>
                 <ActivityList 
-                  activities={activities.filter(a => a.riskScore >= 70).slice(0, 5)} 
->>>>>>> 0481816de9b1c248174805c3fca29620f4a87b5c
+                  activities={activities.filter(a => (a.riskScore || 0) >= 70).slice(0, 5)} 
                   policyIcons={policyIcons}
                 />
               </div>

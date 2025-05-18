@@ -147,35 +147,6 @@ export const ActivityList: React.FC<ActivityListProps> = ({
     return (
       <div className="flex flex-wrap gap-1">
         {categories.map(category => {
-<<<<<<< HEAD
-          if (typeof category !== 'string' || chipCount >= MAX_CHIPS) return null;
-          
-          // Handle array values (multiple breaches in a category)
-          if (Array.isArray(parsedBreaches[category])) {
-            // Limit the number of array items we render for better performance
-            const breaches = parsedBreaches[category].slice(0, MAX_CHIPS - chipCount);
-            chipCount += breaches.length;
-            
-            return breaches.map((breach: any, index: number) => (
-              <Chip
-                key={`${category}-${index}`}
-                label={`${category}: ${String(breach).substring(0, 20)}`}
-                size="small"
-                color="error"
-                variant="outlined"
-                sx={{
-                  m: 0.5,
-                  borderRadius: 9999,
-                  background: 'rgba(255,235,235,0.4)',
-                  fontWeight: 600,
-                  fontFamily: 'Poppins, sans-serif',
-                  color: '#e11d48',
-                  border: '1.5px solid #e11d48',
-                  px: 1.5,
-                  py: 0.5,
-                }}
-              />
-=======
           if (typeof category !== 'string') return null;
           if (Array.isArray(breaches[category])) {
             return breaches[category].map((breach: string, index: number) => (
@@ -188,39 +159,13 @@ export const ActivityList: React.FC<ActivityListProps> = ({
                 )}
                 {breach}
               </span>
->>>>>>> 0481816de9b1c248174805c3fca29620f4a87b5c
             ));
           }
-          
           // Handle boolean or primitive values
           chipCount++;
           return (
             <span
               key={category}
-<<<<<<< HEAD
-              label={String(category).substring(0, 30)}
-              size="small"
-              color="error"
-              variant="outlined"
-              sx={{ 
-                m: 0.5,
-                background: 'rgba(255,235,235,0.4)', 
-                fontWeight: 500
-              }}
-            />
-          );
-        })}
-        {chipCount >= MAX_CHIPS && categories.length > MAX_CHIPS && (
-          <Chip
-            label={`+${categories.length - MAX_CHIPS} more`}
-            size="small"
-            color="default"
-            variant="outlined"
-            sx={{ m: 0.5 }}
-          />
-        )}
-      </Box>
-=======
               className="inline-flex items-center gap-1 bg-[#2A1E3C] border border-[#7E22CE] text-purple-300 text-xs px-2 py-1 rounded-full font-poppins"
             >
               {policyIcons[category] && (
@@ -231,7 +176,6 @@ export const ActivityList: React.FC<ActivityListProps> = ({
           );
         })}
       </div>
->>>>>>> 0481816de9b1c248174805c3fca29620f4a87b5c
     );
   };
 
@@ -272,34 +216,6 @@ export const ActivityList: React.FC<ActivityListProps> = ({
   };
 
   return (
-<<<<<<< HEAD
-    <TableContainer component={Paper} sx={{ maxHeight: 440 }}>
-      <Table stickyHeader size="small">
-        <TableHead>
-          <TableRow>
-            <TableCell>User</TableCell>
-            <TableCell>Risk Score</TableCell>
-            <TableCell>Policy Breaches</TableCell>
-            <TableCell>Last Activity</TableCell>
-          </TableRow>
-        </TableHead>
-        <TableBody>
-          {activities.map((activity) => (
-            <TableRow 
-              key={activity.id || `activity-${Math.random().toString(36).substr(2, 9)}`} 
-              hover
-              onClick={() => onActivitySelect && onActivitySelect(activity)}
-              sx={{ 
-                cursor: onActivitySelect ? 'pointer' : 'default',
-                backgroundColor: getRiskColor(activity.riskScore)
-              }}
-            >
-              <TableCell>{getUserDisplayName(activity)}</TableCell>
-              <TableCell>{activity.riskScore}</TableCell>
-              <TableCell>{formatBreaches(activity.policiesBreached)}</TableCell>
-              <TableCell>{formatDateTime(activity)}</TableCell>
-            </TableRow>
-=======
     <div className="bg-[#1E1E2F] rounded-xl shadow-[inset_-4px_-4px_6px_#2a2a40,inset_4px_4px_6px_#0e0e1e] overflow-x-auto max-h-[70vh] overflow-y-auto font-poppins">
       <table className="min-w-full text-left text-sm">
         <thead>
@@ -326,27 +242,9 @@ export const ActivityList: React.FC<ActivityListProps> = ({
               <td className="px-4 py-3 leading-relaxed text-purple-400 font-semibold">{activity.riskScore}</td>
               <td className="px-4 py-3 leading-relaxed">{formatBreaches(activity.policiesBreached)}</td>
             </tr>
->>>>>>> 0481816de9b1c248174805c3fca29620f4a87b5c
           ))}
         </tbody>
       </table>
     </div>
   );
-<<<<<<< HEAD
-};
-
-/**
- * Returns a background color based on risk score
- * @param score - Risk score value
- * @returns - CSS color value
- */
-const getRiskColor = (score: number | undefined): string => {
-  if (!score) return 'transparent'; // Handle undefined
-  if (score >= 2000) return 'rgba(255, 0, 0, 0.08)';  // Critical risk
-  if (score >= 1500) return 'rgba(255, 80, 0, 0.08)'; // High risk
-  if (score >= 1000) return 'rgba(255, 165, 0, 0.08)'; // Medium-high risk
-  if (score >= 500) return 'rgba(255, 255, 0, 0.04)'; // Medium risk
-  return 'transparent'; // Low risk
-=======
->>>>>>> 0481816de9b1c248174805c3fca29620f4a87b5c
 }; 

@@ -18,19 +18,11 @@ import {
 } from 'recharts';
 import { UserActivity, MLRecommendation, TimeDistribution } from '@/types';
 import { generateStatistics, RISK_THRESHOLDS } from '../../utils/dataProcessor';
-<<<<<<< HEAD
 import { HeatmapCell } from '../../utils/ml/heatmapAnalysis';
 import { SequencePattern, SequenceStep } from '../../utils/ml/sequencePatterns';
 import { useMLProcessing } from '../../hooks/useMLProcessing';
-
-/**
- * Check if code is running in browser
- */
-const isBrowser = () => typeof window !== 'undefined';
-=======
 import { MdOutlineListAlt, MdOutlineGavel, MdOutlinePersonOff } from 'react-icons/md';
 import { FaSkull } from 'react-icons/fa';
->>>>>>> 0481816de9b1c248174805c3fca29620f4a87b5c
 
 /**
  * Tab Panel component for Dashboard tabs
@@ -208,9 +200,6 @@ export default function DashboardPage() {
   };
 
   useEffect(() => {
-    // Only run in browser environment
-    if (!isBrowser()) return;
-    
     fetchActivities();
   }, []);
 
@@ -1360,42 +1349,7 @@ export default function DashboardPage() {
             </TabPanel>
 
             <TabPanel value={activeTab} index={1}>
-<<<<<<< HEAD
               <AdvancedAnalyticsTab />
-=======
-              <h2 className="text-lg font-extrabold text-[#8B5CF6] uppercase tracking-wide mb-4">Advanced Analytics</h2>
-              <div className="bg-[#1F2030] border border-[#333] rounded-xl shadow-lg p-6 mb-8">
-                <h2 className="text-lg font-extrabold text-[#8B5CF6] uppercase tracking-wide mb-2">Risk Distribution</h2>
-                <Box sx={{ height: 300 }}>
-                  {riskDistribution.length > 0 ? (
-                    <ResponsiveContainer width="100%" height="100%">
-                      <PieChart>
-                        <Pie
-                          data={riskDistribution}
-                          cx="50%"
-                          cy="50%"
-                          labelLine={false}
-                          outerRadius={100}
-                          fill="#8884d8"
-                          dataKey="count"
-                          label={({ name, percent }) => `${name}: ${(percent * 100).toFixed(0)}%`}
-                        >
-                          {riskDistribution.map((entry, index) => (
-                            <Cell key={`cell-${index}`} fill={entry.color} />
-                          ))}
-                        </Pie>
-                        <Tooltip />
-                        <Legend />
-                      </PieChart>
-                    </ResponsiveContainer>
-                  ) : (
-                    <div className="flex flex-col items-center justify-center h-[300px]">
-                      <span className="text-gray-400">Not enough data available</span>
-                    </div>
-                  )}
-                </Box>
-              </div>
->>>>>>> 0481816de9b1c248174805c3fca29620f4a87b5c
             </TabPanel>
           </>
         )}

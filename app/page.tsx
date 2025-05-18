@@ -127,132 +127,6 @@ export default function Page() {
   );
 
   return (
-<<<<<<< HEAD
-    <div className="w-full min-h-screen bg-[#f8f8f8] text-gray-800 p-6">
-      {/* Header */}
-      <div className="flex items-center mb-6">
-        <h1 className="text-2xl font-semibold">Dashboard</h1>
-      </div>
-
-      {loading || loadingProgress < 100 ? (
-        renderLoadingIndicator()
-      ) : (
-        <div>
-          {error ? (
-            <div className="bg-red-100 text-red-800 p-4 rounded-md mb-6">
-              <h2 className="text-lg font-semibold mb-2">Error</h2>
-              <p>{error}</p>
-              <div className="mt-4">
-                <Link href="/upload" passHref>
-                  <Button variant="contained" color="primary">
-                    Upload Data
-                  </Button>
-                </Link>
-              </div>
-            </div>
-          ) : (
-            <>
-              {/* Stats Cards Section */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4 mb-6">
-                <div className="bg-gray-900 text-white p-6 rounded shadow-sm flex flex-col items-center">
-                  <div className="text-6xl font-bold">{totalActivities}</div>
-                  <div className="mt-2 text-center">Total Activities</div>
-                </div>
-                
-                <div className="bg-purple-600 text-white p-6 rounded shadow-sm flex flex-col items-center">
-                  <div className="text-6xl font-bold">{highRiskActivities}</div>
-                  <div className="mt-2 text-center">High Risk Activities</div>
-                </div>
-                
-                <div className="bg-pink-500 text-white p-6 rounded shadow-sm flex flex-col items-center">
-                  <div className="text-6xl font-bold">{policyBreaches}</div>
-                  <div className="mt-2 text-center">Recent Policy Breaches</div>
-                </div>
-                
-                <div className="bg-blue-500 text-white p-6 rounded shadow-sm flex flex-col items-center">
-                  <div className="text-6xl font-bold">{usersAtRisk}</div>
-                  <div className="mt-2 text-center">Users at Risk</div>
-                </div>
-              </div>
-
-              {/* ML Insights Banner */}
-              <div className="mb-6">
-                <div className="bg-gradient-to-r from-indigo-500 to-purple-600 text-white rounded-lg shadow-sm p-6">
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <h2 className="text-xl font-bold mb-2">AI-Powered Security Insights</h2>
-                      <p className="text-white text-opacity-90">
-                        Get advanced ML-powered recommendations and security insights to protect your data.
-                      </p>
-                    </div>
-                    <Link href="/ml" passHref>
-                      <Button 
-                        variant="contained" 
-                        className="bg-white text-indigo-600 hover:bg-gray-100"
-                      >
-                        View ML Insights
-                      </Button>
-                    </Link>
-                  </div>
-                </div>
-              </div>
-
-              {/* Dashboard Links */}
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
-                <Link href="/dashboard" passHref>
-                  <div className="bg-white rounded-lg shadow-sm p-6 cursor-pointer transition-transform transform hover:scale-105">
-                    <h2 className="text-xl font-bold mb-2 text-indigo-600">Advanced Dashboard</h2>
-                    <p className="text-gray-600">
-                      View detailed analytics, visualizations, and user activity trends.
-                    </p>
-                  </div>
-                </Link>
-                <Link href="/upload" passHref>
-                  <div className="bg-white rounded-lg shadow-sm p-6 cursor-pointer transition-transform transform hover:scale-105">
-                    <h2 className="text-xl font-bold mb-2 text-purple-600">Upload New Data</h2>
-                    <p className="text-gray-600">
-                      Upload new activity data to analyze and monitor security threats.
-                    </p>
-                  </div>
-                </Link>
-              </div>
-              
-              {/* Recent Activities Section */}
-              <div className="bg-white rounded-lg shadow-sm p-6 mb-6">
-                <h2 className="text-xl font-bold mb-4">Recent Activities</h2>
-                {recentActivities.length > 0 ? (
-                  <ActivityList 
-                    activities={recentActivities} 
-                    policyIcons={policyIcons}
-                  />
-                ) : (
-                  <div className="text-center py-8 text-gray-500">
-                    {error ? 
-                      `Error loading activities: ${error}` :
-                      'No recent activities found. Try uploading new data.'
-                    }
-                  </div>
-                )}
-                <div className="mt-4 text-right">
-                  <Link href="/alerts?tab=2" passHref>
-                    <Button variant="outlined" color="primary">
-                      View All Activities
-                    </Button>
-                  </Link>
-                </div>
-              </div>
-
-              {/* Performance Metrics (if available) */}
-              {adaptiveProcessing.performanceMetrics && adaptiveProcessing.performanceMetrics.processingTime && (
-                <div className="bg-white rounded-lg shadow-sm p-4 text-xs text-gray-500 mb-6">
-                  <p>Data loaded in {adaptiveProcessing.performanceMetrics.processingTime.toFixed(2)}s • {adaptiveProcessing.performanceMetrics.adaptationsApplied?.join(' • ')}</p>
-                </div>
-              )}
-            </>
-          )}
-        </div>
-      )}
-=======
     <div className="min-h-screen bg-[#121324] px-6 py-10 font-['IBM_Plex_Sans',Inter,sans-serif] flex flex-col">
       <div className="w-full bg-[#121324] rounded-2xl border border-[#333] shadow-[0_2px_12px_rgba(110,95,254,0.10)] px-8 py-10 flex flex-col gap-8 mx-auto">
         {/* Header */}
@@ -309,53 +183,65 @@ export default function Page() {
                 <p className="text-white/80">Get advanced ML-powered recommendations and security insights to protect your data.</p>
               </div>
               <Link href="/ml" passHref legacyBehavior>
-                <button className="bg-gradient-to-r from-[#8B5CF6] to-[#EC4899] text-white px-5 py-2 rounded-full font-semibold shadow-lg hover:scale-105 hover:shadow-pink-500/40 transition-all duration-300 focus:outline-none focus:ring-2 focus:ring-pink-400 animate-fadeIn">
+                <Button
+                  variant="contained"
+                  sx={{ background: 'linear-gradient(90deg, #6E5FFE 0%, #A685FF 100%)', color: '#fff', fontWeight: 700, boxShadow: '0 2px 8px #6E5FFE22' }}
+                >
                   View ML Insights
-                </button>
+                </Button>
               </Link>
             </div>
 
             {/* Dashboard Links */}
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
               <Link href="/dashboard" passHref legacyBehavior>
-                <div className="bg-[#1F2030] border border-[#333] rounded-xl shadow-[inset_-4px_-4px_6px_#2a2a40,inset_4px_4px_6px_#0e0e1e] p-6 cursor-pointer hover:ring-2 hover:ring-purple-600 hover:scale-[1.02] transition-all duration-300 text-white">
-                  <h2 className="text-lg font-extrabold text-[#8B5CF6] uppercase tracking-wide mb-2">Advanced Dashboard</h2>
-                  <p className="text-white/70">View detailed analytics, visualizations, and user activity trends.</p>
+                <div className="bg-[#23243a] rounded-lg shadow-sm p-6 cursor-pointer transition-transform transform hover:scale-105">
+                  <h2 className="text-xl font-bold mb-2 text-indigo-400">Advanced Dashboard</h2>
+                  <p className="text-gray-400">View detailed analytics, visualizations, and user activity trends.</p>
                 </div>
               </Link>
               <Link href="/upload" passHref legacyBehavior>
-                <div className="bg-[#1F2030] border border-[#333] rounded-xl shadow-[inset_-4px_-4px_6px_#2a2a40,inset_4px_4px_6px_#0e0e1e] p-6 cursor-pointer hover:ring-2 hover:ring-purple-600 hover:scale-[1.02] transition-all duration-300 text-white">
-                  <h2 className="text-lg font-extrabold text-[#8B5CF6] uppercase tracking-wide mb-2">Upload New Data</h2>
-                  <p className="text-white/70">Upload new activity data to analyze and monitor security threats.</p>
+                <div className="bg-[#23243a] rounded-lg shadow-sm p-6 cursor-pointer transition-transform transform hover:scale-105">
+                  <h2 className="text-xl font-bold mb-2 text-purple-400">Upload New Data</h2>
+                  <p className="text-gray-400">Upload new activity data to analyze and monitor security threats.</p>
                 </div>
               </Link>
             </div>
 
             {/* Recent Activities Section */}
-            <div className="bg-[#1F2030] border border-[#333] rounded-xl shadow-inner p-6 mb-6">
-              <h2 className="text-lg font-extrabold text-gray-300 uppercase tracking-wide mb-4">Recent Activities</h2>
+            <div className="bg-[#23243a] rounded-lg shadow-sm p-6 mb-6">
+              <h2 className="text-xl font-bold mb-4 text-white">Recent Activities</h2>
               {recentActivities.length > 0 ? (
-                <ActivityList 
-                  activities={recentActivities} 
+                <ActivityList
+                  activities={recentActivities}
                   policyIcons={policyIcons}
                 />
               ) : (
                 <div className="text-center py-8 text-gray-500">
-                  No recent activities found.
+                  {error ?
+                    `Error loading activities: ${error}` :
+                    'No recent activities found. Try uploading new data.'
+                  }
                 </div>
               )}
               <div className="mt-4 text-right">
                 <Link href="/alerts?tab=2" passHref legacyBehavior>
-                  <button className="bg-gradient-to-r from-[#8B5CF6] to-[#6E5FFE] text-white px-4 py-2 rounded-full font-semibold shadow-lg hover:scale-105 hover:shadow-purple-500/40 transition-all duration-300 focus:outline-none focus:ring-2 focus:ring-purple-400 animate-fadeIn">
+                  <Button variant="outlined" sx={{ color: '#6E5FFE', borderColor: '#6E5FFE' }}>
                     View All Activities
-                  </button>
+                  </Button>
                 </Link>
               </div>
             </div>
+
+            {/* Performance Metrics (if available) */}
+            {adaptiveProcessing.performanceMetrics && adaptiveProcessing.performanceMetrics.processingTime && (
+              <div className="bg-[#23243a] rounded-lg shadow-sm p-4 text-xs text-gray-400 mb-6">
+                <p>Data loaded in {adaptiveProcessing.performanceMetrics.processingTime.toFixed(2)}s • {adaptiveProcessing.performanceMetrics.adaptationsApplied?.join(' • ')}</p>
+              </div>
+            )}
           </div>
         )}
       </div>
->>>>>>> 0481816de9b1c248174805c3fca29620f4a87b5c
     </div>
   );
 }
