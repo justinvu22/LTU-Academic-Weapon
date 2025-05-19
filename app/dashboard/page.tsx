@@ -89,6 +89,370 @@ function formatDateTime(activity: UserActivity): string {
   return '';
 }
 
+// Place this helper above the AdvancedAnalyticsTab function:
+function getHeatmapColor(intensity: number): string {
+  if (intensity === 0) return 'rgba(60,60,80,0.18)';
+  const stops = [
+    { pct: 0.0, color: [36, 99, 235] },   // blue
+    { pct: 0.33, color: [139, 92, 246] }, // purple
+    { pct: 0.66, color: [239, 68, 68] },  // red
+    { pct: 1.0, color: [253, 224, 71] }   // yellow
+  ];
+  let lower = stops[0], upper = stops[stops.length-1];
+  for (let i = 1; i < stops.length; i++) {
+    if (intensity <= stops[i].pct) {
+      lower = stops[i-1];
+      upper = stops[i];
+      break;
+    }
+  }
+  const range = upper.pct - lower.pct;
+  const pct = (intensity - lower.pct) / (range || 1);
+  const color = lower.color.map((c, i) => Math.round(c + (upper.color[i] - c) * pct));
+  return `rgba(${color[0]},${color[1]},${color[2]},${0.85 - 0.3 * (1-intensity)})`;
+}
+
+// Move AdvancedAnalyticsTab to top-level (outside DashboardPage):
+function AdvancedAnalyticsTab({ activities }: { activities: UserActivity[] }) {
+  const [isMounted, setIsMounted] = useState(false);
+  const [hasClientLoaded, setHasClientLoaded] = useState(false);
+  const [hoveredCell, setHoveredCell] = useState<{integration: string, hour: number} | null>(null);
+  
+  // Only run ML on client side after mount and only if we have enough data
+  const shouldProcessML = isMounted && activities.length >= 10;
+  
+  // Use the ML processing hook for worker-based processing
+  const { 
+    results, 
+    progress, 
+    isProcessing, 
+    error 
+  } = useMLProcessing(shouldProcessML ? activities : []);
+  
+  // Only run on client side after mount
+  useEffect(() => {
+    setIsMounted(true);
+    
+    // Short delay before showing content to ensure client-side code is ready
+    const timer = setTimeout(() => {
+      setHasClientLoaded(true);
+    }, 500);
+    
+    return () => clearTimeout(timer);
+  }, [activities]);
+  
+  // Destructure results for easier access
+  const { 
+    anomalyTimelineData, 
+    heatmapData, 
+    sequentialPatternData, 
+    userClusteringData
+  } = results;
+  
+  // Flag to check if processing is complete
+  const processingComplete = !isProcessing && 
+    anomalyTimelineData?.length > 0 && 
+    heatmapData?.length > 0;
+  
+  // Color constants for visuals
+  const COLORS = ['#0088FE', '#00C49F', '#FFBB28', '#FF8042', '#8884d8'];
+  const RISK_COLORS = {
+    low: '#00C49F',
+    medium: '#FFBB28',
+    high: '#FF8042', 
+    critical: '#FF0000',
+    normal: '#0088FE',
+    anomaly: '#FF0000'
+  };
+  
+  // Custom label renderer for pie charts
+  const renderCustomizedLabel = (props: any) => {
+    const { cx, cy, midAngle, innerRadius, outerRadius, percent, name } = props;
+    const radius = innerRadius + (outerRadius - innerRadius) * 0.5;
+    const x = cx + radius * Math.cos(-midAngle * Math.PI / 180);
+    const y = cy + radius * Math.sin(-midAngle * Math.PI / 180);
+    
+    return (
+      <text 
+        x={x} 
+        y={y} 
+        fill="white" 
+        textAnchor={x > cx ? 'start' : 'end'} 
+        dominantBaseline="central"
+      >
+        {`${name}: ${(percent * 100).toFixed(0)}%`}
+      </text>
+    );
+  };
+  
+  // Server-side or initial render placeholder
+  if (!hasClientLoaded) {
+    return (
+      <Box sx={{ p: 3, textAlign: 'center' }}>
+        <CircularProgress />
+        <Typography variant="body1" sx={{ mt: 2 }}>
+          Loading advanced analytics...
+        </Typography>
+      </Box>
+    );
+  }
+  
+  // Check if we have enough data
+  const hasEnoughActivities = activities.length >= 10;
+  
+  // Show no data message if insufficient data
+  if (!hasEnoughActivities) {
+    return (
+      <Paper sx={{ p: 3, textAlign: 'center' }}>
+        <Typography variant="body1">
+          Not enough activity data for ML analysis. Please collect more data.
+        </Typography>
+      </Paper>
+    );
+  }
+  
+  // Show loading state with progress when processing
+  if (isProcessing && (!processingComplete || 
+      isEmpty(anomalyTimelineData) || 
+      isEmpty(heatmapData) || 
+      isEmpty(sequentialPatternData) || 
+      isEmpty(userClusteringData))) {
+    return (
+      <Box sx={{ p: 3, textAlign: 'center' }}>
+        <CircularProgress variant="determinate" value={progress.overall * 100} />
+        <Typography variant="body2" sx={{ mt: 2 }}>
+          Processing data with machine learning ({Math.round(progress.overall * 100)}%)
+        </Typography>
+        
+        {/* Show partial results message if any results are available */}
+        {(anomalyTimelineData?.length > 0 || heatmapData?.length > 0) && (
+          <Typography variant="caption" sx={{ display: 'block', mt: 1, color: 'text.secondary' }}>
+            Partial results are being displayed below as they become available.
+          </Typography>
+        )}
+      </Box>
+    );
+  }
+  
+  // Show error message if processing failed
+  if (error && !processingComplete) {
+    return (
+      <Alert severity="error" sx={{ m: 2 }}>
+        {error}
+        <Box sx={{ mt: 2 }}>
+          <Button 
+            variant="outlined" 
+            size="small" 
+            onClick={() => window.location.reload()}
+          >
+            Reload Page
+          </Button>
+        </Box>
+      </Alert>
+    );
+  }
+  
+  return (
+    <div className="w-full flex flex-col gap-8">
+      <div className="flex items-center mb-6">
+        <div className="w-1 h-6 rounded bg-[#6E5FFE] mr-3"></div>
+        <h2 className="font-['Inter'] text-[1.5rem] font-extrabold tracking-wider text-[#A084E8] uppercase" style={{ letterSpacing: '0.04em', textShadow: '0 1px 8px #6E5FFE22' }}>Advanced ML Analytics</h2>
+      </div>
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+        {/* Anomaly Detection Timeline */}
+        <div className="bg-[#1f1f2e] border border-[#2d2e44] rounded-[16px] shadow-lg p-8 flex flex-col w-full h-full" style={{ minHeight: 340, minWidth: 0 }}>
+          <div className="flex items-center mb-2">
+            <div className="w-1 h-6 rounded bg-[#6E5FFE] mr-3"></div>
+            <h3 className="font-['Inter'] text-lg font-semibold tracking-wider text-[#A084E8] uppercase">Anomaly Detection Timeline</h3>
+          </div>
+          <span className="text-sm text-gray-400 mb-2">ML-detected anomalies in user activity over time</span>
+          <div className="flex-1 flex items-center justify-center w-full">
+            <ResponsiveContainer width="100%" height={220}>
+              {!isEmpty(anomalyTimelineData) ? (
+                <LineChart 
+                  data={anomalyTimelineData}
+                  margin={{ top: 5, right: 30, left: 20, bottom: 5 }}
+                >
+                  <CartesianGrid strokeDasharray="3 3" stroke="#232346" />
+                  <XAxis dataKey="date" tick={{ fill: '#bdbdfc', fontFamily: 'Inter', fontSize: 13 }} axisLine={false} tickLine={false} />
+                  <YAxis yAxisId="left" tick={{ fill: '#bdbdfc', fontFamily: 'Inter', fontSize: 13 }} axisLine={false} tickLine={false} />
+                  <YAxis yAxisId="right" orientation="right" tick={{ fill: '#bdbdfc', fontFamily: 'Inter', fontSize: 13 }} axisLine={false} tickLine={false} />
+                  <Tooltip contentStyle={{ background: 'rgba(30, 32, 48, 0.85)', border: 'none', borderRadius: 16, boxShadow: '0 4px 24px #8B5CF655', color: '#fff', fontFamily: 'Inter', backdropFilter: 'blur(8px)' }} labelStyle={{ color: '#A084E8', fontWeight: 700, fontFamily: 'Inter', fontSize: 15 }} itemStyle={{ fontFamily: 'Inter', fontWeight: 600, fontSize: 14 }} cursor={{ stroke: '#8B5CF6', strokeWidth: 2, opacity: 0.15 }} />
+                  <Legend iconType="circle" wrapperStyle={{ paddingTop: 16, fontFamily: 'Inter', fontWeight: 700, fontSize: 15, color: '#bdbdfc' }} />
+                  <Line yAxisId="left" type="monotone" dataKey="activities" stroke={RISK_COLORS.normal} name="Activities" strokeWidth={2} />
+                  <Line yAxisId="right" type="monotone" dataKey="anomalyScore" stroke={RISK_COLORS.high} strokeDasharray="5 5" name="Anomaly Score" />
+                  <Line yAxisId="left" type="monotone" dataKey="anomalies" stroke={RISK_COLORS.anomaly} strokeWidth={0} name="Detected Anomalies" dot={{ r: 6, fill: RISK_COLORS.anomaly }} />
+                </LineChart>
+              ) : (
+                <div className="flex flex-col items-center justify-center h-[220px]">
+                  <span className="text-gray-400">No anomaly data available</span>
+                </div>
+              )}
+            </ResponsiveContainer>
+          </div>
+        </div>
+        {/* Risk Pattern Heatmap */}
+        <div className="bg-[#1f1f2e] border border-[#2d2e44] rounded-[16px] shadow-lg p-8 flex flex-col w-full h-full" style={{ minHeight: 340, minWidth: 0 }}>
+          <div className="flex items-center mb-2">
+            <div className="w-1 h-6 rounded bg-[#6E5FFE] mr-3"></div>
+            <h3 className="font-['Inter'] text-lg font-semibold tracking-wider text-[#A084E8] uppercase">Risk Pattern Heatmap</h3>
+          </div>
+          <span className="text-sm text-gray-400 mb-2">ML-identified risk hotspots by time and integration</span>
+          <div className="flex-1 flex flex-col justify-between w-full" style={{ height: 220, position: 'relative' }}>
+            {['email', 'cloud', 'usb', 'application', 'file', 'other'].map((integration) => {
+              const rowCells = heatmapData.filter(cell => cell.integration === integration);
+              return (
+                <div key={integration} className="flex items-center h-[16.66%] w-full relative group">
+                  <span className="w-20 text-right pr-2 text-xs text-gray-300 capitalize truncate font-semibold" style={{ fontFamily: 'Inter', letterSpacing: '0.04em' }}>{integration}</span>
+                  <div className="flex flex-row flex-grow h-full gap-[2px]">
+                    {rowCells.map((cell) => (
+                      <div
+                        key={`${cell.integration}-${cell.hour}`}
+                        className="relative cursor-pointer transition-all duration-200"
+                        style={{
+                          width: `calc((100% - 23px) / 24)`,
+                          height: '100%',
+                          background: getHeatmapColor(cell.intensity),
+                          borderRadius: 6,
+                          boxShadow: cell.intensity > 0 ? '0 2px 8px 0 #6E5FFE22' : 'none',
+                          border: cell.intensity > 0 ? '1.5px solid #fff3' : '1.5px solid #23243a',
+                          transition: 'background 0.3s, box-shadow 0.3s',
+                        }}
+                        onMouseEnter={() => setHoveredCell({integration, hour: cell.hour})}
+                        onMouseLeave={() => setHoveredCell(null)}
+                      >
+                        {hoveredCell && hoveredCell.integration === integration && hoveredCell.hour === cell.hour && (
+                          <div className="absolute z-30 left-1/2 -translate-x-1/2 -top-8 bg-[#23243a] text-white text-xs px-3 py-2 rounded-lg shadow-lg border border-[#A084E8] font-semibold whitespace-nowrap pointer-events-none" style={{ fontFamily: 'Inter', letterSpacing: '0.02em' }}>
+                            <span className="block text-[#A084E8] font-bold mb-1">{integration} @ {cell.hour}:00</span>
+                            <span>Risk Score: <span className="font-bold text-yellow-300">{cell.score.toFixed(0)}</span></span>
+                          </div>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              );
+            })}
+            {/* Hour labels */}
+            <div className="absolute left-20 bottom-0 flex flex-row w-[calc(100%-5rem)] justify-between pr-2">
+              {[0, 6, 12, 18, 23].map(hour => (
+                <span key={hour} className="text-xs text-gray-400 font-semibold" style={{ fontFamily: 'Inter', letterSpacing: '0.02em' }}>{hour}:00</span>
+              ))}
+            </div>
+          </div>
+          {/* Color Legend */}
+          <div className="flex flex-row items-center gap-2 mt-4 ml-20">
+            <span className="text-xs text-gray-400 font-semibold mr-2" style={{ fontFamily: 'Inter' }}>Low</span>
+            <div className="flex flex-row gap-0.5">
+              {[0, 0.25, 0.5, 0.75, 1].map((v, i) => (
+                <div key={i} style={{ width: 32, height: 12, borderRadius: 4, background: (() => {
+                  const stops = [
+                    { pct: 0.0, color: [36, 99, 235] },
+                    { pct: 0.33, color: [139, 92, 246] },
+                    { pct: 0.66, color: [239, 68, 68] },
+                    { pct: 1.0, color: [253, 224, 71] }
+                  ];
+                  let lower = stops[0], upper = stops[stops.length-1];
+                  for (let j = 1; j < stops.length; j++) {
+                    if (v <= stops[j].pct) {
+                      lower = stops[j-1];
+                      upper = stops[j];
+                      break;
+                    }
+                  }
+                  const range = upper.pct - lower.pct;
+                  const pct = (v - lower.pct) / (range || 1);
+                  const color = lower.color.map((c, k) => Math.round(c + (upper.color[k] - c) * pct));
+                  return `rgba(${color[0]},${color[1]},${color[2]},0.85)`;
+                })() }}></div>
+              ))}
+            </div>
+            <span className="text-xs text-gray-400 font-semibold ml-2" style={{ fontFamily: 'Inter' }}>High</span>
+          </div>
+        </div>
+        {/* Sequential Pattern Analysis */}
+        <div className="bg-[#1f1f2e] border border-[#2d2e44] rounded-[16px] shadow-lg p-8 flex flex-col w-full h-full" style={{ minHeight: 340, minWidth: 0 }}>
+          <div className="flex items-center mb-2">
+            <div className="w-1 h-6 rounded bg-[#6E5FFE] mr-3"></div>
+            <h3 className="font-['Inter'] text-lg font-semibold tracking-wider text-[#A084E8] uppercase">Sequential Pattern Analysis</h3>
+          </div>
+          <span className="text-sm text-gray-400 mb-2">ML-detected activity sequences and risk patterns</span>
+          <div className="flex-1 flex flex-col overflow-y-auto" style={{ height: 220 }}>
+            {!isEmpty(sequentialPatternData) ? (
+              sequentialPatternData.map((pattern: SequencePattern, patternIndex: number) => (
+                <div key={patternIndex} className={`flex items-center mb-2 p-3 rounded-lg border ${pattern.isHighRisk ? 'border-red-500 bg-red-500/10 shadow-lg' : 'border-[#e0e0e0] bg-[#23243a]'} transition-all duration-200 hover:shadow-xl`}>
+                  <div className="flex items-center flex-grow">
+                    {pattern.steps.map((step: SequenceStep, stepIndex: number) => (
+                      <React.Fragment key={stepIndex}>
+                        <div className="flex flex-col items-center">
+                          <div className={`min-w-[120px] p-2 rounded-md border ${step.riskLevel === 'critical' ? 'bg-red-600 text-white' : step.riskLevel === 'high' ? 'bg-orange-400 text-white' : step.riskLevel === 'medium' ? 'bg-yellow-400 text-black' : 'bg-green-400 text-black'} flex flex-col items-center justify-center`}>
+                            <span className="font-semibold">{step.action}</span>
+                            <span className="text-xs opacity-90">({step.integration})</span>
+                          </div>
+                          <span className={`mt-1 text-xs ${step.riskLevel === 'critical' || step.riskLevel === 'high' ? 'text-red-500 font-bold' : 'text-gray-400'}`}>{step.riskLevel} risk</span>
+                        </div>
+                        {stepIndex < pattern.steps.length - 1 && (
+                          <span className="px-2 text-2xl text-[#A084E8]">→</span>
+                        )}
+                      </React.Fragment>
+                    ))}
+                  </div>
+                  <div className="ml-4 min-w-[120px] flex flex-col items-start">
+                    <span className="font-semibold text-white">{pattern.count} occurrences</span>
+                    <span className="text-xs text-[#A084E8]">Risk score: {Math.round(pattern.averageRiskScore)}</span>
+                    {pattern.isHighRisk && (
+                      <span className="flex items-center gap-1 text-xs text-red-500 font-bold mt-1"><span className="inline-block w-2 h-2 rounded-full bg-red-500"></span>ML-Flagged Risk</span>
+                    )}
+                  </div>
+                </div>
+              ))
+            ) : (
+              <div className="flex flex-col items-center justify-center h-full">
+                <span className="text-gray-400">No pattern data available</span>
+              </div>
+            )}
+          </div>
+        </div>
+        {/* User Behavior Clustering */}
+        <div className="bg-[#1f1f2e] border border-[#2d2e44] rounded-[16px] shadow-lg p-8 flex flex-col w-full h-full" style={{ minHeight: 340, minWidth: 0 }}>
+          <div className="flex items-center mb-2">
+            <div className="w-1 h-6 rounded bg-[#6E5FFE] mr-3"></div>
+            <h3 className="font-['Inter'] text-lg font-semibold tracking-wider text-[#A084E8] uppercase">User Behavior Clustering</h3>
+          </div>
+          <span className="text-sm text-gray-400 mb-2">ML-detected user behavior groupings and outliers</span>
+          <div className="flex-1 flex items-center justify-center w-full">
+            <ResponsiveContainer width="100%" height={220}>
+              <ScatterChart margin={{ top: 20, right: 20, bottom: 20, left: 20 }}>
+                <CartesianGrid />
+                <XAxis type="number" dataKey="x" name="Risk Profile" label={{ value: 'Risk Profile', position: 'bottom', offset: 0 }} />
+                <YAxis type="number" dataKey="y" name="Behavior Diversity" label={{ value: 'Behavior Diversity', angle: -90, position: 'left' }} />
+                <Tooltip cursor={{ strokeDasharray: '3 3' }} content={({ active, payload }) => {
+                  if (active && payload && payload.length) {
+                    const data = payload[0].payload;
+                    return (
+                      <div className="bg-[#23243a] p-2 rounded-lg border border-[#A084E8] shadow-lg">
+                        <span className="font-semibold text-white">{data.name}</span>
+                        <span className="block text-xs text-[#A084E8]">Cluster: {data.cluster}</span>
+                        <span className={`block text-xs ${data.isOutlier ? 'text-red-500 font-bold' : 'text-gray-400'}`}>{data.isOutlier ? 'ML-Flagged Outlier' : 'Normal Behavior Pattern'}</span>
+                      </div>
+                    );
+                  }
+                  return null;
+                }} />
+                <Scatter name="Users" data={userClusteringData} fill={RISK_COLORS.normal}>
+                  {userClusteringData.map((entry: any, index: number) => (
+                    <Cell key={index} fill={entry.isOutlier ? RISK_COLORS.critical : RISK_COLORS.normal} />
+                  ))}
+                </Scatter>
+              </ScatterChart>
+            </ResponsiveContainer>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 /**
  * Dashboard page with multiple views (Overview, Advanced Analytics)
  */
@@ -593,499 +957,6 @@ export default function DashboardPage() {
     );
   };
 
-  // Advanced Analytics Tab
-  function AdvancedAnalyticsTab() {
-    // Client-side only state to track if component is mounted
-    const [isMounted, setIsMounted] = useState(false);
-    const [hasClientLoaded, setHasClientLoaded] = useState(false);
-    
-    // Only run ML on client side after mount and only if we have enough data
-    const shouldProcessML = isMounted && activities.length >= 10;
-    
-    // Use the ML processing hook for worker-based processing
-    const { 
-      results, 
-      progress, 
-      isProcessing, 
-      error 
-    } = useMLProcessing(shouldProcessML ? activities : []);
-    
-    // Only run on client side after mount
-    useEffect(() => {
-      setIsMounted(true);
-      
-      // Short delay before showing content to ensure client-side code is ready
-      const timer = setTimeout(() => {
-        setHasClientLoaded(true);
-      }, 500);
-      
-      return () => clearTimeout(timer);
-    }, [activities]);
-    
-    // Destructure results for easier access
-    const { 
-      anomalyTimelineData, 
-      heatmapData, 
-      sequentialPatternData, 
-      userClusteringData
-    } = results;
-    
-    // Flag to check if processing is complete
-    const processingComplete = !isProcessing && 
-      anomalyTimelineData?.length > 0 && 
-      heatmapData?.length > 0;
-    
-    // Color constants for visuals
-    const COLORS = ['#0088FE', '#00C49F', '#FFBB28', '#FF8042', '#8884d8'];
-    const RISK_COLORS = {
-      low: '#00C49F',
-      medium: '#FFBB28',
-      high: '#FF8042', 
-      critical: '#FF0000',
-      normal: '#0088FE',
-      anomaly: '#FF0000'
-    };
-    
-    // Custom label renderer for pie charts
-    const renderCustomizedLabel = (props: any) => {
-      const { cx, cy, midAngle, innerRadius, outerRadius, percent, name } = props;
-      const radius = innerRadius + (outerRadius - innerRadius) * 0.5;
-      const x = cx + radius * Math.cos(-midAngle * Math.PI / 180);
-      const y = cy + radius * Math.sin(-midAngle * Math.PI / 180);
-      
-      return (
-        <text 
-          x={x} 
-          y={y} 
-          fill="white" 
-          textAnchor={x > cx ? 'start' : 'end'} 
-          dominantBaseline="central"
-        >
-          {`${name}: ${(percent * 100).toFixed(0)}%`}
-        </text>
-      );
-    };
-    
-    // Server-side or initial render placeholder
-    if (!hasClientLoaded) {
-      return (
-        <Box sx={{ p: 3, textAlign: 'center' }}>
-          <CircularProgress />
-          <Typography variant="body1" sx={{ mt: 2 }}>
-            Loading advanced analytics...
-          </Typography>
-        </Box>
-      );
-    }
-    
-    // Check if we have enough data
-    const hasEnoughActivities = activities.length >= 10;
-    
-    // Show no data message if insufficient data
-    if (!hasEnoughActivities) {
-      return (
-        <Paper sx={{ p: 3, textAlign: 'center' }}>
-          <Typography variant="body1">
-            Not enough activity data for ML analysis. Please collect more data.
-          </Typography>
-        </Paper>
-      );
-    }
-    
-    // Show loading state with progress when processing
-    if (isProcessing && (!processingComplete || 
-        isEmpty(anomalyTimelineData) || 
-        isEmpty(heatmapData) || 
-        isEmpty(sequentialPatternData) || 
-        isEmpty(userClusteringData))) {
-      return (
-        <Box sx={{ p: 3, textAlign: 'center' }}>
-          <CircularProgress variant="determinate" value={progress.overall * 100} />
-          <Typography variant="body2" sx={{ mt: 2 }}>
-            Processing data with machine learning ({Math.round(progress.overall * 100)}%)
-          </Typography>
-          
-          {/* Show partial results message if any results are available */}
-          {(anomalyTimelineData?.length > 0 || heatmapData?.length > 0) && (
-            <Typography variant="caption" sx={{ display: 'block', mt: 1, color: 'text.secondary' }}>
-              Partial results are being displayed below as they become available.
-            </Typography>
-          )}
-        </Box>
-      );
-    }
-    
-    // Show error message if processing failed
-    if (error && !processingComplete) {
-      return (
-        <Alert severity="error" sx={{ m: 2 }}>
-          {error}
-          <Box sx={{ mt: 2 }}>
-            <Button 
-              variant="outlined" 
-              size="small" 
-              onClick={() => window.location.reload()}
-            >
-              Reload Page
-            </Button>
-          </Box>
-        </Alert>
-      );
-    }
-    
-    // Render the ML analytics dashboard
-    return (
-      <Box sx={{ p: 2 }}>
-        <Typography variant="h5" sx={{ mb: 3 }}>Advanced ML Analytics</Typography>
-        
-        <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', md: '1fr 1fr' }, gap: 3 }}>
-          {/* Anomaly Detection Timeline */}
-          <Paper sx={{ p: 2, height: 300 }}>
-            <Typography variant="h6">Anomaly Detection Timeline</Typography>
-            <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
-              ML-detected anomalies in user activity over time
-            </Typography>
-            
-            <ResponsiveContainer width="100%" height={220}>
-              {!isEmpty(anomalyTimelineData) ? (
-                <LineChart 
-                  data={anomalyTimelineData}
-                  margin={{ top: 5, right: 30, left: 20, bottom: 5 }}
-                >
-                  <CartesianGrid strokeDasharray="3 3" />
-                  <XAxis dataKey="date" />
-                  <YAxis yAxisId="left" />
-                  <YAxis yAxisId="right" orientation="right" />
-                  <Tooltip />
-                  <Legend />
-                  <Line
-                    yAxisId="left"
-                    type="monotone"
-                    dataKey="activities"
-                    stroke={RISK_COLORS.normal}
-                    name="Activities"
-                    strokeWidth={2}
-                  />
-                  <Line 
-                    yAxisId="right"
-                    type="monotone" 
-                    dataKey="anomalyScore" 
-                    stroke={RISK_COLORS.high}
-                    strokeDasharray="5 5"
-                    name="Anomaly Score"
-                  />
-                  <Line 
-                    yAxisId="left"
-                    type="monotone" 
-                    dataKey="anomalies" 
-                    stroke={RISK_COLORS.anomaly}
-                    strokeWidth={0}
-                    name="Detected Anomalies"
-                    dot={{ r: 6, fill: RISK_COLORS.anomaly }}
-                  />
-                </LineChart>
-              ) : (
-                <Box sx={{ height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                  <Typography variant="body2" color="text.secondary">
-                    No anomaly data available
-                  </Typography>
-                </Box>
-              )}
-            </ResponsiveContainer>
-          </Paper>
-          
-          {/* Risk Pattern Heatmap */}
-          <Paper sx={{ p: 2, height: 300 }}>
-            <Typography variant="h6">Risk Pattern Heatmap</Typography>
-            <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
-              ML-identified risk hotspots by time and integration
-            </Typography>
-            
-            <Box sx={{ 
-              display: 'flex', 
-              height: 220,
-              flexDirection: 'column',
-              justifyContent: 'space-between'
-            }}>
-              {/* Custom heatmap rendering since recharts doesn't have built-in heatmaps */}
-              {['email', 'cloud', 'usb', 'application', 'file', 'other'].map((integration) => (
-                <Box 
-                  key={integration} 
-                  sx={{ 
-                    display: 'flex', 
-                    height: '16.66%', 
-                    width: '100%',
-                    alignItems: 'center',
-                  }}
-                >
-                  <Typography 
-                    variant="caption" 
-                    sx={{ 
-                      width: 80, 
-                      textAlign: 'right', 
-                      pr: 1,
-                      textTransform: 'capitalize',
-                      whiteSpace: 'nowrap',
-                      overflow: 'hidden',
-                      textOverflow: 'ellipsis'
-                    }}
-                  >
-                    {integration}
-                  </Typography>
-                  <Box sx={{ display: 'flex', flexGrow: 1, height: '100%' }}>
-                    {heatmapData
-                      .filter(cell => cell.integration === integration)
-                      .map((cell: HeatmapCell) => (
-                        <Box
-                          key={`${cell.integration}-${cell.hour}`}
-                          sx={{
-                            width: `${100/24}%`,
-                            height: '100%',
-                            bgcolor: cell.intensity > 0 
-                              ? `rgba(255, ${Math.max(0, 150 - Math.floor(cell.intensity * 150))}, 0, ${Math.min(0.9, cell.intensity)})`
-                              : 'rgba(240, 240, 240, 0.5)',
-                            border: '1px solid white',
-                            position: 'relative',
-                            '&:hover': {
-                              opacity: 0.8,
-                            }
-                          }}
-                          title={`${cell.integration} at ${cell.hour}:00 - Risk Score: ${cell.score.toFixed(0)}`}
-                        />
-                      ))}
-                  </Box>
-                </Box>
-              ))}
-              {/* Hour labels */}
-              <Box sx={{ display: 'flex', width: '100%', pl: 80 }}>
-                {[0, 6, 12, 18, 23].map(hour => (
-                  <Typography 
-                    key={hour} 
-                    variant="caption"
-                    sx={{ 
-                      position: 'absolute',
-                      left: `calc(80px + ${hour * 4.1}%)`,
-                      bottom: 0
-                    }}
-                  >
-                    {hour}:00
-                  </Typography>
-                ))}
-              </Box>
-            </Box>
-          </Paper>
-          
-          {/* Sequential Pattern Graph - Improved Version */}
-          <Paper sx={{ p: 2, height: 300 }}>
-            <Typography variant="h6">Sequential Pattern Analysis</Typography>
-            <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
-              ML-detected activity sequences and risk patterns
-            </Typography>
-            
-            <Box sx={{ display: 'flex', flexDirection: 'column', height: 220, overflowY: 'auto' }}>
-              {!isEmpty(sequentialPatternData) ? (
-                sequentialPatternData.map((pattern: SequencePattern, patternIndex: number) => (
-                  <Box 
-                    key={patternIndex}
-                    sx={{
-                      display: 'flex',
-                      alignItems: 'center',
-                      mb: 2,
-                      p: 1.5,
-                      border: pattern.isHighRisk ? '1px solid #ff3d00' : '1px solid #e0e0e0',
-                      borderRadius: 1,
-                      backgroundColor: pattern.isHighRisk ? 'rgba(255, 61, 0, 0.08)' : 'rgba(0, 0, 0, 0.02)',
-                      boxShadow: pattern.isHighRisk ? '0 2px 6px rgba(255, 0, 0, 0.2)' : 'none',
-                      transition: 'all 0.2s ease',
-                      '&:hover': {
-                        boxShadow: '0 3px 8px rgba(0, 0, 0, 0.15)'
-                      }
-                    }}
-                  >
-                    <Box sx={{ display: 'flex', alignItems: 'center', flexGrow: 1 }}>
-                      {pattern.steps.map((step: SequenceStep, stepIndex: number) => (
-                        <React.Fragment key={stepIndex}>
-                          <Box 
-                            sx={{
-                              display: 'flex',
-                              flexDirection: 'column',
-                              alignItems: 'center'
-                            }}
-                          >
-                            <Box
-                              sx={{
-                                minWidth: 120,
-                                p: 1.5,
-                                borderRadius: 1,
-                                border: '1px solid rgba(0,0,0,0.1)',
-                                backgroundColor: step.riskLevel === 'critical' ? '#FF0000' :
-                                                  step.riskLevel === 'high' ? '#FF8042' :
-                                                  step.riskLevel === 'medium' ? '#FFBB28' : '#00C49F',
-                                display: 'flex',
-                                flexDirection: 'column',
-                                alignItems: 'center',
-                                justifyContent: 'center',
-                              }}
-                            >
-                              <Typography variant="body2" sx={{ fontWeight: 'inherit' }}>
-                                {step.action}
-                              </Typography>
-                              <Typography variant="caption" sx={{ opacity: 0.9, fontSize: '0.7rem' }}>
-                                ({step.integration})
-                              </Typography>
-                            </Box>
-                            <Typography 
-                              variant="caption" 
-                              sx={{ 
-                                mt: 0.5, 
-                                color: step.riskLevel === 'critical' || step.riskLevel === 'high' ? 'error.main' : 'text.secondary',
-                                fontWeight: step.riskLevel === 'critical' || step.riskLevel === 'high' ? 'bold' : 'normal'
-                              }}
-                            >
-                              {step.riskLevel} risk
-                            </Typography>
-                          </Box>
-                          
-                          {stepIndex < pattern.steps.length - 1 && (
-                            <Box sx={{ 
-                              px: 1, 
-                              fontSize: '1.5rem', 
-                              color: pattern.isHighRisk ? 'error.main' : 'text.secondary',
-                              display: 'flex',
-                              alignItems: 'center'
-                            }}>
-                              →
-                            </Box>
-                          )}
-                        </React.Fragment>
-                      ))}
-                    </Box>
-                    
-                    <Box sx={{ ml: 2, minWidth: 120 }}>
-                      <Typography variant="body2" sx={{ 
-                        fontWeight: 'medium',
-                        color: pattern.isHighRisk ? 'error.main' : 'text.primary'
-                      }}>
-                        {pattern.count} occurrences
-                      </Typography>
-                      <Typography variant="caption" sx={{ 
-                        display: 'block',
-                        color: pattern.isHighRisk ? 'error.main' : 'text.secondary',
-                        fontWeight: pattern.isHighRisk ? 'bold' : 'normal'
-                      }}>
-                        Risk score: {Math.round(pattern.averageRiskScore)}
-                      </Typography>
-                      {pattern.isHighRisk && (
-                        <Typography variant="caption" sx={{ 
-                          display: 'flex',
-                          alignItems: 'center',
-                          gap: 0.5,
-                          color: 'error.main',
-                          fontWeight: 'bold',
-                          mt: 0.5
-                        }}>
-                          <Box component="span" sx={{ 
-                            display: 'inline-block',
-                            width: 8,
-                            height: 8,
-                            borderRadius: '50%',
-                            backgroundColor: 'error.main'
-                          }}/>
-                          ML-Flagged Risk
-                        </Typography>
-                      )}
-                    </Box>
-                  </Box>
-                ))
-              ) : (
-                <Box sx={{ 
-                  display: 'flex', 
-                  flexDirection: 'column', 
-                  alignItems: 'center', 
-                  justifyContent: 'center',
-                  height: '100%'
-                }}>
-                  <Typography variant="body2" color="text.secondary">
-                    No pattern data available
-                  </Typography>
-                </Box>
-              )}
-            </Box>
-          </Paper>
-          
-          {/* User Behavior Clustering */}
-          <Paper sx={{ p: 2, height: 300 }}>
-            <Typography variant="h6">User Behavior Clustering</Typography>
-            <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
-              ML-detected user behavior groupings and outliers
-            </Typography>
-            
-            <ResponsiveContainer width="100%" height={220}>
-              <ScatterChart
-                margin={{ top: 20, right: 20, bottom: 20, left: 20 }}
-              >
-                <CartesianGrid />
-                <XAxis 
-                  type="number" 
-                  dataKey="x" 
-                  name="Risk Profile" 
-                  label={{ 
-                    value: 'Risk Profile', 
-                    position: 'bottom', 
-                    offset: 0 
-                  }}
-                />
-                <YAxis 
-                  type="number" 
-                  dataKey="y" 
-                  name="Behavior Diversity"
-                  label={{ 
-                    value: 'Behavior Diversity', 
-                    angle: -90, 
-                    position: 'left' 
-                  }}
-                />
-                <Tooltip 
-                  cursor={{ strokeDasharray: '3 3' }}
-                  content={({ active, payload }) => {
-                    if (active && payload && payload.length) {
-                      const data = payload[0].payload;
-                      return (
-                        <Box sx={{ bgcolor: 'background.paper', p: 1, border: '1px solid #ccc' }}>
-                          <Typography variant="body2">{data.name}</Typography>
-                          <Typography variant="caption" display="block">
-                            Cluster: {data.cluster}
-                          </Typography>
-                          <Typography variant="caption" display="block" 
-                            color={data.isOutlier ? RISK_COLORS.critical : 'text.secondary'}>
-                            {data.isOutlier ? 'ML-Flagged Outlier' : 'Normal Behavior Pattern'}
-                          </Typography>
-                        </Box>
-                      );
-                    }
-                    return null;
-                  }}
-                />
-                <Scatter 
-                  name="Users" 
-                  data={userClusteringData}
-                  fill={RISK_COLORS.normal}
-                >
-                  {userClusteringData.map((entry: any, index: number) => (
-                    <Cell 
-                      key={index} 
-                      fill={entry.isOutlier ? RISK_COLORS.critical : RISK_COLORS.normal}
-                    />
-                  ))}
-                </Scatter>
-              </ScatterChart>
-            </ResponsiveContainer>
-          </Paper>
-        </Box>
-      </Box>
-    );
-  }
-
   const totalStatus = statusDistribution.reduce((a, b) => a + b.count, 0);
   const [drawnPercents, setDrawnPercents] = React.useState([0, 0, 0, 0]);
   const [hoveredRing, setHoveredRing] = React.useState<number | null>(null);
@@ -1135,9 +1006,9 @@ export default function DashboardPage() {
         ) : (
           <>
             {/* Summary Cards */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-12 mb-12">
+            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-6 mb-12 w-full">
               {/* Total Activities */}
-              <Box className="flex items-center bg-white rounded-2xl shadow-2xl p-8 hover:shadow-[0_4px_32px_rgba(255,255,255,0.35)] hover:scale-[1.03] transition-all duration-300 min-h-[8.5rem]">
+              <div className="flex items-center bg-white rounded-2xl shadow-2xl p-8 hover:shadow-[0_4px_32px_rgba(255,255,255,0.35)] hover:scale-[1.03] transition-all duration-300 min-h-[8.5rem]">
                 <div className="flex items-center justify-center w-16 h-16 rounded-full bg-white shadow-lg mr-6">
                   <MdOutlineListAlt className="text-4xl text-black drop-shadow" />
                 </div>
@@ -1145,9 +1016,9 @@ export default function DashboardPage() {
                   <div className="text-6xl font-extrabold text-[#232346] drop-shadow-lg leading-tight">{totalActivities}</div>
                   <div className="text-sm font-semibold uppercase tracking-widest mt-2 text-[#444] opacity-90" style={{ letterSpacing: '0.12em' }}>Total Activities</div>
                 </div>
-              </Box>
+              </div>
               {/* High Risk Activities */}
-              <Box className="flex items-center bg-gradient-to-br from-[#FF3B3B] to-[#EC4899] rounded-2xl shadow-2xl p-8 hover:shadow-[0_4px_32px_#FF3B3B44] hover:scale-[1.03] transition-all duration-300 min-h-[8.5rem]">
+              <div className="flex items-center bg-gradient-to-br from-[#FF3B3B] to-[#EC4899] rounded-2xl shadow-2xl p-8 hover:shadow-[0_4px_32px_#FF3B3B44] hover:scale-[1.03] transition-all duration-300 min-h-[8.5rem]">
                 <div className="flex items-center justify-center w-16 h-16 rounded-full bg-gradient-to-br from-[#FF7B7B] to-[#FF3B3B] shadow-lg mr-6">
                   <FaSkull className="text-4xl text-white drop-shadow" />
                 </div>
@@ -1155,9 +1026,9 @@ export default function DashboardPage() {
                   <div className="text-6xl font-extrabold text-white drop-shadow-lg leading-tight">{highRiskActivities}</div>
                   <div className="text-sm font-semibold uppercase tracking-widest mt-2 text-white opacity-90" style={{ letterSpacing: '0.12em' }}>High Risk Activities</div>
                 </div>
-              </Box>
+              </div>
               {/* Policy Breaches */}
-              <Box className="flex items-center bg-gradient-to-br from-[#7928CA] to-[#8B5CF6] rounded-2xl shadow-2xl p-8 hover:shadow-[0_4px_32px_#7928CA44] hover:scale-[1.03] transition-all duration-300 min-h-[8.5rem]">
+              <div className="flex items-center bg-gradient-to-br from-[#7928CA] to-[#8B5CF6] rounded-2xl shadow-2xl p-8 hover:shadow-[0_4px_32px_#7928CA44] hover:scale-[1.03] transition-all duration-300 min-h-[8.5rem]">
                 <div className="flex items-center justify-center w-16 h-16 rounded-full bg-gradient-to-br from-[#A084E8] to-[#8B5CF6] shadow-lg mr-6">
                   <MdOutlineGavel className="text-4xl text-white drop-shadow" />
                 </div>
@@ -1165,17 +1036,17 @@ export default function DashboardPage() {
                   <div className="text-6xl font-extrabold text-white drop-shadow-lg leading-tight">{policyBreaches}</div>
                   <div className="text-sm font-semibold uppercase tracking-widest mt-2 text-white opacity-90" style={{ letterSpacing: '0.12em' }}>Recent Policy Breaches</div>
                 </div>
-              </Box>
+              </div>
               {/* Users at Risk */}
-              <Box className="flex items-center bg-gradient-to-br from-[#6EE7B7] to-[#34D399] rounded-2xl shadow-2xl p-8 hover:shadow-[0_4px_32px_#10B98144] hover:scale-[1.03] transition-all duration-300 min-h-[8.5rem]">
-                <div className="flex items-center justify-center w-16 h-16 rounded-full bg-gradient-to-br from-[#6EE7B7] to-[#34D399] shadow-lg mr-6">
+              <div className="flex items-center bg-gradient-to-br from-[#f59e42] to-[#ff6a00] rounded-2xl shadow-2xl p-8 hover:shadow-[0_4px_32px_#ff6a0044] hover:scale-[1.03] transition-all duration-300 min-h-[8.5rem]">
+                <div className="flex items-center justify-center w-16 h-16 rounded-full bg-gradient-to-br from-[#f59e42] to-[#ff6a00] shadow-lg mr-6">
                   <MdOutlinePersonOff className="text-4xl text-white drop-shadow" />
                 </div>
                 <div>
                   <div className="text-6xl font-extrabold text-white drop-shadow-lg leading-tight">{usersAtRisk}</div>
                   <div className="text-sm font-semibold uppercase tracking-widest mt-2 text-white opacity-90" style={{ letterSpacing: '0.12em' }}>Users at Risk</div>
                 </div>
-              </Box>
+              </div>
             </div>
 
             {/* Tabs */}
@@ -1228,7 +1099,7 @@ export default function DashboardPage() {
                   }}
                 >
                   <Tab label="Overview" />
-                  <Tab label="Advanced Analytics" />
+                  <Tab label="Advanced" />
                 </Tabs>
               </div>
             </div>
@@ -1842,7 +1713,7 @@ export default function DashboardPage() {
             </TabPanel>
 
             <TabPanel value={activeTab} index={1}>
-              <AdvancedAnalyticsTab />
+              <AdvancedAnalyticsTab activities={activities} />
             </TabPanel>
           </>
         )}
