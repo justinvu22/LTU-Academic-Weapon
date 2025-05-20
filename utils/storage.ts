@@ -717,4 +717,170 @@ function clearObjectStore(db: IDBDatabase, storeName: string): Promise<void> {
       reject(error);
     }
   });
+}
+
+/**
+ * Get the current size of stored activities in bytes
+ */
+export async function getStoredActivitiesSize(): Promise<number> {
+  try {
+    const activities = await getActivitiesFromIndexedDB();
+    
+    // Estimate size by serializing the activities to JSON and measuring the length
+    const jsonString = JSON.stringify(activities);
+    return jsonString.length;
+  } catch (error) {
+    console.error('Error calculating activities size:', error);
+    return 0;
+  }
+}
+
+/**
+ * Append new activities to existing ones
+ * @param newActivities Activities to append to the existing data
+ * @returns Object with success status and operation details
+ */
+export async function appendActivities(
+  newActivities: UserActivity[]
+): Promise<{ success: boolean; addedCount: number; remainingSpaceBytes: number }> {
+  if (!newActivities || newActivities.length === 0) {
+    return { success: true, addedCount: 0, remainingSpaceBytes: 10 * 1024 * 1024 };
+  }
+
+  try {
+    console.log(`Attempting to append ${newActivities.length} activities to existing data...`);
+    
+    // Get existing activities
+    const existingActivities = await getActivitiesFromIndexedDB();
+    console.log(`Retrieved ${existingActivities.length} existing activities`);
+    
+    // Calculate current size
+    const currentSizeBytes = await getStoredActivitiesSize();
+    
+    // Calculate max size (10MB in bytes)
+    const MAX_SIZE_BYTES = 10 * 1024 * 1024;
+    
+    // Calculate remaining space
+    const remainingSpaceBytes = MAX_SIZE_BYTES - currentSizeBytes;
+    
+    if (remainingSpaceBytes <= 0) {
+      console.warn('Storage is already at maximum capacity (10MB). Cannot add more activities.');
+      return { success: false, addedCount: 0, remainingSpaceBytes: 0 };
+    }
+    
+    // Estimate size of new activities (based on average size of existing)
+    const avgSizePerActivity = existingActivities.length > 0 
+      ? currentSizeBytes / existingActivities.length 
+      : 500; // Default estimate: 500 bytes per activity
+    
+    const estimatedNewSize = avgSizePerActivity * newActivities.length;
+    console.log(`Estimated size of new activities: ${(estimatedNewSize / 1024).toFixed(2)}KB`);
+    
+    if (estimatedNewSize > remainingSpaceBytes) {
+      // Calculate how many we can add
+      const maxItemsToAdd = Math.floor(remainingSpaceBytes / avgSizePerActivity);
+      console.warn(`Cannot add all activities due to size limits. Will add ${maxItemsToAdd} of ${newActivities.length}`);
+      
+      if (maxItemsToAdd <= 0) {
+        return { success: false, addedCount: 0, remainingSpaceBytes };
+      }
+      
+      // Add only what fits
+      newActivities = newActivities.slice(0, maxItemsToAdd);
+    }
+    
+    // Ensure new activities have unique IDs
+    const processedActivities = newActivities.map(activity => ({
+      ...activity,
+      id: activity.id || `activity-${Date.now()}-${Math.floor(Math.random() * 1000000)}`
+    }));
+    
+    // Combine with existing
+    const combinedActivities = [...existingActivities, ...processedActivities];
+    console.log(`Combined into ${combinedActivities.length} total activities`);
+    
+    // Store the combined data
+    const success = await storeActivitiesInIndexedDB(combinedActivities);
+    
+    if (!success) {
+      return { 
+        success: false, 
+        addedCount: 0, 
+        remainingSpaceBytes 
+      };
+    }
+    
+    // Calculate new remaining space
+    const newTotalSize = await getStoredActivitiesSize();
+    const newRemainingBytes = Math.max(0, MAX_SIZE_BYTES - newTotalSize);
+    
+    return {
+      success: true,
+      addedCount: processedActivities.length,
+      remainingSpaceBytes: newRemainingBytes
+    };
+  } catch (error) {
+    console.error('Error appending activities:', error);
+    return { 
+      success: false, 
+      addedCount: 0, 
+      remainingSpaceBytes: 0 
+    };
+  }
+}
+
+/**
+ * Reset the database entirely - useful for troubleshooting or when schema changes
+ */
+export async function resetDatabase(): Promise<boolean> {
+  if (!isBrowser()) {
+    console.warn('IndexedDB operations can only run in browser');
+    return false;
+  }
+
+  return new Promise((resolve) => {
+    try {
+      console.log('Attempting to delete and reset the database...');
+      
+      // First, close any open connections
+      const closeRequest = indexedDB.open('activityDatabase');
+      closeRequest.onsuccess = (event) => {
+        const db = (event.target as IDBOpenDBRequest).result;
+        db.close();
+        
+        // Now try to delete the database
+        const deleteRequest = indexedDB.deleteDatabase('activityDatabase');
+        
+        deleteRequest.onsuccess = () => {
+          console.log('Successfully deleted database');
+          
+          // Clear localStorage flags
+          localStorage.removeItem('hasStoredActivities');
+          localStorage.removeItem('activityCount');
+          localStorage.removeItem('lastStorageTime');
+          localStorage.removeItem('activities-total-count');
+          localStorage.removeItem('activities-chunk-size');
+          localStorage.removeItem('activities-is-chunked');
+          localStorage.removeItem('activities-skip-individual');
+          localStorage.removeItem('activities-last-updated');
+          
+          console.log('Database reset complete');
+          resolve(true);
+        };
+        
+        deleteRequest.onerror = () => {
+          console.error('Error deleting database');
+          resolve(false);
+        };
+      };
+      
+      closeRequest.onerror = () => {
+        console.error('Error closing database connections');
+        resolve(false);
+      };
+    } catch (error) {
+      console.error('Error resetting database:', error);
+      resolve(false);
+    }
+  });
 } 

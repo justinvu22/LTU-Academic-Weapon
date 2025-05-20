@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import Papa from 'papaparse';
 import { UploadFile, Check } from '@mui/icons-material';
@@ -34,6 +34,26 @@ export default function DataUploadPage() {
   const [isLoading, setIsLoading] = useState<boolean>(false);
   const [uploadedActivities, setUploadedActivities] = useState<UserActivity[]>([]);
   const [successMessage, setSuccessMessage] = useState<string>('');
+  const [isAppendMode, setIsAppendMode] = useState<boolean>(false);
+  const [currentStorageSize, setCurrentStorageSize] = useState<number>(0);
+  const [maxStorageSize] = useState<number>(10 * 1024 * 1024); // 10MB
+  const [remainingStorageBytes, setRemainingStorageBytes] = useState<number>(10 * 1024 * 1024);
+
+  useEffect(() => {
+    // Check current storage size when the component mounts
+    const checkStorageSize = async () => {
+      try {
+        const { getStoredActivitiesSize } = await import('../../utils/storage');
+        const size = await getStoredActivitiesSize();
+        setCurrentStorageSize(size);
+        setRemainingStorageBytes(Math.max(0, maxStorageSize - size));
+      } catch (error) {
+        console.error('Error checking storage size:', error);
+      }
+    };
+    
+    checkStorageSize();
+  }, [maxStorageSize]);
 
   const onDrop = useCallback((acceptedFiles: File[]) => {
     setErrorMessage(null);
@@ -75,6 +95,7 @@ export default function DataUploadPage() {
       return;
     }
     try {
+      setIsLoading(true);
       console.log('Starting file processing...');
       const formatOptions = {
         autoDetect: autoDetectColumns,
@@ -89,8 +110,14 @@ export default function DataUploadPage() {
       const { AdaptiveConfig } = await import('../../utils/adaptiveConfig');
       const config = new AdaptiveConfig();
       await config.initialize();
-      // Use IndexedDB as main storage method 
-      const { storeActivitiesInIndexedDB, getActivitiesFromIndexedDB } = await import('../../utils/storage');
+      // Use IndexedDB as main storage method
+      const { 
+        storeActivitiesInIndexedDB, 
+        getActivitiesFromIndexedDB, 
+        appendActivities,
+        getStoredActivitiesSize 
+      } = await import('../../utils/storage');
+      
       // Set a reasonable progress update interval
       const totalFiles = 1;
       let filesProcessed = 0;
@@ -98,6 +125,7 @@ export default function DataUploadPage() {
       let totalActivities = 0;
       let allActivities: UserActivity[] = [];
       // Process the single file
+      
       // Update progress
       setProgress((filesProcessed / totalFiles) * 30); // First 30% is file reading
       setStatus(`Reading file 1 of 1: ${file.name}`);
@@ -138,50 +166,88 @@ export default function DataUploadPage() {
         console.error(`Error processing file ${file.name}:`, fileError);
         setErrorMessage(`Error processing file ${file.name}: ${fileError instanceof Error ? fileError.message : 'Unknown error'}`);
       }
+      
       // Store all activities in IndexedDB
       if (allActivities.length > 0) {
-        setStatus(`Storing ${allActivities.length} activities in database...`);
-        console.log(`Storing ${allActivities.length} activities in IndexedDB`);
+        const activityCount = allActivities.length;
+        
         try {
-          const storageSuccess = await storeActivitiesInIndexedDB(allActivities);
-          if (storageSuccess) {
-            console.log('Successfully stored activities in IndexedDB');
-          } else {
-            if (allActivities.length <= 1000) {
-              console.log('Falling back to localStorage due to IndexedDB failure');
-              localStorage.setItem('activities', JSON.stringify(allActivities));
-              console.log('Stored activities in localStorage');
+          let storageSuccess = false;
+          let addedCount = 0;
+          let newRemainingSpaceBytes = 0;
+          
+          if (isAppendMode) {
+            // Append to existing activities
+            setStatus(`Appending ${activityCount} activities to existing data...`);
+            const { success, addedCount: added, remainingSpaceBytes } = await appendActivities(allActivities);
+            storageSuccess = success;
+            addedCount = added;
+            newRemainingSpaceBytes = remainingSpaceBytes;
+            
+            if (success) {
+              console.log(`Successfully appended ${addedCount} of ${activityCount} activities`);
+              if (addedCount < activityCount) {
+                setErrorMessage(`Only ${addedCount} of ${activityCount} activities were appended due to the 10MB size limit.`);
+              }
             } else {
-              console.warn('Dataset too large for localStorage. Only IndexedDB data will be available.');
+              setErrorMessage('Failed to append activities. Storage may be full or there was an error.');
+            }
+            
+            // Update the remaining storage size
+            setRemainingStorageBytes(newRemainingSpaceBytes);
+          } else {
+            // Replace existing activities
+            setStatus(`Storing ${activityCount} activities in database...`);
+            console.log(`Storing ${activityCount} activities in IndexedDB`);
+            
+            storageSuccess = await storeActivitiesInIndexedDB(allActivities);
+            addedCount = activityCount;
+            
+            if (storageSuccess) {
+              console.log('Successfully stored activities in IndexedDB');
+              
+              // Update storage size
+              const newSize = await getStoredActivitiesSize();
+              setCurrentStorageSize(newSize);
+              setRemainingStorageBytes(Math.max(0, maxStorageSize - newSize));
+            } else {
+              if (allActivities.length <= 1000) {
+                console.log('Falling back to localStorage due to IndexedDB failure');
+                localStorage.setItem('activities', JSON.stringify(allActivities));
+                console.log('Stored activities in localStorage');
+              } else {
+                console.warn('Dataset too large for localStorage. Only IndexedDB data will be available.');
+              }
             }
           }
+          
+          setStatus('Calculating statistics...');
+          try {
+            const { calculateStatistics } = await import('../../utils/dataProcessor');
+            const stats = await calculateStatistics(allActivities);
+            setStatistics(stats);
+            console.log('Statistics calculated successfully:', stats);
+          } catch (statsError) {
+            console.error('Error calculating statistics:', statsError);
+          }
+          
+          setActivities(allActivities.slice(0, 100));
+          setUploadSuccess(true);
+          setUploadComplete(true);
+          setUploadStats({ rows: allActivities.length });
+          
+          if (isAppendMode) {
+            setSuccessMessage(`Successfully appended ${addedCount} activities to existing data!`);
+          } else {
+            setSuccessMessage('CSV uploaded and processed successfully!');
+          }
+          
+          setProgress(100);
+          setStatus(`Successfully ${isAppendMode ? 'appended' : 'uploaded'} ${totalActivities} activities from ${filesProcessed} files`);
         } catch (storageError) {
           console.error('Error storing activities:', storageError);
-          if (allActivities.length <= 1000) {
-            try {
-              localStorage.setItem('activities', JSON.stringify(allActivities));
-              console.log('Stored activities in localStorage as fallback');
-            } catch (lsError) {
-              console.error('Failed to store in localStorage:', lsError);
-            }
-          }
+          setErrorMessage(`Error storing activities: ${storageError instanceof Error ? storageError.message : 'Unknown error'}`);
         }
-        setStatus('Calculating statistics...');
-        try {
-          const { calculateStatistics } = await import('../../utils/dataProcessor');
-          const stats = await calculateStatistics(allActivities);
-          setStatistics(stats);
-          console.log('Statistics calculated successfully:', stats);
-        } catch (statsError) {
-          console.error('Error calculating statistics:', statsError);
-        }
-        setActivities(allActivities.slice(0, 100));
-        setUploadSuccess(true);
-        setUploadComplete(true);
-        setUploadStats({ rows: allActivities.length });
-        setSuccessMessage('CSV uploaded and processed successfully!');
-        setProgress(100);
-        setStatus(`Successfully processed ${totalActivities} activities from ${filesProcessed} files`);
       } else {
         setErrorMessage('No valid activities found in the uploaded files');
       }
@@ -467,6 +533,41 @@ export default function DataUploadPage() {
         <div className="bg-[#1F2030] border border-[#333] rounded-xl shadow-[0_2px_8px_rgba(110,95,254,0.08)] p-8 mb-10 animate-fadeIn transition-all duration-300 w-full overflow-hidden">
           <h2 className="text-xl font-extrabold text-[#EEE] uppercase tracking-wide mb-4">Upload Activity Data CSV</h2>
           <p className="text-gray-300 mb-6 leading-relaxed">Upload a CSV file containing user activity data to analyze for policy breaches and security risks. The CSV should include columns for user ID, timestamp, activity type, and potential policy breaches.</p>
+          <div className="mb-6 bg-[#242536] rounded-lg p-4">
+            <div className="flex justify-between items-center mb-2">
+              <span className="text-white font-medium">Storage Usage</span>
+              <span className="text-gray-300">
+                {(currentStorageSize / (1024 * 1024)).toFixed(2)} MB / 10 MB
+              </span>
+            </div>
+            <div className="w-full bg-gray-700 rounded-full h-2.5">
+              <div 
+                className="bg-gradient-to-r from-[#8B5CF6] to-[#EC4899] h-2.5 rounded-full" 
+                style={{ width: `${Math.min(100, (currentStorageSize / maxStorageSize) * 100)}%` }}
+              ></div>
+            </div>
+            <div className="mt-2 text-xs text-gray-400">
+              {(remainingStorageBytes / (1024 * 1024)).toFixed(2)} MB available
+            </div>
+          </div>
+          <div className="mb-6">
+            <label className="inline-flex items-center cursor-pointer">
+              <input 
+                type="checkbox" 
+                value="" 
+                className="sr-only peer" 
+                checked={isAppendMode}
+                onChange={(e) => setIsAppendMode(e.target.checked)}
+              />
+              <div className="relative w-11 h-6 bg-gray-700 rounded-full peer peer-checked:after:translate-x-full rtl:peer-checked:after:-translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-0.5 after:start-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-[#8B5CF6]"></div>
+              <span className="ms-3 text-sm font-medium text-gray-300">Append mode (add to existing data)</span>
+            </label>
+            <p className="text-xs text-gray-400 mt-1 ml-14">
+              {isAppendMode 
+                ? "New data will be added to existing data, respecting the 10MB limit"
+                : "New data will replace existing data"}
+            </p>
+          </div>
           {errorMessage && (
             <div className="w-full mb-3 p-3 rounded-xl bg-red-500/10 text-red-400 text-center font-semibold shadow transition-all duration-300">
               {errorMessage}

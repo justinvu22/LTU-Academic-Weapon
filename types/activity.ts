@@ -37,6 +37,12 @@ export interface UserActivity {
   destination?: string;
   accessType?: string;
   dataVolume?: number;
+  
+  // Enhanced features for ML insights
+  sensitiveData?: boolean;
+  dataSource?: string;
+  managerAction?: string;
+  documentCount?: number;
 }
 
 /**
@@ -95,9 +101,11 @@ export interface MLRecommendation {
   confidence: number;
   affectedUsers: string[];
   suggestedActions: string[];
-  timestamp: string;
+  timestamp?: string;
   category: RecommendationCategory;
   relatedActivities?: string[];
+  createdAt?: string;
+  deviationFactors?: string[];
 }
 
 /**
