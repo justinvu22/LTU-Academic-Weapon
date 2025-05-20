@@ -89,6 +89,370 @@ function formatDateTime(activity: UserActivity): string {
   return '';
 }
 
+// Place this helper above the AdvancedAnalyticsTab function:
+function getHeatmapColor(intensity: number): string {
+  if (intensity === 0) return 'rgba(60,60,80,0.18)';
+  const stops = [
+    { pct: 0.0, color: [36, 99, 235] },   // blue
+    { pct: 0.33, color: [139, 92, 246] }, // purple
+    { pct: 0.66, color: [239, 68, 68] },  // red
+    { pct: 1.0, color: [253, 224, 71] }   // yellow
+  ];
+  let lower = stops[0], upper = stops[stops.length-1];
+  for (let i = 1; i < stops.length; i++) {
+    if (intensity <= stops[i].pct) {
+      lower = stops[i-1];
+      upper = stops[i];
+      break;
+    }
+  }
+  const range = upper.pct - lower.pct;
+  const pct = (intensity - lower.pct) / (range || 1);
+  const color = lower.color.map((c, i) => Math.round(c + (upper.color[i] - c) * pct));
+  return `rgba(${color[0]},${color[1]},${color[2]},${0.85 - 0.3 * (1-intensity)})`;
+}
+
+// Move AdvancedAnalyticsTab to top-level (outside DashboardPage):
+function AdvancedAnalyticsTab({ activities }: { activities: UserActivity[] }) {
+  const [isMounted, setIsMounted] = useState(false);
+  const [hasClientLoaded, setHasClientLoaded] = useState(false);
+  const [hoveredCell, setHoveredCell] = useState<{integration: string, hour: number} | null>(null);
+  
+  // Only run ML on client side after mount and only if we have enough data
+  const shouldProcessML = isMounted && activities.length >= 10;
+  
+  // Use the ML processing hook for worker-based processing
+  const { 
+    results, 
+    progress, 
+    isProcessing, 
+    error 
+  } = useMLProcessing(shouldProcessML ? activities : []);
+  
+  // Only run on client side after mount
+  useEffect(() => {
+    setIsMounted(true);
+    
+    // Short delay before showing content to ensure client-side code is ready
+    const timer = setTimeout(() => {
+      setHasClientLoaded(true);
+    }, 500);
+    
+    return () => clearTimeout(timer);
+  }, [activities]);
+  
+  // Destructure results for easier access
+  const { 
+    anomalyTimelineData, 
+    heatmapData, 
+    sequentialPatternData, 
+    userClusteringData
+  } = results;
+  
+  // Flag to check if processing is complete
+  const processingComplete = !isProcessing && 
+    anomalyTimelineData?.length > 0 && 
+    heatmapData?.length > 0;
+  
+  // Color constants for visuals
+  const COLORS = ['#0088FE', '#00C49F', '#FFBB28', '#FF8042', '#8884d8'];
+  const RISK_COLORS = {
+    low: '#00C49F',
+    medium: '#FFBB28',
+    high: '#FF8042', 
+    critical: '#FF0000',
+    normal: '#0088FE',
+    anomaly: '#FF0000'
+  };
+  
+  // Custom label renderer for pie charts
+  const renderCustomizedLabel = (props: any) => {
+    const { cx, cy, midAngle, innerRadius, outerRadius, percent, name } = props;
+    const radius = innerRadius + (outerRadius - innerRadius) * 0.5;
+    const x = cx + radius * Math.cos(-midAngle * Math.PI / 180);
+    const y = cy + radius * Math.sin(-midAngle * Math.PI / 180);
+    
+    return (
+      <text 
+        x={x} 
+        y={y} 
+        fill="white" 
+        textAnchor={x > cx ? 'start' : 'end'} 
+        dominantBaseline="central"
+      >
+        {`${name}: ${(percent * 100).toFixed(0)}%`}
+      </text>
+    );
+  };
+  
+  // Server-side or initial render placeholder
+  if (!hasClientLoaded) {
+    return (
+      <Box sx={{ p: 3, textAlign: 'center' }}>
+        <CircularProgress />
+        <Typography variant="body1" sx={{ mt: 2 }}>
+          Loading advanced analytics...
+        </Typography>
+      </Box>
+    );
+  }
+  
+  // Check if we have enough data
+  const hasEnoughActivities = activities.length >= 10;
+  
+  // Show no data message if insufficient data
+  if (!hasEnoughActivities) {
+    return (
+      <Paper sx={{ p: 3, textAlign: 'center' }}>
+        <Typography variant="body1">
+          Not enough activity data for ML analysis. Please collect more data.
+        </Typography>
+      </Paper>
+    );
+  }
+  
+  // Show loading state with progress when processing
+  if (isProcessing && (!processingComplete || 
+      isEmpty(anomalyTimelineData) || 
+      isEmpty(heatmapData) || 
+      isEmpty(sequentialPatternData) || 
+      isEmpty(userClusteringData))) {
+    return (
+      <Box sx={{ p: 3, textAlign: 'center' }}>
+        <CircularProgress variant="determinate" value={progress.overall * 100} />
+        <Typography variant="body2" sx={{ mt: 2 }}>
+          Processing data with machine learning ({Math.round(progress.overall * 100)}%)
+        </Typography>
+        
+        {/* Show partial results message if any results are available */}
+        {(anomalyTimelineData?.length > 0 || heatmapData?.length > 0) && (
+          <Typography variant="caption" sx={{ display: 'block', mt: 1, color: 'text.secondary' }}>
+            Partial results are being displayed below as they become available.
+          </Typography>
+        )}
+      </Box>
+    );
+  }
+  
+  // Show error message if processing failed
+  if (error && !processingComplete) {
+    return (
+      <Alert severity="error" sx={{ m: 2 }}>
+        {error}
+        <Box sx={{ mt: 2 }}>
+          <Button 
+            variant="outlined" 
+            size="small" 
+            onClick={() => window.location.reload()}
+          >
+            Reload Page
+          </Button>
+        </Box>
+      </Alert>
+    );
+  }
+  
+  return (
+    <div className="w-full flex flex-col gap-8">
+      <div className="flex items-center mb-6">
+        <div className="w-1 h-6 rounded bg-[#6E5FFE] mr-3"></div>
+        <h2 className="font-['Inter'] text-[1.5rem] font-extrabold tracking-wider text-[#A084E8] uppercase" style={{ letterSpacing: '0.04em', textShadow: '0 1px 8px #6E5FFE22' }}>Advanced ML Analytics</h2>
+      </div>
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+        {/* Anomaly Detection Timeline */}
+        <div className="bg-[#1f1f2e] border border-[#2d2e44] rounded-[16px] shadow-lg p-8 flex flex-col w-full h-full" style={{ minHeight: 340, minWidth: 0 }}>
+          <div className="flex items-center mb-2">
+            <div className="w-1 h-6 rounded bg-[#6E5FFE] mr-3"></div>
+            <h3 className="font-['Inter'] text-lg font-semibold tracking-wider text-[#A084E8] uppercase">Anomaly Detection Timeline</h3>
+          </div>
+          <span className="text-sm text-gray-400 mb-2">ML-detected anomalies in user activity over time</span>
+          <div className="flex-1 flex items-center justify-center w-full">
+            <ResponsiveContainer width="100%" height={220}>
+              {!isEmpty(anomalyTimelineData) ? (
+                <LineChart 
+                  data={anomalyTimelineData}
+                  margin={{ top: 5, right: 30, left: 20, bottom: 5 }}
+                >
+                  <CartesianGrid strokeDasharray="3 3" stroke="#232346" />
+                  <XAxis dataKey="date" tick={{ fill: '#bdbdfc', fontFamily: 'Inter', fontSize: 13 }} axisLine={false} tickLine={false} />
+                  <YAxis yAxisId="left" tick={{ fill: '#bdbdfc', fontFamily: 'Inter', fontSize: 13 }} axisLine={false} tickLine={false} />
+                  <YAxis yAxisId="right" orientation="right" tick={{ fill: '#bdbdfc', fontFamily: 'Inter', fontSize: 13 }} axisLine={false} tickLine={false} />
+                  <Tooltip contentStyle={{ background: 'rgba(30, 32, 48, 0.85)', border: 'none', borderRadius: 16, boxShadow: '0 4px 24px #8B5CF655', color: '#fff', fontFamily: 'Inter', backdropFilter: 'blur(8px)' }} labelStyle={{ color: '#A084E8', fontWeight: 700, fontFamily: 'Inter', fontSize: 15 }} itemStyle={{ fontFamily: 'Inter', fontWeight: 600, fontSize: 14 }} cursor={{ stroke: '#8B5CF6', strokeWidth: 2, opacity: 0.15 }} />
+                  <Legend iconType="circle" wrapperStyle={{ paddingTop: 16, fontFamily: 'Inter', fontWeight: 700, fontSize: 15, color: '#bdbdfc' }} />
+                  <Line yAxisId="left" type="monotone" dataKey="activities" stroke={RISK_COLORS.normal} name="Activities" strokeWidth={2} />
+                  <Line yAxisId="right" type="monotone" dataKey="anomalyScore" stroke={RISK_COLORS.high} strokeDasharray="5 5" name="Anomaly Score" />
+                  <Line yAxisId="left" type="monotone" dataKey="anomalies" stroke={RISK_COLORS.anomaly} strokeWidth={0} name="Detected Anomalies" dot={{ r: 6, fill: RISK_COLORS.anomaly }} />
+                </LineChart>
+              ) : (
+                <div className="flex flex-col items-center justify-center h-[220px]">
+                  <span className="text-gray-400">No anomaly data available</span>
+                </div>
+              )}
+            </ResponsiveContainer>
+          </div>
+        </div>
+        {/* Risk Pattern Heatmap */}
+        <div className="bg-[#1f1f2e] border border-[#2d2e44] rounded-[16px] shadow-lg p-8 flex flex-col w-full h-full" style={{ minHeight: 340, minWidth: 0 }}>
+          <div className="flex items-center mb-2">
+            <div className="w-1 h-6 rounded bg-[#6E5FFE] mr-3"></div>
+            <h3 className="font-['Inter'] text-lg font-semibold tracking-wider text-[#A084E8] uppercase">Risk Pattern Heatmap</h3>
+          </div>
+          <span className="text-sm text-gray-400 mb-2">ML-identified risk hotspots by time and integration</span>
+          <div className="flex-1 flex flex-col justify-between w-full" style={{ height: 220, position: 'relative' }}>
+            {['email', 'cloud', 'usb', 'application', 'file', 'other'].map((integration) => {
+              const rowCells = heatmapData.filter(cell => cell.integration === integration);
+              return (
+                <div key={integration} className="flex items-center h-[16.66%] w-full relative group">
+                  <span className="w-20 text-right pr-2 text-xs text-gray-300 capitalize truncate font-semibold" style={{ fontFamily: 'Inter', letterSpacing: '0.04em' }}>{integration}</span>
+                  <div className="flex flex-row flex-grow h-full gap-[2px]">
+                    {rowCells.map((cell) => (
+                      <div
+                        key={`${cell.integration}-${cell.hour}`}
+                        className="relative cursor-pointer transition-all duration-200"
+                        style={{
+                          width: `calc((100% - 23px) / 24)`,
+                          height: '100%',
+                          background: getHeatmapColor(cell.intensity),
+                          borderRadius: 6,
+                          boxShadow: cell.intensity > 0 ? '0 2px 8px 0 #6E5FFE22' : 'none',
+                          border: cell.intensity > 0 ? '1.5px solid #fff3' : '1.5px solid #23243a',
+                          transition: 'background 0.3s, box-shadow 0.3s',
+                        }}
+                        onMouseEnter={() => setHoveredCell({integration, hour: cell.hour})}
+                        onMouseLeave={() => setHoveredCell(null)}
+                      >
+                        {hoveredCell && hoveredCell.integration === integration && hoveredCell.hour === cell.hour && (
+                          <div className="absolute z-30 left-1/2 -translate-x-1/2 -top-8 bg-[#23243a] text-white text-xs px-3 py-2 rounded-lg shadow-lg border border-[#A084E8] font-semibold whitespace-nowrap pointer-events-none" style={{ fontFamily: 'Inter', letterSpacing: '0.02em' }}>
+                            <span className="block text-[#A084E8] font-bold mb-1">{integration} @ {cell.hour}:00</span>
+                            <span>Risk Score: <span className="font-bold text-yellow-300">{cell.score.toFixed(0)}</span></span>
+                          </div>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              );
+            })}
+            {/* Hour labels */}
+            <div className="absolute left-20 bottom-0 flex flex-row w-[calc(100%-5rem)] justify-between pr-2">
+              {[0, 6, 12, 18, 23].map(hour => (
+                <span key={hour} className="text-xs text-gray-400 font-semibold" style={{ fontFamily: 'Inter', letterSpacing: '0.02em' }}>{hour}:00</span>
+              ))}
+            </div>
+          </div>
+          {/* Color Legend */}
+          <div className="flex flex-row items-center gap-2 mt-4 ml-20">
+            <span className="text-xs text-gray-400 font-semibold mr-2" style={{ fontFamily: 'Inter' }}>Low</span>
+            <div className="flex flex-row gap-0.5">
+              {[0, 0.25, 0.5, 0.75, 1].map((v, i) => (
+                <div key={i} style={{ width: 32, height: 12, borderRadius: 4, background: (() => {
+                  const stops = [
+                    { pct: 0.0, color: [36, 99, 235] },
+                    { pct: 0.33, color: [139, 92, 246] },
+                    { pct: 0.66, color: [239, 68, 68] },
+                    { pct: 1.0, color: [253, 224, 71] }
+                  ];
+                  let lower = stops[0], upper = stops[stops.length-1];
+                  for (let j = 1; j < stops.length; j++) {
+                    if (v <= stops[j].pct) {
+                      lower = stops[j-1];
+                      upper = stops[j];
+                      break;
+                    }
+                  }
+                  const range = upper.pct - lower.pct;
+                  const pct = (v - lower.pct) / (range || 1);
+                  const color = lower.color.map((c, k) => Math.round(c + (upper.color[k] - c) * pct));
+                  return `rgba(${color[0]},${color[1]},${color[2]},0.85)`;
+                })() }}></div>
+              ))}
+            </div>
+            <span className="text-xs text-gray-400 font-semibold ml-2" style={{ fontFamily: 'Inter' }}>High</span>
+          </div>
+        </div>
+        {/* Sequential Pattern Analysis */}
+        <div className="bg-[#1f1f2e] border border-[#2d2e44] rounded-[16px] shadow-lg p-8 flex flex-col w-full h-full" style={{ minHeight: 340, minWidth: 0 }}>
+          <div className="flex items-center mb-2">
+            <div className="w-1 h-6 rounded bg-[#6E5FFE] mr-3"></div>
+            <h3 className="font-['Inter'] text-lg font-semibold tracking-wider text-[#A084E8] uppercase">Sequential Pattern Analysis</h3>
+          </div>
+          <span className="text-sm text-gray-400 mb-2">ML-detected activity sequences and risk patterns</span>
+          <div className="flex-1 flex flex-col overflow-y-auto" style={{ height: 220 }}>
+            {!isEmpty(sequentialPatternData) ? (
+              sequentialPatternData.map((pattern: SequencePattern, patternIndex: number) => (
+                <div key={patternIndex} className={`flex items-center mb-2 p-3 rounded-lg border ${pattern.isHighRisk ? 'border-red-500 bg-red-500/10 shadow-lg' : 'border-[#e0e0e0] bg-[#23243a]'} transition-all duration-200 hover:shadow-xl`}>
+                  <div className="flex items-center flex-grow">
+                    {pattern.steps.map((step: SequenceStep, stepIndex: number) => (
+                      <React.Fragment key={stepIndex}>
+                        <div className="flex flex-col items-center">
+                          <div className={`min-w-[120px] p-2 rounded-md border ${step.riskLevel === 'critical' ? 'bg-red-600 text-white' : step.riskLevel === 'high' ? 'bg-orange-400 text-white' : step.riskLevel === 'medium' ? 'bg-yellow-400 text-black' : 'bg-green-400 text-black'} flex flex-col items-center justify-center`}>
+                            <span className="font-semibold">{step.action}</span>
+                            <span className="text-xs opacity-90">({step.integration})</span>
+                          </div>
+                          <span className={`mt-1 text-xs ${step.riskLevel === 'critical' || step.riskLevel === 'high' ? 'text-red-500 font-bold' : 'text-gray-400'}`}>{step.riskLevel} risk</span>
+                        </div>
+                        {stepIndex < pattern.steps.length - 1 && (
+                          <span className="px-2 text-2xl text-[#A084E8]">→</span>
+                        )}
+                      </React.Fragment>
+                    ))}
+                  </div>
+                  <div className="ml-4 min-w-[120px] flex flex-col items-start">
+                    <span className="font-semibold text-white">{pattern.count} occurrences</span>
+                    <span className="text-xs text-[#A084E8]">Risk score: {Math.round(pattern.averageRiskScore)}</span>
+                    {pattern.isHighRisk && (
+                      <span className="flex items-center gap-1 text-xs text-red-500 font-bold mt-1"><span className="inline-block w-2 h-2 rounded-full bg-red-500"></span>ML-Flagged Risk</span>
+                    )}
+                  </div>
+                </div>
+              ))
+            ) : (
+              <div className="flex flex-col items-center justify-center h-full">
+                <span className="text-gray-400">No pattern data available</span>
+              </div>
+            )}
+          </div>
+        </div>
+        {/* User Behavior Clustering */}
+        <div className="bg-[#1f1f2e] border border-[#2d2e44] rounded-[16px] shadow-lg p-8 flex flex-col w-full h-full" style={{ minHeight: 340, minWidth: 0 }}>
+          <div className="flex items-center mb-2">
+            <div className="w-1 h-6 rounded bg-[#6E5FFE] mr-3"></div>
+            <h3 className="font-['Inter'] text-lg font-semibold tracking-wider text-[#A084E8] uppercase">User Behavior Clustering</h3>
+          </div>
+          <span className="text-sm text-gray-400 mb-2">ML-detected user behavior groupings and outliers</span>
+          <div className="flex-1 flex items-center justify-center w-full">
+            <ResponsiveContainer width="100%" height={220}>
+              <ScatterChart margin={{ top: 20, right: 20, bottom: 20, left: 20 }}>
+                <CartesianGrid />
+                <XAxis type="number" dataKey="x" name="Risk Profile" label={{ value: 'Risk Profile', position: 'bottom', offset: 0 }} />
+                <YAxis type="number" dataKey="y" name="Behavior Diversity" label={{ value: 'Behavior Diversity', angle: -90, position: 'left' }} />
+                <Tooltip cursor={{ strokeDasharray: '3 3' }} content={({ active, payload }) => {
+                  if (active && payload && payload.length) {
+                    const data = payload[0].payload;
+                    return (
+                      <div className="bg-[#23243a] p-2 rounded-lg border border-[#A084E8] shadow-lg">
+                        <span className="font-semibold text-white">{data.name}</span>
+                        <span className="block text-xs text-[#A084E8]">Cluster: {data.cluster}</span>
+                        <span className={`block text-xs ${data.isOutlier ? 'text-red-500 font-bold' : 'text-gray-400'}`}>{data.isOutlier ? 'ML-Flagged Outlier' : 'Normal Behavior Pattern'}</span>
+                      </div>
+                    );
+                  }
+                  return null;
+                }} />
+                <Scatter name="Users" data={userClusteringData} fill={RISK_COLORS.normal}>
+                  {userClusteringData.map((entry: any, index: number) => (
+                    <Cell key={index} fill={entry.isOutlier ? RISK_COLORS.critical : RISK_COLORS.normal} />
+                  ))}
+                </Scatter>
+              </ScatterChart>
+            </ResponsiveContainer>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 /**
  * Dashboard page with multiple views (Overview, Advanced Analytics)
  */
@@ -142,7 +506,19 @@ export default function DashboardPage() {
       cloud: '#673ab7',
       usb: '#ff5722',
       application: '#009688'
+    },
+    policy: {
+      // This is a placeholder for the new policy color logic
     }
+  };
+
+  // Add at the top of the component, after COLORS:
+  const POLICY_COLORS: { [key: string]: string } = {
+    'Unusual Activity': '#FF4C4C',
+    'Monitoring': '#FFB84C',
+    'Data Security': '#4CBFFF',
+    'Critical Violations': '#4CFF8B',
+    'Access Violation': '#FF4C8B',
   };
 
   const DISTRIBUTION_TABS = [
@@ -152,6 +528,13 @@ export default function DashboardPage() {
     { label: 'Integration', key: 'integration', data: integrationDistribution },
   ];
   const [selectedDistributionTab, setSelectedDistributionTab] = useState('status');
+
+  // Add hoveredBar state for hover animation
+  const [hoveredBar, setHoveredBar] = React.useState<number | null>(null);
+  const maxBarHeight = 120;
+  const minBarHeight = 32;
+  const barBaseHeight = (count: number) => Math.max(minBarHeight, Math.min(maxBarHeight, (count / Math.max(...statusDistribution.map(e => e.count))) * maxBarHeight));
+  const barHoverHeight = (count: number) => barBaseHeight(count) + 28;
 
   const fetchActivities = async () => {
     try {
@@ -464,8 +847,8 @@ export default function DashboardPage() {
                   className="font-medium"
                   style={{
                     fontFamily: 'IBM Plex Sans, Inter, sans-serif',
-                    fontWeight: 500,
-                    fontSize: '1rem',
+                    fontWeight: 600,
+                    fontSize: '1.25rem', // 20px, bigger
                     color: '#EEE',
                     letterSpacing: '0.02em',
                     textShadow: '0 1px 8px #0008',
@@ -475,11 +858,11 @@ export default function DashboardPage() {
                   {item.name}
                 </span>
                 <span
-                  className="font-semibold"
+                  className="font-extrabold"
                   style={{
                     fontFamily: 'IBM Plex Sans, Inter, sans-serif',
-                    fontWeight: 600,
-                    fontSize: '1.125rem', // 18px
+                    fontWeight: 800,
+                    fontSize: '1.5rem', // 24px, bigger
                     color: '#EEE',
                     textShadow: '0 1px 8px #0008',
                     letterSpacing: '0.02em',
@@ -493,9 +876,10 @@ export default function DashboardPage() {
               <div
                 className="relative w-full cursor-pointer select-none"
                 style={{
-                  height: isHovered ? 12 : 10,
+                  height: isHovered ? 18 : 16, // bigger bar height
                   transition: 'height 120ms cubic-bezier(.4,0,.2,1), transform 120ms cubic-bezier(.4,0,.2,1)',
                   transform: isHovered ? 'scale(1.015)' : 'scale(1)',
+                  overflow: 'visible',
                 }}
                 onMouseEnter={() => setHovered(index)}
                 onMouseLeave={() => setHovered(null)}
@@ -545,6 +929,21 @@ export default function DashboardPage() {
                       }}
                     />
                   )}
+                  {/* Triangle indicator at the end of the bar */}
+                  <svg
+                    width="22"
+                    height="14"
+                    viewBox="0 0 22 14"
+                    style={{
+                      position: 'absolute',
+                      right: -11,
+                      top: '100%',
+                      marginTop: 2,
+                      zIndex: 4,
+                    }}
+                  >
+                    <polygon points="0,0 22,0 11,14" fill={item.color} />
+                  </svg>
                 </div>
                 {/* Ripple */}
                 {Ripple}
@@ -558,498 +957,29 @@ export default function DashboardPage() {
     );
   };
 
-  // Advanced Analytics Tab
-  function AdvancedAnalyticsTab() {
-    // Client-side only state to track if component is mounted
-    const [isMounted, setIsMounted] = useState(false);
-    const [hasClientLoaded, setHasClientLoaded] = useState(false);
-    
-    // Only run ML on client side after mount and only if we have enough data
-    const shouldProcessML = isMounted && activities.length >= 10;
-    
-    // Use the ML processing hook for worker-based processing
-    const { 
-      results, 
-      progress, 
-      isProcessing, 
-      error 
-    } = useMLProcessing(shouldProcessML ? activities : []);
-    
-    // Only run on client side after mount
-    useEffect(() => {
-      setIsMounted(true);
-      
-      // Short delay before showing content to ensure client-side code is ready
-      const timer = setTimeout(() => {
-        setHasClientLoaded(true);
-      }, 500);
-      
-      return () => clearTimeout(timer);
-    }, [activities]);
-    
-    // Destructure results for easier access
-    const { 
-      anomalyTimelineData, 
-      heatmapData, 
-      sequentialPatternData, 
-      userClusteringData
-    } = results;
-    
-    // Flag to check if processing is complete
-    const processingComplete = !isProcessing && 
-      anomalyTimelineData?.length > 0 && 
-      heatmapData?.length > 0;
-    
-    // Color constants for visuals
-    const COLORS = ['#0088FE', '#00C49F', '#FFBB28', '#FF8042', '#8884d8'];
-    const RISK_COLORS = {
-      low: '#00C49F',
-      medium: '#FFBB28',
-      high: '#FF8042', 
-      critical: '#FF0000',
-      normal: '#0088FE',
-      anomaly: '#FF0000'
-    };
-    
-    // Custom label renderer for pie charts
-    const renderCustomizedLabel = (props: any) => {
-      const { cx, cy, midAngle, innerRadius, outerRadius, percent, name } = props;
-      const radius = innerRadius + (outerRadius - innerRadius) * 0.5;
-      const x = cx + radius * Math.cos(-midAngle * Math.PI / 180);
-      const y = cy + radius * Math.sin(-midAngle * Math.PI / 180);
-      
-      return (
-        <text 
-          x={x} 
-          y={y} 
-          fill="white" 
-          textAnchor={x > cx ? 'start' : 'end'} 
-          dominantBaseline="central"
-        >
-          {`${name}: ${(percent * 100).toFixed(0)}%`}
-        </text>
-      );
-    };
-    
-    // Server-side or initial render placeholder
-    if (!hasClientLoaded) {
-      return (
-        <Box sx={{ p: 3, textAlign: 'center' }}>
-          <CircularProgress />
-          <Typography variant="body1" sx={{ mt: 2 }}>
-            Loading advanced analytics...
-          </Typography>
-        </Box>
-      );
-    }
-    
-    // Check if we have enough data
-    const hasEnoughActivities = activities.length >= 10;
-    
-    // Show no data message if insufficient data
-    if (!hasEnoughActivities) {
-      return (
-        <Paper sx={{ p: 3, textAlign: 'center' }}>
-          <Typography variant="body1">
-            Not enough activity data for ML analysis. Please collect more data.
-          </Typography>
-        </Paper>
-      );
-    }
-    
-    // Show loading state with progress when processing
-    if (isProcessing && (!processingComplete || 
-        isEmpty(anomalyTimelineData) || 
-        isEmpty(heatmapData) || 
-        isEmpty(sequentialPatternData) || 
-        isEmpty(userClusteringData))) {
-      return (
-        <Box sx={{ p: 3, textAlign: 'center' }}>
-          <CircularProgress variant="determinate" value={progress.overall * 100} />
-          <Typography variant="body2" sx={{ mt: 2 }}>
-            Processing data with machine learning ({Math.round(progress.overall * 100)}%)
-          </Typography>
-          
-          {/* Show partial results message if any results are available */}
-          {(anomalyTimelineData?.length > 0 || heatmapData?.length > 0) && (
-            <Typography variant="caption" sx={{ display: 'block', mt: 1, color: 'text.secondary' }}>
-              Partial results are being displayed below as they become available.
-            </Typography>
-          )}
-        </Box>
-      );
-    }
-    
-    // Show error message if processing failed
-    if (error && !processingComplete) {
-      return (
-        <Alert severity="error" sx={{ m: 2 }}>
-          {error}
-          <Box sx={{ mt: 2 }}>
-            <Button 
-              variant="outlined" 
-              size="small" 
-              onClick={() => window.location.reload()}
-            >
-              Reload Page
-            </Button>
-          </Box>
-        </Alert>
-      );
-    }
-    
-    // Render the ML analytics dashboard
-    return (
-      <Box sx={{ p: 2 }}>
-        <Typography variant="h5" sx={{ mb: 3 }}>Advanced ML Analytics</Typography>
-        
-        <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', md: '1fr 1fr' }, gap: 3 }}>
-          {/* Anomaly Detection Timeline */}
-          <Paper sx={{ p: 2, height: 300 }}>
-            <Typography variant="h6">Anomaly Detection Timeline</Typography>
-            <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
-              ML-detected anomalies in user activity over time
-            </Typography>
-            
-            <ResponsiveContainer width="100%" height={220}>
-              {!isEmpty(anomalyTimelineData) ? (
-                <LineChart 
-                  data={anomalyTimelineData}
-                  margin={{ top: 5, right: 30, left: 20, bottom: 5 }}
-                >
-                  <CartesianGrid strokeDasharray="3 3" />
-                  <XAxis dataKey="date" />
-                  <YAxis yAxisId="left" />
-                  <YAxis yAxisId="right" orientation="right" />
-                  <Tooltip />
-                  <Legend />
-                  <Line
-                    yAxisId="left"
-                    type="monotone"
-                    dataKey="activities"
-                    stroke={RISK_COLORS.normal}
-                    name="Activities"
-                    strokeWidth={2}
-                  />
-                  <Line 
-                    yAxisId="right"
-                    type="monotone" 
-                    dataKey="anomalyScore" 
-                    stroke={RISK_COLORS.high}
-                    strokeDasharray="5 5"
-                    name="Anomaly Score"
-                  />
-                  <Line 
-                    yAxisId="left"
-                    type="monotone" 
-                    dataKey="anomalies" 
-                    stroke={RISK_COLORS.anomaly}
-                    strokeWidth={0}
-                    name="Detected Anomalies"
-                    dot={{ r: 6, fill: RISK_COLORS.anomaly }}
-                  />
-                </LineChart>
-              ) : (
-                <Box sx={{ height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                  <Typography variant="body2" color="text.secondary">
-                    No anomaly data available
-                  </Typography>
-                </Box>
-              )}
-            </ResponsiveContainer>
-          </Paper>
-          
-          {/* Risk Pattern Heatmap */}
-          <Paper sx={{ p: 2, height: 300 }}>
-            <Typography variant="h6">Risk Pattern Heatmap</Typography>
-            <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
-              ML-identified risk hotspots by time and integration
-            </Typography>
-            
-            <Box sx={{ 
-              display: 'flex', 
-              height: 220,
-              flexDirection: 'column',
-              justifyContent: 'space-between'
-            }}>
-              {/* Custom heatmap rendering since recharts doesn't have built-in heatmaps */}
-              {['email', 'cloud', 'usb', 'application', 'file', 'other'].map((integration) => (
-                <Box 
-                  key={integration} 
-                  sx={{ 
-                    display: 'flex', 
-                    height: '16.66%', 
-                    width: '100%',
-                    alignItems: 'center',
-                  }}
-                >
-                  <Typography 
-                    variant="caption" 
-                    sx={{ 
-                      width: 80, 
-                      textAlign: 'right', 
-                      pr: 1,
-                      textTransform: 'capitalize',
-                      whiteSpace: 'nowrap',
-                      overflow: 'hidden',
-                      textOverflow: 'ellipsis'
-                    }}
-                  >
-                    {integration}
-                  </Typography>
-                  <Box sx={{ display: 'flex', flexGrow: 1, height: '100%' }}>
-                    {heatmapData
-                      .filter(cell => cell.integration === integration)
-                      .map((cell: HeatmapCell) => (
-                        <Box
-                          key={`${cell.integration}-${cell.hour}`}
-                          sx={{
-                            width: `${100/24}%`,
-                            height: '100%',
-                            bgcolor: cell.intensity > 0 
-                              ? `rgba(255, ${Math.max(0, 150 - Math.floor(cell.intensity * 150))}, 0, ${Math.min(0.9, cell.intensity)})`
-                              : 'rgba(240, 240, 240, 0.5)',
-                            border: '1px solid white',
-                            position: 'relative',
-                            '&:hover': {
-                              opacity: 0.8,
-                            }
-                          }}
-                          title={`${cell.integration} at ${cell.hour}:00 - Risk Score: ${cell.score.toFixed(0)}`}
-                        />
-                      ))}
-                  </Box>
-                </Box>
-              ))}
-              {/* Hour labels */}
-              <Box sx={{ display: 'flex', width: '100%', pl: 80 }}>
-                {[0, 6, 12, 18, 23].map(hour => (
-                  <Typography 
-                    key={hour} 
-                    variant="caption"
-                    sx={{ 
-                      position: 'absolute',
-                      left: `calc(80px + ${hour * 4.1}%)`,
-                      bottom: 0
-                    }}
-                  >
-                    {hour}:00
-                  </Typography>
-                ))}
-              </Box>
-            </Box>
-          </Paper>
-          
-          {/* Sequential Pattern Graph - Improved Version */}
-          <Paper sx={{ p: 2, height: 300 }}>
-            <Typography variant="h6">Sequential Pattern Analysis</Typography>
-            <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
-              ML-detected activity sequences and risk patterns
-            </Typography>
-            
-            <Box sx={{ display: 'flex', flexDirection: 'column', height: 220, overflowY: 'auto' }}>
-              {!isEmpty(sequentialPatternData) ? (
-                sequentialPatternData.map((pattern: SequencePattern, patternIndex: number) => (
-                  <Box 
-                    key={patternIndex}
-                    sx={{
-                      display: 'flex',
-                      alignItems: 'center',
-                      mb: 2,
-                      p: 1.5,
-                      border: pattern.isHighRisk ? '1px solid #ff3d00' : '1px solid #e0e0e0',
-                      borderRadius: 1,
-                      backgroundColor: pattern.isHighRisk ? 'rgba(255, 61, 0, 0.08)' : 'rgba(0, 0, 0, 0.02)',
-                      boxShadow: pattern.isHighRisk ? '0 2px 6px rgba(255, 0, 0, 0.2)' : 'none',
-                      transition: 'all 0.2s ease',
-                      '&:hover': {
-                        boxShadow: '0 3px 8px rgba(0, 0, 0, 0.15)'
-                      }
-                    }}
-                  >
-                    <Box sx={{ display: 'flex', alignItems: 'center', flexGrow: 1 }}>
-                      {pattern.steps.map((step: SequenceStep, stepIndex: number) => (
-                        <React.Fragment key={stepIndex}>
-                          <Box 
-                            sx={{
-                              display: 'flex',
-                              flexDirection: 'column',
-                              alignItems: 'center'
-                            }}
-                          >
-                            <Box
-                              sx={{
-                                minWidth: 120,
-                                p: 1.5,
-                                borderRadius: 1,
-                                border: '1px solid rgba(0,0,0,0.1)',
-                                backgroundColor: step.riskLevel === 'critical' ? '#FF0000' :
-                                                  step.riskLevel === 'high' ? '#FF8042' :
-                                                  step.riskLevel === 'medium' ? '#FFBB28' : '#00C49F',
-                                display: 'flex',
-                                flexDirection: 'column',
-                                alignItems: 'center',
-                                justifyContent: 'center',
-                              }}
-                            >
-                              <Typography variant="body2" sx={{ fontWeight: 'inherit' }}>
-                                {step.action}
-                              </Typography>
-                              <Typography variant="caption" sx={{ opacity: 0.9, fontSize: '0.7rem' }}>
-                                ({step.integration})
-                              </Typography>
-                            </Box>
-                            <Typography 
-                              variant="caption" 
-                              sx={{ 
-                                mt: 0.5, 
-                                color: step.riskLevel === 'critical' || step.riskLevel === 'high' ? 'error.main' : 'text.secondary',
-                                fontWeight: step.riskLevel === 'critical' || step.riskLevel === 'high' ? 'bold' : 'normal'
-                              }}
-                            >
-                              {step.riskLevel} risk
-                            </Typography>
-                          </Box>
-                          
-                          {stepIndex < pattern.steps.length - 1 && (
-                            <Box sx={{ 
-                              px: 1, 
-                              fontSize: '1.5rem', 
-                              color: pattern.isHighRisk ? 'error.main' : 'text.secondary',
-                              display: 'flex',
-                              alignItems: 'center'
-                            }}>
-                              →
-                            </Box>
-                          )}
-                        </React.Fragment>
-                      ))}
-                    </Box>
-                    
-                    <Box sx={{ ml: 2, minWidth: 120 }}>
-                      <Typography variant="body2" sx={{ 
-                        fontWeight: 'medium',
-                        color: pattern.isHighRisk ? 'error.main' : 'text.primary'
-                      }}>
-                        {pattern.count} occurrences
-                      </Typography>
-                      <Typography variant="caption" sx={{ 
-                        display: 'block',
-                        color: pattern.isHighRisk ? 'error.main' : 'text.secondary',
-                        fontWeight: pattern.isHighRisk ? 'bold' : 'normal'
-                      }}>
-                        Risk score: {Math.round(pattern.averageRiskScore)}
-                      </Typography>
-                      {pattern.isHighRisk && (
-                        <Typography variant="caption" sx={{ 
-                          display: 'flex',
-                          alignItems: 'center',
-                          gap: 0.5,
-                          color: 'error.main',
-                          fontWeight: 'bold',
-                          mt: 0.5
-                        }}>
-                          <Box component="span" sx={{ 
-                            display: 'inline-block',
-                            width: 8,
-                            height: 8,
-                            borderRadius: '50%',
-                            backgroundColor: 'error.main'
-                          }}/>
-                          ML-Flagged Risk
-                        </Typography>
-                      )}
-                    </Box>
-                  </Box>
-                ))
-              ) : (
-                <Box sx={{ 
-                  display: 'flex', 
-                  flexDirection: 'column', 
-                  alignItems: 'center', 
-                  justifyContent: 'center',
-                  height: '100%'
-                }}>
-                  <Typography variant="body2" color="text.secondary">
-                    No pattern data available
-                  </Typography>
-                </Box>
-              )}
-            </Box>
-          </Paper>
-          
-          {/* User Behavior Clustering */}
-          <Paper sx={{ p: 2, height: 300 }}>
-            <Typography variant="h6">User Behavior Clustering</Typography>
-            <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
-              ML-detected user behavior groupings and outliers
-            </Typography>
-            
-            <ResponsiveContainer width="100%" height={220}>
-              <ScatterChart
-                margin={{ top: 20, right: 20, bottom: 20, left: 20 }}
-              >
-                <CartesianGrid />
-                <XAxis 
-                  type="number" 
-                  dataKey="x" 
-                  name="Risk Profile" 
-                  label={{ 
-                    value: 'Risk Profile', 
-                    position: 'bottom', 
-                    offset: 0 
-                  }}
-                />
-                <YAxis 
-                  type="number" 
-                  dataKey="y" 
-                  name="Behavior Diversity"
-                  label={{ 
-                    value: 'Behavior Diversity', 
-                    angle: -90, 
-                    position: 'left' 
-                  }}
-                />
-                <Tooltip 
-                  cursor={{ strokeDasharray: '3 3' }}
-                  content={({ active, payload }) => {
-                    if (active && payload && payload.length) {
-                      const data = payload[0].payload;
-                      return (
-                        <Box sx={{ bgcolor: 'background.paper', p: 1, border: '1px solid #ccc' }}>
-                          <Typography variant="body2">{data.name}</Typography>
-                          <Typography variant="caption" display="block">
-                            Cluster: {data.cluster}
-                          </Typography>
-                          <Typography variant="caption" display="block" 
-                            color={data.isOutlier ? RISK_COLORS.critical : 'text.secondary'}>
-                            {data.isOutlier ? 'ML-Flagged Outlier' : 'Normal Behavior Pattern'}
-                          </Typography>
-                        </Box>
-                      );
-                    }
-                    return null;
-                  }}
-                />
-                <Scatter 
-                  name="Users" 
-                  data={userClusteringData}
-                  fill={RISK_COLORS.normal}
-                >
-                  {userClusteringData.map((entry: any, index: number) => (
-                    <Cell 
-                      key={index} 
-                      fill={entry.isOutlier ? RISK_COLORS.critical : RISK_COLORS.normal}
-                    />
-                  ))}
-                </Scatter>
-              </ScatterChart>
-            </ResponsiveContainer>
-          </Paper>
-        </Box>
-      </Box>
-    );
-  }
+  const totalStatus = statusDistribution.reduce((a, b) => a + b.count, 0);
+  const [drawnPercents, setDrawnPercents] = React.useState([0, 0, 0, 0]);
+  const [hoveredRing, setHoveredRing] = React.useState<number | null>(null);
+  React.useEffect(() => {
+    statusDistribution.forEach((entry, idx) => {
+      const percent = totalStatus > 0 ? Math.round((entry.count / totalStatus) * 100) : 0;
+      setTimeout(() => {
+        setDrawnPercents(prev => {
+          const next = [...prev];
+          next[idx] = percent;
+          return next;
+        });
+      }, 100 + idx * 120);
+    });
+  }, [statusDistribution, totalStatus]);
+
+  // Dynamic sizing for multi-ring donut chart
+  const ringCount = Math.min(policyBreachData.length, 5);
+  const chartSize = 300;
+  const padding = 10;
+  const maxOuterRadius = (chartSize / 2) - padding; // e.g., 140
+  const minInnerRadius = 80; // enough for text
+  const ringThickness = (maxOuterRadius - minInnerRadius) / ringCount;
 
   return (
     <div className="min-h-screen bg-[#121324] px-6 py-10 font-['IBM_Plex_Sans',Inter,sans-serif] flex flex-col">
@@ -1076,9 +1006,9 @@ export default function DashboardPage() {
         ) : (
           <>
             {/* Summary Cards */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-8 mb-8">
+            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-6 mb-12 w-full">
               {/* Total Activities */}
-              <Box className="flex items-center bg-white rounded-2xl shadow-2xl p-8 hover:shadow-[0_4px_32px_rgba(255,255,255,0.35)] hover:scale-[1.03] transition-all duration-300 min-h-[8.5rem]">
+              <div className="flex items-center bg-white rounded-2xl shadow-2xl p-8 hover:shadow-[0_4px_32px_rgba(255,255,255,0.35)] hover:scale-[1.03] transition-all duration-300 min-h-[8.5rem]">
                 <div className="flex items-center justify-center w-16 h-16 rounded-full bg-white shadow-lg mr-6">
                   <MdOutlineListAlt className="text-4xl text-black drop-shadow" />
                 </div>
@@ -1086,9 +1016,9 @@ export default function DashboardPage() {
                   <div className="text-6xl font-extrabold text-[#232346] drop-shadow-lg leading-tight">{totalActivities}</div>
                   <div className="text-sm font-semibold uppercase tracking-widest mt-2 text-[#444] opacity-90" style={{ letterSpacing: '0.12em' }}>Total Activities</div>
                 </div>
-              </Box>
+              </div>
               {/* High Risk Activities */}
-              <Box className="flex items-center bg-gradient-to-br from-[#FF3B3B] to-[#EC4899] rounded-2xl shadow-2xl p-8 hover:shadow-[0_4px_32px_#FF3B3B44] hover:scale-[1.03] transition-all duration-300 min-h-[8.5rem]">
+              <div className="flex items-center bg-gradient-to-br from-[#FF3B3B] to-[#EC4899] rounded-2xl shadow-2xl p-8 hover:shadow-[0_4px_32px_#FF3B3B44] hover:scale-[1.03] transition-all duration-300 min-h-[8.5rem]">
                 <div className="flex items-center justify-center w-16 h-16 rounded-full bg-gradient-to-br from-[#FF7B7B] to-[#FF3B3B] shadow-lg mr-6">
                   <FaSkull className="text-4xl text-white drop-shadow" />
                 </div>
@@ -1096,9 +1026,9 @@ export default function DashboardPage() {
                   <div className="text-6xl font-extrabold text-white drop-shadow-lg leading-tight">{highRiskActivities}</div>
                   <div className="text-sm font-semibold uppercase tracking-widest mt-2 text-white opacity-90" style={{ letterSpacing: '0.12em' }}>High Risk Activities</div>
                 </div>
-              </Box>
+              </div>
               {/* Policy Breaches */}
-              <Box className="flex items-center bg-gradient-to-br from-[#7928CA] to-[#8B5CF6] rounded-2xl shadow-2xl p-8 hover:shadow-[0_4px_32px_#7928CA44] hover:scale-[1.03] transition-all duration-300 min-h-[8.5rem]">
+              <div className="flex items-center bg-gradient-to-br from-[#7928CA] to-[#8B5CF6] rounded-2xl shadow-2xl p-8 hover:shadow-[0_4px_32px_#7928CA44] hover:scale-[1.03] transition-all duration-300 min-h-[8.5rem]">
                 <div className="flex items-center justify-center w-16 h-16 rounded-full bg-gradient-to-br from-[#A084E8] to-[#8B5CF6] shadow-lg mr-6">
                   <MdOutlineGavel className="text-4xl text-white drop-shadow" />
                 </div>
@@ -1106,17 +1036,17 @@ export default function DashboardPage() {
                   <div className="text-6xl font-extrabold text-white drop-shadow-lg leading-tight">{policyBreaches}</div>
                   <div className="text-sm font-semibold uppercase tracking-widest mt-2 text-white opacity-90" style={{ letterSpacing: '0.12em' }}>Recent Policy Breaches</div>
                 </div>
-              </Box>
+              </div>
               {/* Users at Risk */}
-              <Box className="flex items-center bg-gradient-to-br from-[#34D399] to-[#10B981] rounded-2xl shadow-2xl p-8 hover:shadow-[0_4px_32px_#10B98144] hover:scale-[1.03] transition-all duration-300 min-h-[8.5rem]">
-                <div className="flex items-center justify-center w-16 h-16 rounded-full bg-gradient-to-br from-[#6EE7B7] to-[#34D399] shadow-lg mr-6">
+              <div className="flex items-center bg-gradient-to-br from-[#f59e42] to-[#ff6a00] rounded-2xl shadow-2xl p-8 hover:shadow-[0_4px_32px_#ff6a0044] hover:scale-[1.03] transition-all duration-300 min-h-[8.5rem]">
+                <div className="flex items-center justify-center w-16 h-16 rounded-full bg-gradient-to-br from-[#f59e42] to-[#ff6a00] shadow-lg mr-6">
                   <MdOutlinePersonOff className="text-4xl text-white drop-shadow" />
                 </div>
                 <div>
                   <div className="text-6xl font-extrabold text-white drop-shadow-lg leading-tight">{usersAtRisk}</div>
                   <div className="text-sm font-semibold uppercase tracking-widest mt-2 text-white opacity-90" style={{ letterSpacing: '0.12em' }}>Users at Risk</div>
                 </div>
-              </Box>
+              </div>
             </div>
 
             {/* Tabs */}
@@ -1169,220 +1099,621 @@ export default function DashboardPage() {
                   }}
                 >
                   <Tab label="Overview" />
-                  <Tab label="Advanced Analytics" />
+                  <Tab label="Advanced" />
                 </Tabs>
               </div>
             </div>
 
             {/* Tab Panels */}
             <TabPanel value={activeTab} index={0}>
-              {/* Distribution Cards Section */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-8 w-full mb-8">
-                <div className="lg:col-span-2 bg-[#1F2030]/70 backdrop-blur-md border border-white/10 rounded-xl shadow-lg p-6 flex flex-col justify-between">
-                  <div className="flex mb-4">
-                    {DISTRIBUTION_TABS.map(tab => (
-                      <button
-                        key={tab.key}
-                        className={`px-4 py-2 font-bold uppercase tracking-wide rounded-t transition-colors duration-200 ${selectedDistributionTab === tab.key ? 'text-[#8B5CF6] border-b-4 border-[#8B5CF6] bg-[#232346]/60' : 'text-gray-300 hover:text-[#8B5CF6] border-b-4 border-transparent'}`}
-                        onClick={() => setSelectedDistributionTab(tab.key)}
-                      >
-                        {tab.label} Distribution
-                      </button>
-                    ))}
-                  </div>
-                  <div className="mt-2 min-h-[220px] flex items-start w-full">
-                    {DISTRIBUTION_TABS.map(tab => (
-                      selectedDistributionTab === tab.key && (
-                        <div className="w-full">
-                          <DistributionBars key={tab.key} data={tab.data} type={tab.key} />
+              {/* --- SECTION 1: Top Row --- */}
+              <div className="w-full mb-10 grid grid-cols-3 gap-8 items-stretch">
+                {/* Unified Policy Breach Card */}
+                <div className="col-span-1 flex flex-col h-full" style={{ minWidth: 0 }}>
+                  <div
+                    className="bg-[#1f1f2e] border border-[#2d2e44] rounded-[16px] shadow-lg flex flex-row items-center h-full px-10 py-8 gap-8"
+                    style={{ minHeight: 340, boxSizing: 'border-box', position: 'relative' }}
+                  >
+                    {/* Donut Chart - larger, right side compact, divider restored */}
+                    <div className="flex flex-col items-center justify-center" style={{ minWidth: 300, maxWidth: 340, flex: '0 0 300px' }}>
+                      {policyBreachData.length > 0 ? (
+                        <div className="relative flex items-center justify-center w-full shadow-[0_4px_32px_#8B5CF622] rounded-full" style={{ width: 300, height: 300, maxWidth: '100%', background: 'rgba(35,35,70,0.10)' }}>
+                          <svg width="0" height="0">
+                            {policyBreachData.slice(0, ringCount).map((entry, idx) => (
+                              <defs key={entry.category}>
+                                <linearGradient id={`pb-gradient-${idx}`} x1="0" y1="0" x2="1" y2="1">
+                                  <stop offset="0%" stopColor={POLICY_COLORS[entry.category] || Object.values(COLORS.risk)[idx % 4]} stopOpacity="0.95" />
+                                  <stop offset="100%" stopColor={POLICY_COLORS[entry.category] || Object.values(COLORS.risk)[idx % 4]} stopOpacity="0.65" />
+                                </linearGradient>
+                              </defs>
+                            ))}
+                          </svg>
+                          <ResponsiveContainer width={300} height={300}>
+                            <PieChart>
+                              {policyBreachData.slice(0, 5).map((entry, idx) => (
+                                <Pie
+                                  key={entry.category}
+                                  data={[
+                                    { name: entry.category, value: entry.count },
+                                    { name: 'remainder', value: Math.max(0, policyBreachData.reduce((sum, e) => sum + e.count, 0) - entry.count) }
+                                  ]}
+                                  dataKey="value"
+                                  cx="50%"
+                                  cy="50%"
+                                  startAngle={90}
+                                  endAngle={-270}
+                                  innerRadius={minInnerRadius + idx * ringThickness}
+                                  outerRadius={minInnerRadius + (idx + 1) * ringThickness}
+                                  stroke="none"
+                                  isAnimationActive={true}
+                                  cornerRadius={12}
+                                >
+                                  <Cell fill={`url(#pb-gradient-${idx})`} />
+                                  <Cell fill="rgba(35,35,70,0.18)" />
+                                </Pie>
+                              ))}
+                            </PieChart>
+                          </ResponsiveContainer>
+                          {/* Center content */}
+                          <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 flex flex-col items-center w-full" style={{ pointerEvents: 'none' }}>
+                            {(() => {
+                              const total = policyBreachData.reduce((a, b) => a + b.count, 0);
+                              const numDigits = String(total).length;
+                              let fontSize = 48;
+                              if (numDigits >= 7) fontSize = 32;
+                              else if (numDigits >= 5) fontSize = 38;
+                              else if (numDigits >= 3) fontSize = 44;
+                              return (
+                                <>
+                                  <span
+                                    className="font-extrabold text-white drop-shadow-lg"
+                                    style={{
+                                      fontFamily: 'Inter',
+                                      lineHeight: 1.1,
+                                      fontSize,
+                                      maxWidth: 140,
+                                      textAlign: 'center',
+                                      wordBreak: 'break-word',
+                                      letterSpacing: '-0.04em',
+                                    }}
+                                  >
+                                    {total}
+                                  </span>
+                                  <span
+                                    className="font-semibold text-[#A084E8] mt-1 tracking-widest uppercase"
+                                    style={{
+                                      fontFamily: 'Inter',
+                                      letterSpacing: '0.08em',
+                                      fontSize: 14,
+                                      textAlign: 'center',
+                                      display: 'block',
+                                    }}
+                                  >
+                                    Total Breaches
+                                  </span>
+                                </>
+                              );
+                            })()}
+                </div>
+                </div>
+                      ) : (
+                        <div className="flex flex-col items-center justify-center h-[300px]">
+                          <span className="text-gray-400">No policy breach data available</span>
+                </div>
+                      )}
+                </div>
+                    {/* Divider */}
+                    <div style={{ width: 2, height: 220, background: 'linear-gradient(180deg, #6E5FFE33 0%, #23234600 100%)', borderRadius: 2, margin: '0 2.5rem' }} />
+                    {/* Legend - no header */}
+                    <div className="flex flex-col justify-center gap-4 w-full" style={{ minWidth: 0 }}>
+                      {policyBreachData.length > 0 ? (
+                        <div className="flex flex-col gap-4 w-full items-start justify-center">
+                          {policyBreachData.map((entry, idx) => (
+                            <div key={entry.category} className="flex flex-row items-center gap-3">
+                              <span className="font-extrabold text-white text-lg" style={{ fontFamily: 'Inter', minWidth: 38, textAlign: 'right', letterSpacing: '0.01em' }}>{entry.count}</span>
+                              <span
+                                className="px-4 py-1 rounded-full font-semibold text-sm shadow-md transition-transform duration-150 border"
+                                style={{
+                                  background: `${POLICY_COLORS[entry.category] || Object.values(COLORS.risk)[idx % 4]}`,
+                                  color: '#fff',
+                                  boxShadow: '0 2px 8px rgba(0,0,0,0.10)',
+                                  border: `1.5px solid ${(POLICY_COLORS[entry.category] || Object.values(COLORS.risk)[idx % 4])}`,
+                                  letterSpacing: '0.04em',
+                                  fontFamily: 'Inter',
+                                  fontSize: 13,
+                                  minWidth: 0,
+                                  borderRadius: 9999,
+                                  marginLeft: 4,
+                                  cursor: 'pointer',
+                                  backgroundImage: 'linear-gradient(0deg, rgba(255,255,255,0.08), rgba(255,255,255,0.02))',
+                                  backdropFilter: 'blur(2px)',
+                                }}
+                                onMouseOver={e => e.currentTarget.style.transform = 'scale(1.06)'}
+                                onMouseOut={e => e.currentTarget.style.transform = 'scale(1)'}
+                              >
+                                {entry.category}
+                              </span>
+              </div>
+                          ))}
                         </div>
-                      )
-                    ))}
+                      ) : (
+                        <div className="flex flex-col items-center justify-center h-[300px]">
+                          <span className="text-gray-400">No policy breach data available</span>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                </div>
+                {/* Right column: Risk Trend */}
+                <div className="col-span-2 bg-[#1f1f2e] border border-[#2d2e44] rounded-[16px] shadow-lg p-10 flex flex-col w-full h-full" style={{ minHeight: 440, minWidth: 0 }}>
+                  <div className="flex items-center mb-4">
+                    <div className="w-1 h-6 rounded bg-[#6E5FFE] mr-3"></div>
+                    <h2 className="font-['Inter'] text-[18px] font-semibold tracking-wider text-[#A084E8] uppercase">Risk Trend</h2>
+                  </div>
+                  <div className="flex-1 flex items-center justify-center w-full">
+                    <ResponsiveContainer width="100%" height="100%" minHeight={260}>
+                      <AreaChart
+                        data={riskTrendData}
+                        margin={{ top: 20, right: 20, left: 0, bottom: 0 }}
+                      >
+                        <defs>
+                          <linearGradient id="riskGradient" x1="0" y1="0" x2="0" y2="1">
+                            <stop offset="0%" stopColor="#8B5CF6" stopOpacity={0.35} />
+                            <stop offset="100%" stopColor="#8B5CF6" stopOpacity={0.02} />
+                          </linearGradient>
+                          <linearGradient id="activityGradient" x1="0" y1="0" x2="0" y2="1">
+                            <stop offset="0%" stopColor="#FFB84C" stopOpacity={0.35} />
+                            <stop offset="100%" stopColor="#FFB84C" stopOpacity={0.02} />
+                          </linearGradient>
+                        </defs>
+                        <CartesianGrid strokeDasharray="6 6" stroke="#232346" />
+                        <XAxis
+                          dataKey="date"
+                          tick={{ fill: '#bdbdfc', fontFamily: 'Inter', fontSize: 13 }}
+                          axisLine={false}
+                          tickLine={false}
+                        />
+                        <YAxis
+                          tick={{ fill: '#bdbdfc', fontFamily: 'Inter', fontSize: 13 }}
+                          axisLine={false}
+                          tickLine={false}
+                        />
+                        <Tooltip
+                          contentStyle={{
+                            background: 'rgba(30, 32, 48, 0.85)',
+                            border: 'none',
+                            borderRadius: 16,
+                            boxShadow: '0 4px 24px #8B5CF655',
+                            color: '#fff',
+                            fontFamily: 'Inter',
+                            backdropFilter: 'blur(8px)',
+                          }}
+                          labelStyle={{
+                            color: '#A084E8',
+                            fontWeight: 700,
+                            fontFamily: 'Inter',
+                            fontSize: 15,
+                          }}
+                          itemStyle={{
+                            fontFamily: 'Inter',
+                            fontWeight: 600,
+                            fontSize: 14,
+                          }}
+                          cursor={{ stroke: '#8B5CF6', strokeWidth: 2, opacity: 0.15 }}
+                        />
+                        <Area
+                          type="monotone"
+                          dataKey="risk"
+                          stroke="#8B5CF6"
+                          strokeWidth={4}
+                          fill="url(#riskGradient)"
+                          dot={(props) => (
+                            <circle
+                              {...props}
+                              r={7}
+                              fill="#8B5CF6"
+                              stroke="#fff"
+                              strokeWidth={2}
+                              style={{ filter: 'drop-shadow(0 0 12px #8B5CF6aa)' }}
+                            />
+                          )}
+                          activeDot={(props) => (
+                            <circle
+                              {...props}
+                              r={10}
+                              fill="#fff"
+                              stroke="#8B5CF6"
+                              strokeWidth={5}
+                              style={{ filter: 'drop-shadow(0 0 16px #8B5CF6cc)' }}
+                            />
+                          )}
+                          name="Risk Score"
+                        />
+                        <Area
+                          type="monotone"
+                          dataKey="count"
+                          stroke="#FFB84C"
+                          strokeWidth={4}
+                          fill="url(#activityGradient)"
+                          dot={(props) => (
+                            <circle
+                              {...props}
+                              r={7}
+                              fill="#FFB84C"
+                              stroke="#fff"
+                              strokeWidth={2}
+                              style={{ filter: 'drop-shadow(0 0 12px #FFB84Caa)' }}
+                            />
+                          )}
+                          activeDot={(props) => (
+                            <circle
+                              {...props}
+                              r={10}
+                              fill="#fff"
+                              stroke="#FFB84C"
+                              strokeWidth={5}
+                              style={{ filter: 'drop-shadow(0 0 16px #FFB84Ccc)' }}
+                            />
+                          )}
+                          name="Activities"
+                        />
+                        <Legend
+                          iconType="circle"
+                          wrapperStyle={{
+                            paddingTop: 16,
+                            fontFamily: 'Inter',
+                            fontWeight: 700,
+                            fontSize: 15,
+                            color: '#bdbdfc',
+                          }}
+                          formatter={(value) => {
+                            if (value === 'risk') return <span style={{ color: '#8B5CF6' }}>Risk Score</span>;
+                            if (value === 'count') return <span style={{ color: '#FFB84C' }}>Activities</span>;
+                            return value;
+                          }}
+                        />
+                      </AreaChart>
+                    </ResponsiveContainer>
                   </div>
                 </div>
               </div>
 
-              {/* Risk Trend and Severity Trend */}
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
-                <div className="bg-[#1F2030] border border-[#333] rounded-xl shadow-lg p-6">
-                  <h2 className="text-lg font-extrabold text-[#8B5CF6] uppercase tracking-wide mb-2">Risk Trend</h2>
-                  <Box sx={{ height: 300 }}>
-                    {riskTrendData.length > 0 ? (
-                      <ResponsiveContainer width="100%" height="100%">
-                        <LineChart
-                          data={riskTrendData}
-                          margin={{ top: 5, right: 30, left: 20, bottom: 5 }}
-                        >
-                          <CartesianGrid strokeDasharray="3 3" />
-                          <XAxis dataKey="date" />
-                          <YAxis />
-                          <Tooltip />
-                          <Legend />
-                          <Line type="monotone" dataKey="count" name="Activities" stroke="#8884d8" activeDot={{ r: 8 }} />
-                          <Line type="monotone" dataKey="risk" name="Risk Score" stroke="#ff9800" activeDot={{ r: 8 }} />
-                        </LineChart>
-                      </ResponsiveContainer>
-                    ) : (
-                      <div className="flex flex-col items-center justify-center h-[300px]">
-                        <span className="text-gray-400">Not enough data available</span>
+              {/* --- SECTION 2: Middle Cards --- */}
+              <div className="w-full mb-10" style={{ display: 'grid', gridTemplateColumns: '4fr 1fr', gap: '2rem' }}>
+                {/* Left: Severity Trend, Status Distribution, Activity Status Distribution */}
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '2rem' }}>
+                  {/* Severity Trend */}
+                  <div className="bg-[#1f1f2e] border border-[#2d2e44] rounded-[16px] shadow-lg p-10 flex flex-col w-full h-full" style={{ minHeight: 440, minWidth: 0 }}>
+                    <div className="flex items-center mb-4">
+                      <div className="w-1 h-6 rounded bg-[#6E5FFE] mr-3"></div>
+                      <h2 className="font-['Inter'] text-[18px] font-semibold tracking-wider text-[#A084E8] uppercase">Severity Trend</h2>
+                    </div>
+                    <Box sx={{ height: 440 }}>
+                      {severityTrendData.length > 0 ? (
+                        <ResponsiveContainer width="100%" height="100%">
+                          <LineChart
+                            data={severityTrendData}
+                            margin={{ top: 20, right: 30, left: 0, bottom: 0 }}
+                          >
+                            <defs>
+                              <linearGradient id="criticalGradient" x1="0" y1="0" x2="0" y2="1">
+                                <stop offset="0%" stopColor="#FF4C4C" stopOpacity={0.35} />
+                                <stop offset="100%" stopColor="#FF4C4C" stopOpacity={0.02} />
+                              </linearGradient>
+                              <linearGradient id="highGradient" x1="0" y1="0" x2="0" y2="1">
+                                <stop offset="0%" stopColor="#FFB84C" stopOpacity={0.35} />
+                                <stop offset="100%" stopColor="#FFB84C" stopOpacity={0.02} />
+                              </linearGradient>
+                              <linearGradient id="mediumGradient" x1="0" y1="0" x2="0" y2="1">
+                                <stop offset="0%" stopColor="#4CBFFF" stopOpacity={0.35} />
+                                <stop offset="100%" stopColor="#4CBFFF" stopOpacity={0.02} />
+                              </linearGradient>
+                              <linearGradient id="lowGradient" x1="0" y1="0" x2="0" y2="1">
+                                <stop offset="0%" stopColor="#4CFF8B" stopOpacity={0.35} />
+                                <stop offset="100%" stopColor="#4CFF8B" stopOpacity={0.02} />
+                              </linearGradient>
+                            </defs>
+                            <CartesianGrid strokeDasharray="6 6" stroke="#2d2e44" />
+                            <XAxis dataKey="date" tick={{ fill: '#bdbdfc', fontFamily: 'Inter', fontSize: 13 }} axisLine={false} tickLine={false} />
+                            <YAxis tick={{ fill: '#bdbdfc', fontFamily: 'Inter', fontSize: 13 }} axisLine={false} tickLine={false} />
+                            <Tooltip
+                              contentStyle={{ background: 'rgba(30, 32, 48, 0.95)', border: 'none', borderRadius: 12, boxShadow: '0 4px 24px #7B8BFF55', color: '#fff', fontFamily: 'Inter' }}
+                              labelStyle={{ color: '#7B8BFF', fontWeight: 700, fontFamily: 'Inter' }}
+                              itemStyle={{ fontFamily: 'Inter', fontWeight: 600 }}
+                              cursor={{ stroke: '#7B8BFF', strokeWidth: 2, opacity: 0.2 }}
+                            />
+                            <Line
+                              type="monotone"
+                              dataKey="critical"
+                              stroke="#FF4C4C"
+                              strokeWidth={4}
+                              fill="url(#criticalGradient)"
+                              dot={{ r: 3, fill: '#FF4C4C', stroke: 'none', filter: 'none' }}
+                              activeDot={{ r: 4, fill: '#FF4C4C', stroke: 'none', filter: 'none' }}
+                              name="Critical"
+                              isAnimationActive={true}
+                              opacity={0.95}
+                              style={{ filter: 'drop-shadow(0 0 8px #FF4C4C88)' }}
+                            />
+                            <Line
+                              type="monotone"
+                              dataKey="high"
+                              stroke="#FFB84C"
+                              strokeWidth={4}
+                              fill="url(#highGradient)"
+                              dot={{ r: 3, fill: '#FFB84C', stroke: 'none', filter: 'none' }}
+                              activeDot={{ r: 4, fill: '#FFB84C', stroke: 'none', filter: 'none' }}
+                              name="High"
+                              isAnimationActive={true}
+                              opacity={0.95}
+                              style={{ filter: 'drop-shadow(0 0 8px #FFB84C88)' }}
+                            />
+                            <Line
+                              type="monotone"
+                              dataKey="medium"
+                              stroke="#4CBFFF"
+                              strokeWidth={4}
+                              fill="url(#mediumGradient)"
+                              dot={{ r: 3, fill: '#4CBFFF', stroke: 'none', filter: 'none' }}
+                              activeDot={{ r: 4, fill: '#4CBFFF', stroke: 'none', filter: 'none' }}
+                              name="Medium"
+                              isAnimationActive={true}
+                              opacity={0.95}
+                              style={{ filter: 'drop-shadow(0 0 8px #4CBFFF88)' }}
+                            />
+                            <Line
+                              type="monotone"
+                              dataKey="low"
+                              stroke="#4CFF8B"
+                              strokeWidth={4}
+                              fill="url(#lowGradient)"
+                              dot={{ r: 3, fill: '#4CFF8B', stroke: 'none', filter: 'none' }}
+                              activeDot={{ r: 4, fill: '#4CFF8B', stroke: 'none', filter: 'none' }}
+                              name="Low"
+                              isAnimationActive={true}
+                              opacity={0.95}
+                              style={{ filter: 'drop-shadow(0 0 8px #4CFF8B88)' }}
+                            />
+                            <Legend
+                              iconType="circle"
+                              wrapperStyle={{ paddingTop: 16, fontFamily: 'Inter', fontWeight: 700, fontSize: 15 }}
+                              formatter={(value) => {
+                                if (value === 'critical') return <span style={{ color: '#FF4C4C' }}>Critical</span>;
+                                if (value === 'high') return <span style={{ color: '#FFB84C' }}>High</span>;
+                                if (value === 'medium') return <span style={{ color: '#4CBFFF' }}>Medium</span>;
+                                if (value === 'low') return <span style={{ color: '#4CFF8B' }}>Low</span>;
+                                return value;
+                              }}
+                            />
+                          </LineChart>
+                        </ResponsiveContainer>
+                      ) : (
+                        <div className="flex flex-col items-center justify-center h-[440px]">
+                          <span className="text-gray-400">Not enough data available</span>
+                        </div>
+                      )}
+                    </Box>
+                  </div>
+                  {/* Risk Distribution */}
+                  <div style={{ display: 'flex', flexDirection: 'row', gap: '2rem' }}>
+                    {/* Risk Distribution */}
+                    <div className="bg-[#1f1f2e] border border-[#2d2e44] rounded-[16px] shadow-lg p-8 flex flex-col gap-10 w-full" style={{ minWidth: 0, minHeight: 440 }}>
+                      <div className="flex flex-row gap-4 mb-6 px-1 py-2 rounded-lg border border-[#444] bg-transparent w-fit mt-2" style={{ boxShadow: '0 1px 8px #6E5FFE11' }}>
+                        {DISTRIBUTION_TABS.map(tab => (
+                          <button
+                            key={tab.key}
+                            className={`relative px-7 py-2 rounded-md font-extrabold text-base tracking-widest uppercase transition-all duration-200
+                              ${selectedDistributionTab === tab.key
+                                ? 'text-[#A084E8] border-none outline-none'
+                                : 'text-[#bdbdfc] border-none outline-none hover:text-[#A084E8]'}
+                            `}
+                            style={{
+                              fontFamily: 'Inter',
+                              letterSpacing: '0.08em',
+                              background: 'transparent',
+                              boxShadow: 'none',
+                              border: 'none',
+                              position: 'relative',
+                            }}
+                            onClick={() => setSelectedDistributionTab(tab.key)}
+                          >
+                            {tab.label}
+                            {selectedDistributionTab === tab.key && (
+                              <span
+                                className="absolute left-1/2 -translate-x-1/2 bottom-0 h-1 rounded-full"
+                                style={{
+                                  width: '70%',
+                                  background: 'linear-gradient(90deg, #A084E8 0%, #6E5FFE 100%)',
+                                  boxShadow: '0 2px 8px #A084E855',
+                                  transition: 'all 0.25s cubic-bezier(.4,0,.2,1)',
+                                }}
+                              />
+                            )}
+                          </button>
+                        ))}
                       </div>
-                    )}
-                  </Box>
+                      {/* Show the selected distribution's bars */}
+                      <DistributionBars data={DISTRIBUTION_TABS.find(tab => tab.key === selectedDistributionTab)?.data || riskDistribution} type={selectedDistributionTab} />
                 </div>
-                <div className="bg-[#1F2030] border border-[#333] rounded-xl shadow-lg p-6">
-                  <h2 className="text-lg font-extrabold text-[#8B5CF6] uppercase tracking-wide mb-2">Severity Trend</h2>
-                  <Box sx={{ height: 300 }}>
-                    {severityTrendData.length > 0 ? (
-                      <ResponsiveContainer width="100%" height="100%">
-                        <LineChart
-                          data={severityTrendData}
-                          margin={{ top: 5, right: 30, left: 20, bottom: 5 }}
-                        >
-                          <CartesianGrid strokeDasharray="3 3" />
-                          <XAxis dataKey="date" />
-                          <YAxis />
-                          <Tooltip />
-                          <Legend />
-                          <Line type="monotone" dataKey="critical" name="Critical" stroke="#f44336" strokeWidth={2} />
-                          <Line type="monotone" dataKey="high" name="High" stroke="#ff9800" strokeWidth={2} />
-                          <Line type="monotone" dataKey="medium" name="Medium" stroke="#2196f3" strokeWidth={2} />
-                          <Line type="monotone" dataKey="low" name="Low" stroke="#4caf50" strokeWidth={2} />
-                        </LineChart>
-                      </ResponsiveContainer>
-                    ) : (
-                      <div className="flex flex-col items-center justify-center h-[300px]">
-                        <span className="text-gray-400">Not enough data available</span>
+                    {/* Activity Status Distribution - Premium Redesign */}
+                    <div className="bg-[#1f1f2e] border border-[#2d2e44] rounded-[16px] shadow-lg p-10 flex flex-col w-full h-full" style={{ minWidth: 0, minHeight: 440, boxSizing: 'border-box' }}>
+                      <div className="flex flex-row items-end justify-evenly w-full h-full gap-10 md:gap-10 sm:gap-6 mt-6" style={{ minHeight: 260, gap: '2.5rem' }}>
+                        {statusDistribution.map((entry, idx) => {
+                          const color = entry.color;
+                          const isHovered = hoveredBar === idx;
+                          return (
+                            <div key={entry.name} className="flex flex-col items-center justify-end" style={{ minWidth: 90 }}>
+                              {/* Count */}
+                              <span className="font-extrabold text-white mb-3" style={{ fontSize: 32, textShadow: '0 2px 12px #0008', letterSpacing: '0.01em', fontFamily: 'Inter' }}>{entry.count}</span>
+                              {/* Bar with hover animation */}
+                              <div className="w-12 mb-3 flex items-end justify-center" style={{ height: 140 }}>
+                                <div
+                                  className="w-12 cursor-pointer"
+                                  style={{
+                                    height: isHovered ? barHoverHeight(entry.count) : barBaseHeight(entry.count),
+                                    background: `linear-gradient(180deg, ${color} 80%, ${color}33 100%)`,
+                                    borderRadius: 24,
+                                    boxShadow: isHovered
+                                      ? `0 8px 32px 0 ${color}88, 0 2px 0 0 #fff2 inset`
+                                      : `0 4px 24px 0 ${color}44, 0 1.5px 0 0 #fff2 inset`,
+                                    transition: 'height 0.35s cubic-bezier(.4,0,.2,1), box-shadow 0.35s cubic-bezier(.4,0,.2,1)',
+                                    opacity: 1,
+                                  }}
+                                  onMouseEnter={() => setHoveredBar(idx)}
+                                  onMouseLeave={() => setHoveredBar(null)}
+                                ></div>
+                              </div>
+                              {/* Label */}
+                              <span className="mt-1 font-semibold" style={{ color, fontFamily: 'Inter', fontSize: 16, letterSpacing: '0.04em', textShadow: '0 1px 6px #0006' }}>{entry.name}</span>
+                            </div>
+                          );
+                        })}
                       </div>
-                    )}
-                  </Box>
+                    </div>
+                  </div>
+                </div>
+                {/* Right: Status Percentages (with Integration Breakdown) */}
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '2rem', minWidth: 0, maxWidth: '100%' }}>
+                  <div className="bg-[#1f1f2e] border border-[#2d2e44] rounded-[16px] shadow-lg p-8 flex flex-col gap-6 w-full h-full" style={{ minHeight: 440 }}>
+                    <div className="flex items-center mb-2">
+                      <div className="w-1 h-6 rounded bg-[#6E5FFE] mr-3"></div>
+                      <h2 className="font-['Inter'] text-[18px] font-semibold tracking-wider text-[#9c7bed] uppercase">Status Percentages</h2>
+                    </div>
+                    <div className="grid grid-cols-2 gap-6 w-full flex-1">
+                      {statusDistribution.map((entry, idx) => (
+                        <div key={entry.name} className="flex flex-col items-center justify-center transition-transform duration-200 group">
+                          <div className="relative flex items-center justify-center mb-2">
+                            <span className="absolute transition-all duration-300 pointer-events-none" style={{ left: '50%', top: '50%', transform: 'translate(-50%, -50%)', width: 172, height: 172, borderRadius: '50%', border: '4px solid transparent', boxSizing: 'border-box', zIndex: 1 }}></span>
+                             <svg width="160" height="160" viewBox="0 0 128 128" className="transition-all duration-300 group-hover:scale-110 group-hover:z-10">
+                              <circle cx="64" cy="64" r="54" stroke="#2d2e44" strokeWidth="14" fill="none" />
+                              <circle cx="64" cy="64" r="54" stroke={entry.color} strokeWidth="14" fill="none" strokeDasharray={2 * Math.PI * 54} strokeDashoffset={2 * Math.PI * 54 * (1 - drawnPercents[idx] / 100)} strokeLinecap="round" style={{ transition: 'stroke-dashoffset 1s cubic-bezier(.4,0,.2,1)' }} />
+                            </svg>
+                            <span className="absolute text-[32px] font-extrabold text-white" style={{ left: '50%', top: '50%', transform: 'translate(-50%, -50%)', fontFamily: 'Inter', letterSpacing: '0.01em', width: '80px', textAlign: 'center' }}>{drawnPercents[idx]}%</span>
+                          </div>
+                          <span className="mt-1 text-[16px] font-medium text-[#e0e6f0] capitalize" style={{ fontFamily: 'Inter', letterSpacing: '0.02em' }}>{entry.name}</span>
+                          <span className="block text-sm text-[#9c7bed] mt-0.5">{entry.count} activities</span>
+                          {/* Accent ring on hover */}
+                          <style>{`.group:hover > .accent-ring { border-color: #A084E8 !important; }`}</style>
+                        </div>
+                      ))}
+                    </div>
+                    <div className="flex items-center mb-2 mt-4">
+                      <div className="w-1 h-6 rounded bg-[#6E5FFE] mr-3"></div>
+                      <h2 className="font-['Inter'] text-[18px] font-semibold tracking-wider text-[#9c7bed] uppercase">Integration Breakdown</h2>
+                    </div>
+                    <div className="grid grid-cols-2 gap-6 w-full flex-1 min-h-0">
+                      {integrationDistribution.map((integration, idx) => {
+                        const total = integrationDistribution.reduce((sum, i) => sum + i.count, 0);
+                        const percent = total > 0 ? Math.round((integration.count / total) * 100) : 0;
+                        const color = integration.color;
+                        return (
+                          <div key={integration.name} className="flex flex-col items-center justify-center transition-transform duration-200 group">
+                            <div className="relative flex items-center justify-center mb-2">
+                              <span className="absolute transition-all duration-300 pointer-events-none" style={{ left: '50%', top: '50%', transform: 'translate(-50%, -50%)', width: 172, height: 172, borderRadius: '50%', border: '4px solid transparent', boxSizing: 'border-box', zIndex: 1 }}></span>
+                               <svg width="160" height="160" viewBox="0 0 128 128" className="transition-all duration-300 group-hover:scale-110 group-hover:z-10">
+                              <circle cx="64" cy="64" r="54" stroke="#2d2e44" strokeWidth="14" fill="none" />
+                              <circle cx="64" cy="64" r="54" stroke={color} strokeWidth="14" fill="none" strokeDasharray={2 * Math.PI * 54} strokeDashoffset={2 * Math.PI * 54 * (1 - percent / 100)} strokeLinecap="round" style={{ transition: 'stroke-dashoffset 1s cubic-bezier(.4,0,.2,1)' }} />
+                            </svg>
+                              <span className="absolute text-[32px] font-extrabold text-white" style={{ left: '50%', top: '50%', transform: 'translate(-50%, -50%)', fontFamily: 'Inter', letterSpacing: '0.01em', width: '80px', textAlign: 'center' }}>{percent}%</span>
+                            </div>
+                            <span className="mt-1 text-[16px] font-medium text-[#e0e6f0] capitalize" style={{ fontFamily: 'Inter', letterSpacing: '0.02em' }}>{integration.name}</span>
+                            <span className="block text-sm text-[#9c7bed] mt-0.5">{integration.count} activities</span>
+                            {/* Accent ring on hover */}
+                            <style>{`.group:hover > .accent-ring { border-color: #A084E8 !important; }`}</style>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
                 </div>
               </div>
 
-              {/* Activity Timeline and Policy Breaches Pie Chart */}
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
-                <div className="bg-[#1F2030] border border-[#333] rounded-xl shadow-lg p-6">
-                  <h2 className="text-lg font-extrabold text-[#8B5CF6] uppercase tracking-wide mb-2">Activity Timeline</h2>
-                  <Box sx={{ height: 300 }}>
+              {/* --- SECTION 3: Bottom Row --- */}
+              <div className="w-full" style={{ marginBottom: '2rem' }}>
+                <div className="bg-[#1f1f2e] border border-[#2d2e44] rounded-[16px] shadow-lg p-8">
+                  <div className="flex items-center mb-2">
+                    <div className="w-1 h-6 rounded bg-[#6E5FFE] mr-3"></div>
+                    <h2 className="text-lg font-extrabold text-[#8B5CF6] uppercase tracking-wide">Activity Timeline</h2>
+                  </div>
+                <Box sx={{ height: 300 }}>
                     {riskTrendData.length > 0 ? (
-                      <ResponsiveContainer width="100%" height="100%">
+                    <ResponsiveContainer width="100%" height="100%">
                         <ComposedChart
                           data={calculateActivityOverTime(activities)}
-                          margin={{ top: 5, right: 30, left: 20, bottom: 5 }}
+                          margin={{ top: 20, right: 30, left: 0, bottom: 0 }}
                         >
-                          <CartesianGrid strokeDasharray="3 3" />
-                          <XAxis dataKey="date" />
-                          <YAxis yAxisId="left" />
-                          <YAxis yAxisId="right" orientation="right" />
-                          <Tooltip />
-                          <Legend />
-                          <Bar yAxisId="left" dataKey="count" name="Activities" fill="#8884d8" />
-                          <Line yAxisId="right" type="monotone" dataKey="risk" name="Anomaly Score" stroke="#ff9800" />
+                          <defs>
+                            <linearGradient id="barGradient" x1="0" y1="0" x2="0" y2="1">
+                              <stop offset="0%" stopColor="#7B8BFF" stopOpacity={0.85} />
+                              <stop offset="100%" stopColor="#7B8BFF" stopOpacity={0.18} />
+                            </linearGradient>
+                          </defs>
+                          <CartesianGrid strokeDasharray="6 6" stroke="#2d2e44" />
+                          <XAxis dataKey="date" tick={{ fill: '#bdbdfc', fontFamily: 'Inter', fontSize: 13 }} axisLine={false} tickLine={false} />
+                          <YAxis yAxisId="left" tick={{ fill: '#bdbdfc', fontFamily: 'Inter', fontSize: 13 }} axisLine={false} tickLine={false} />
+                          <YAxis yAxisId="right" orientation="right" tick={{ fill: '#bdbdfc', fontFamily: 'Inter', fontSize: 13 }} axisLine={false} tickLine={false} />
+                          <Tooltip
+                            contentStyle={{ background: 'rgba(30, 32, 48, 0.95)', border: 'none', borderRadius: 12, boxShadow: '0 4px 24px #7B8BFF55', color: '#fff', fontFamily: 'Inter' }}
+                            labelStyle={{ color: '#7B8BFF', fontWeight: 700, fontFamily: 'Inter' }}
+                            itemStyle={{ fontFamily: 'Inter', fontWeight: 600 }}
+                            cursor={{ stroke: '#7B8BFF', strokeWidth: 2, opacity: 0.2 }}
+                          />
+                          <Bar
+                            yAxisId="left"
+                            dataKey="count"
+                            name="Activities"
+                            fill="url(#barGradient)"
+                            radius={[8, 8, 4, 4]}
+                            barSize={18}
+                            stroke="#A6B6FF"
+                            strokeWidth={1.5}
+                            style={{ filter: 'drop-shadow(0 2px 12px #7B8BFF44)' }}
+                          />
+                          <Line
+                            yAxisId="right"
+                            type="monotone"
+                            dataKey="risk"
+                            name="Anomaly Score"
+                            stroke="#FFB84C"
+                            strokeWidth={4}
+                            dot={{
+                              r: 7,
+                              fill: '#FFB84C',
+                              stroke: '#fff',
+                              strokeWidth: 3,
+                              filter: 'drop-shadow(0 2px 8px #FFB84CAA)'
+                            }}
+                            activeDot={{
+                              r: 10,
+                              fill: '#fff',
+                              stroke: '#FFB84C',
+                              strokeWidth: 5,
+                              filter: 'drop-shadow(0 2px 12px #FFB84CCC)'
+                            }}
+                          />
+                          <Legend
+                            iconType="circle"
+                            wrapperStyle={{ paddingTop: 16, fontFamily: 'Inter', fontWeight: 700, fontSize: 15 }}
+                            formatter={(value) => {
+                              if (value === 'count') return <span style={{ color: '#FFB84C', fontWeight: 700 }}>Activities</span>;
+                              if (value === 'risk') return <span style={{ color: '#8B5CF6', fontWeight: 700 }}>Anomaly Score</span>;
+                              return <span style={{ color: '#fff', fontWeight: 700 }}>{value}</span>;
+                            }}
+                          />
                         </ComposedChart>
-                      </ResponsiveContainer>
-                    ) : (
-                      <div className="flex flex-col items-center justify-center h-[300px]">
-                        <span className="text-gray-400">Not enough data available</span>
-                      </div>
-                    )}
-                  </Box>
-                </div>
-                <div className="bg-[#1F2030] border border-[#333] rounded-xl shadow-lg p-6">
-                  <h2 className="text-lg font-extrabold text-[#8B5CF6] uppercase tracking-wide mb-2">Policy Breaches</h2>
-                  <Box sx={{ height: 300 }}>
-                    {policyBreachData.length > 0 ? (
-                      <ResponsiveContainer width="100%" height="100%">
-                        <PieChart>
-                          <Pie
-                            data={policyBreachData}
-                            cx="50%"
-                            cy="50%"
-                            labelLine={false}
-                            outerRadius={80}
-                            fill="#8884d8"
-                            dataKey="count"
-                            nameKey="category"
-                            label={({ name, percent }) => `${name}: ${(percent * 100).toFixed(0)}%`}
-                          >
-                            {policyBreachData.map((entry, index) => (
-                              <Cell key={`cell-${index}`} fill={COLORS.risk[index % 4 === 0 ? 'critical' : index % 4 === 1 ? 'high' : index % 4 === 2 ? 'medium' : 'low']} />
-                            ))}
-                          </Pie>
-                          <Tooltip formatter={(value) => [`${value} breaches`, 'Count']} />
-                          <Legend />
-                        </PieChart>
-                      </ResponsiveContainer>
-                    ) : (
-                      <div className="flex flex-col items-center justify-center h-[300px]">
-                        <span className="text-gray-400">No policy breach data available</span>
-                      </div>
-                    )}
-                  </Box>
-                </div>
+                    </ResponsiveContainer>
+                  ) : (
+                    <div className="flex flex-col items-center justify-center h-[300px]">
+                      <span className="text-gray-400">Not enough data available</span>
+                    </div>
+                  )}
+                </Box>
               </div>
-
-              {/* Integration Breakdown and User Risk Distribution */}
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
-                <div className="bg-[#1F2030] border border-[#333] rounded-xl shadow-lg p-6">
-                  <h2 className="text-lg font-extrabold text-[#8B5CF6] uppercase tracking-wide mb-2">Integration Breakdown</h2>
-                  <Box sx={{ height: 300 }}>
-                    {integrationData.length > 0 ? (
-                      <ResponsiveContainer width="100%" height="100%">
-                        <BarChart
-                          data={integrationData}
-                          margin={{ top: 5, right: 30, left: 20, bottom: 5 }}
-                        >
-                          <CartesianGrid strokeDasharray="3 3" />
-                          <XAxis dataKey="name" />
-                          <YAxis />
-                          <Tooltip />
-                          <Legend />
-                          <Bar dataKey="value" name="Count" fill="#82ca9d" />
-                        </BarChart>
-                      </ResponsiveContainer>
-                    ) : (
-                      <div className="flex flex-col items-center justify-center h-[300px]">
-                        <span className="text-gray-400">Not enough data available</span>
-                      </div>
-                    )}
-                  </Box>
-                </div>
-                <div className="bg-[#1F2030] border border-[#333] rounded-xl shadow-lg p-6">
-                  <h2 className="text-lg font-extrabold text-[#8B5CF6] uppercase tracking-wide mb-2">Activity Status Distribution</h2>
-                  <Box sx={{ height: 300 }}>
-                    {statusDistribution.length > 0 ? (
-                      <ResponsiveContainer width="100%" height="100%">
-                        <PieChart>
-                          <Pie
-                            data={statusDistribution}
-                            cx="50%"
-                            cy="50%"
-                            labelLine={false}
-                            outerRadius={80}
-                            fill="#8884d8"
-                            dataKey="count"
-                            nameKey="name"
-                            label={({ name, percent }) => `${name}: ${(percent * 100).toFixed(0)}%`}
-                          >
-                            {statusDistribution.map((entry, index) => (
-                              <Cell key={`cell-${index}`} fill={entry.color} />
-                            ))}
-                          </Pie>
-                          <Tooltip formatter={(value) => [`${value} activities`, 'Count']} />
-                          <Legend />
-                        </PieChart>
-                      </ResponsiveContainer>
-                    ) : (
-                      <div className="flex flex-col items-center justify-center h-[300px]">
-                        <span className="text-gray-400">No activity status data available</span>
-                      </div>
-                    )}
-                  </Box>
-                </div>
               </div>
             </TabPanel>
 
             <TabPanel value={activeTab} index={1}>
-              <AdvancedAnalyticsTab />
+              <AdvancedAnalyticsTab activities={activities} />
             </TabPanel>
           </>
         )}

@@ -2,7 +2,7 @@
 "use client";
 
 import { useState, useEffect } from 'react';
-import { MdOutlineListAlt, MdOutlineWarningAmber, MdOutlineGavel, MdOutlinePersonOff } from 'react-icons/md';
+import { MdOutlineListAlt, MdOutlineWarningAmber, MdOutlineGavel, MdOutlinePersonOff, MdArrowForward, MdCloudUpload, MdDashboard } from 'react-icons/md';
 import { Box, CircularProgress, Typography, Card, CardContent, Grid, Button, Paper } from '@mui/material';
 import { ActivityList } from '../components/ActivityList';
 import { policyIcons } from '../constants/policyIcons';
@@ -11,6 +11,8 @@ import { generateStatistics, RISK_THRESHOLDS } from '../utils/dataProcessor';
 import { useAdaptiveProcessing } from '../hooks/useAdaptiveProcessing';
 import adaptiveConfig from '../utils/adaptiveConfig';
 import Link from 'next/link';
+import { FaMicrochip, FaSkull } from "react-icons/fa";
+import { useRouter } from 'next/navigation';
 
 export default function Page() {
   // State for activities and their statistics
@@ -34,6 +36,8 @@ export default function Page() {
 
   // Use the adaptive processing hook for optimized processing
   const adaptiveProcessing = useAdaptiveProcessing(activities.length > 0 ? activities : null);
+
+  const router = useRouter();
 
   // Load activities from IndexedDB
   useEffect(() => {
@@ -137,73 +141,90 @@ export default function Page() {
           </div>
         ) : (
           <div className="space-y-8">
-            {/* Stats Cards Section */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-8">
-              {/* Total Activities */}
-              <div className="flex items-center bg-[#1F2030] rounded-xl shadow-[inset_-4px_-4px_6px_#2a2a40,inset_4px_4px_6px_#0e0e1e] p-8 hover:shadow-lg hover:scale-[1.02] transition-all duration-300 min-h-[8.5rem]">
-                <MdOutlineListAlt className="text-5xl text-white/80 mr-6" />
-                <div>
-                  <div className="text-5xl font-bold text-white">{totalActivities}</div>
-                  <div className="text-lg text-gray-400 mt-2">Total Activities</div>
+            <div className="w-full">
+              {/* Stats Cards Section */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-6 mb-12 w-full">
+                {/* Total Activities */}
+                <div className="flex items-center bg-white rounded-2xl shadow-2xl p-8 hover:shadow-[0_4px_32px_rgba(255,255,255,0.35)] hover:scale-[1.03] transition-all duration-300 min-h-[8.5rem]">
+                  <div className="flex items-center justify-center w-16 h-16 rounded-full bg-white shadow-lg mr-6">
+                    <MdOutlineListAlt className="text-4xl text-black drop-shadow" />
+                  </div>
+                  <div>
+                    <div className="text-6xl font-extrabold text-[#232346] drop-shadow-lg leading-tight">{totalActivities}</div>
+                    <div className="text-sm font-semibold uppercase tracking-widest mt-2 text-[#444] opacity-90" style={{ letterSpacing: '0.12em' }}>Total Activities</div>
+                  </div>
+                </div>
+                {/* High Risk Activities */}
+                <div className="flex items-center bg-gradient-to-br from-[#FF3B3B] to-[#EC4899] rounded-2xl shadow-2xl p-8 hover:shadow-[0_4px_32px_#FF3B3B44] hover:scale-[1.03] transition-all duration-300 min-h-[8.5rem]">
+                  <div className="flex items-center justify-center w-16 h-16 rounded-full bg-gradient-to-br from-[#FF7B7B] to-[#FF3B3B] shadow-lg mr-6">
+                    <FaSkull className="text-4xl text-white drop-shadow" />
+                  </div>
+                  <div>
+                    <div className="text-6xl font-extrabold text-white drop-shadow-lg leading-tight">{highRiskActivities}</div>
+                    <div className="text-sm font-semibold uppercase tracking-widest mt-2 text-white opacity-90" style={{ letterSpacing: '0.12em' }}>High Risk Activities</div>
+                  </div>
+                </div>
+                {/* Policy Breaches */}
+                <div className="flex items-center bg-gradient-to-br from-[#7928CA] to-[#8B5CF6] rounded-2xl shadow-2xl p-8 hover:shadow-[0_4px_32px_#7928CA44] hover:scale-[1.03] transition-all duration-300 min-h-[8.5rem]">
+                  <div className="flex items-center justify-center w-16 h-16 rounded-full bg-gradient-to-br from-[#A084E8] to-[#8B5CF6] shadow-lg mr-6">
+                    <MdOutlineGavel className="text-4xl text-white drop-shadow" />
+                  </div>
+                  <div>
+                    <div className="text-6xl font-extrabold text-white drop-shadow-lg leading-tight">{policyBreaches}</div>
+                    <div className="text-sm font-semibold uppercase tracking-widest mt-2 text-white opacity-90" style={{ letterSpacing: '0.12em' }}>Recent Policy Breaches</div>
+                  </div>
+                </div>
+                {/* Users at Risk */}
+                <div className="flex items-center bg-gradient-to-br from-[#f59e42] to-[#ff6a00] rounded-2xl shadow-2xl p-8 hover:shadow-[0_4px_32px_#ff6a0044] hover:scale-[1.03] transition-all duration-300 min-h-[8.5rem]">
+                  <div className="flex items-center justify-center w-16 h-16 rounded-full bg-gradient-to-br from-[#f59e42] to-[#ff6a00] shadow-lg mr-6">
+                    <MdOutlinePersonOff className="text-4xl text-white drop-shadow" />
+                  </div>
+                  <div>
+                    <div className="text-6xl font-extrabold text-white drop-shadow-lg leading-tight">{usersAtRisk}</div>
+                    <div className="text-sm font-semibold uppercase tracking-widest mt-2 text-white opacity-90" style={{ letterSpacing: '0.12em' }}>Users at Risk</div>
+                  </div>
                 </div>
               </div>
-              {/* High Risk Activities */}
-              <div className="flex items-center bg-[#1F2030] rounded-xl shadow-[inset_-4px_-4px_6px_#2a2a40,inset_4px_4px_6px_#0e0e1e] p-8 hover:shadow-lg hover:scale-[1.02] transition-all duration-300 min-h-[8.5rem]">
-                <MdOutlineWarningAmber className="text-5xl mr-6 text-red-500" />
-                <div>
-                  <div className="text-5xl font-bold text-red-500">{highRiskActivities}</div>
-                  <div className="text-lg text-gray-400 mt-2">High Risk Activities</div>
-                </div>
-              </div>
-              {/* Policy Breaches */}
-              <div className="flex items-center bg-[#1F2030] rounded-xl shadow-[inset_-4px_-4px_6px_#2a2a40,inset_4px_4px_6px_#0e0e1e] p-8 hover:shadow-lg hover:scale-[1.02] transition-all duration-300 min-h-[8.5rem]">
-                <MdOutlineGavel className="text-5xl text-pink-400 mr-6" />
-                <div>
-                  <div className="text-5xl font-bold text-pink-400">{policyBreaches}</div>
-                  <div className="text-lg text-gray-400 mt-2">Recent Policy Breaches</div>
-                </div>
-              </div>
-              {/* Users at Risk */}
-              <div className="flex items-center bg-[#1F2030] rounded-xl shadow-[inset_-4px_-4px_6px_#2a2a40,inset_4px_4px_6px_#0e0e1e] p-8 hover:shadow-lg hover:scale-[1.02] transition-all duration-300 min-h-[8.5rem]">
-                <MdOutlinePersonOff className="text-5xl text-blue-400 mr-6" />
-                <div>
-                  <div className="text-5xl font-bold text-blue-400">{usersAtRisk}</div>
-                  <div className="text-lg text-gray-400 mt-2">Users at Risk</div>
-                </div>
+              {/* Premium Divider */}
+              <div className="w-full flex justify-center mb-12">
+                <div className="h-1 w-full bg-[#23243a] rounded-full opacity-80"></div>
               </div>
             </div>
 
-            {/* AI Insights Banner */}
-            <div className="bg-[#1F2030] border border-[#333] shadow-[0_2px_8px_rgba(110,95,254,0.08)] rounded-xl px-6 py-4 text-white flex items-center justify-between">
-              <div>
-                <h2 className="text-lg md:text-xl font-extrabold mb-1 uppercase tracking-wide text-[#EEE]">AI-Powered Security Insights</h2>
-                <p className="text-white/80">Get advanced ML-powered recommendations and security insights to protect your data.</p>
-              </div>
-              <Link href="/ml" passHref legacyBehavior>
-                <Button
-                  variant="contained"
-                  sx={{ background: 'linear-gradient(90deg, #6E5FFE 0%, #A685FF 100%)', color: '#fff', fontWeight: 700, boxShadow: '0 2px 8px #6E5FFE22' }}
-                >
-                  View ML Insights
-                </Button>
-              </Link>
-            </div>
-
+            {/* Move the lower section here, inside the same px-8 container */}
             {/* Dashboard Links */}
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
-              <Link href="/dashboard" passHref legacyBehavior>
-                <div className="bg-[#23243a] rounded-lg shadow-sm p-6 cursor-pointer transition-transform transform hover:scale-105">
-                  <h2 className="text-xl font-bold mb-2 text-indigo-400">Advanced Dashboard</h2>
-                  <p className="text-gray-400">View detailed analytics, visualizations, and user activity trends.</p>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-8 mb-10">
+              {/* Step 1: Upload CSV */}
+              <div className="bg-[#23243a] rounded-2xl border border-[#2d2e44] p-8 flex flex-col items-center text-center">
+                <div className="flex items-center justify-center w-20 h-20 rounded-full bg-gradient-to-br from-[#A084E8] to-[#6EE7F7] mb-6">
+                  <MdCloudUpload className="text-white text-5xl" />
                 </div>
-              </Link>
-              <Link href="/upload" passHref legacyBehavior>
-                <div className="bg-[#23243a] rounded-lg shadow-sm p-6 cursor-pointer transition-transform transform hover:scale-105">
-                  <h2 className="text-xl font-bold mb-2 text-purple-400">Upload New Data</h2>
-                  <p className="text-gray-400">Upload new activity data to analyze and monitor security threats.</p>
+                <h3 className="text-lg font-extrabold text-white uppercase tracking-wide mb-2">Step 1: Upload CSV</h3>
+                <p className="text-white/80 font-medium">Upload your activity data to get started with analytics.</p>
+              </div>
+              {/* Step 2: View Dashboard */}
+              <div className="bg-[#23243a] rounded-2xl border border-[#2d2e44] p-8 flex flex-col items-center text-center">
+                <div className="flex items-center justify-center w-20 h-20 rounded-full bg-gradient-to-br from-[#6E5FFE] to-[#A084E8] mb-6">
+                  <MdDashboard className="text-white text-5xl" />
                 </div>
-              </Link>
+                <h3 className="text-lg font-extrabold text-white uppercase tracking-wide mb-2">Step 2: View Dashboard</h3>
+                <p className="text-white/80 font-medium">See your security analytics and activity trends.</p>
+              </div>
+              {/* Step 3: View ML Suggestions */}
+              <div className="bg-[#23243a] rounded-2xl border border-[#2d2e44] p-8 flex flex-col items-center text-center">
+                <div className="flex items-center justify-center w-20 h-20 rounded-full bg-gradient-to-br from-[#6EE7F7] to-[#A084E8] mb-6">
+                  <FaMicrochip className="text-white text-5xl" />
+                </div>
+                <h3 className="text-lg font-extrabold text-white uppercase tracking-wide mb-2">Step 3: View ML Suggestions</h3>
+                <p className="text-white/80 font-medium">Unlock advanced AI-powered security recommendations.</p>
+              </div>
             </div>
+            {/* Ready to start banner */}
+            <Link href="/upload" passHref legacyBehavior>
+              <div className="w-full bg-[#18192b]/80 border-2 border-[#23243a] rounded-2xl px-8 py-6 text-white text-center font-extrabold text-2xl tracking-wide mb-8 cursor-pointer transition-all duration-200 hover:border-[#6EE7F7]">
+                Ready to start?
+              </div>
+            </Link>
 
             {/* High-Risk Activities Section */}
             <div className="bg-[#23243a] rounded-lg shadow-sm p-6 mb-6">

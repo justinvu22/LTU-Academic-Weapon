@@ -38,6 +38,7 @@ export default function DataUploadPage() {
   const [currentStorageSize, setCurrentStorageSize] = useState<number>(0);
   const [maxStorageSize] = useState<number>(10 * 1024 * 1024); // 10MB
   const [remainingStorageBytes, setRemainingStorageBytes] = useState<number>(10 * 1024 * 1024);
+  const [isProcessHovered, setIsProcessHovered] = useState(false);
 
   useEffect(() => {
     // Check current storage size when the component mounts
@@ -485,8 +486,8 @@ export default function DataUploadPage() {
         
         // Refresh activities context for live badge update
         await refreshActivities();
-        // Navigate to the alerts page to see the processed data
-        router.push('/alerts');
+        // Navigate to the dashboard page to see the processed data
+        router.push('/dashboard');
       } catch (error) {
         console.error('Error processing data:', error);
         setErrorMessage(error instanceof Error ? error.message : 'An unknown error occurred');
@@ -645,15 +646,18 @@ export default function DataUploadPage() {
                 type="button"
                 onClick={processForAnalytics}
                 disabled={isProcessing}
-                className={`inline-flex items-center gap-2 bg-gradient-to-r from-[#3B82F6] to-[#8B5CF6] text-white font-semibold px-6 py-3 rounded-full shadow-lg hover:scale-105 hover:shadow-xl transition-all duration-300 w-full disabled:opacity-60 disabled:cursor-not-allowed`}
-                aria-label="Process Data & View Alerts"
+                onMouseEnter={() => setIsProcessHovered(true)}
+                onMouseLeave={() => setIsProcessHovered(false)}
+                style={{ transform: isProcessHovered ? 'scale(1.02)' : 'scale(1)' }}
+                className={`inline-flex items-center gap-2 bg-gradient-to-r from-[#3B82F6] to-[#8B5CF6] text-white font-semibold px-6 py-3 rounded-full shadow-lg hover:shadow-xl transition-all duration-300 w-full disabled:opacity-60 disabled:cursor-not-allowed`}
+                aria-label="Process Data"
               >
                 {isProcessing ? (
                   <>
                     <span className="animate-spin inline-block mr-2"><svg width="20" height="20" fill="none" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10" stroke="#fff" strokeWidth="4" opacity="0.2"/><path d="M22 12c0-5.523-4.477-10-10-10" stroke="#fff" strokeWidth="4" strokeLinecap="round"/></svg></span>
                     Processing...
                   </>
-                ) : 'Process Data & View Alerts'}
+                ) : 'Process Data'}
               </button>
             </div>
           </>

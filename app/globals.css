@@ -36,4 +36,20 @@
 .premium-scrollbar:hover::-webkit-scrollbar-track {
   background: #232346;
   border-radius: 8px;
+}
+
+@keyframes border-glow {
+  0% {
+    border-image: linear-gradient(90deg, #6EE7F7, #A084E8) 1;
+  }
+  50% {
+    border-image: linear-gradient(90deg, #A084E8, #6EE7F7) 1;
+  }
+  100% {
+    border-image: linear-gradient(90deg, #6EE7F7, #A084E8) 1;
+  }
+}
+.futuristic-animated-border {
+  border-image: linear-gradient(90deg, #6EE7F7, #A084E8) 1;
+  animation: border-glow 2s linear infinite;
 } 
