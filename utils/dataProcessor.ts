@@ -7,7 +7,7 @@ export const RISK_THRESHOLDS = {
   LOW: 1000,    // 0-999
   MEDIUM: 1500, // 1000-1499
   HIGH: 2000,   // 1500-1999
-  CRITICAL: 2000  // 2000+
+  CRITICAL: 2001  // 2000+
 };
 
 /**
@@ -389,10 +389,10 @@ function normalizeRiskScore(score: any): number {
  * Categorize risk score into severity levels
  */
 function categorizeRiskScore(score: number): 'low' | 'medium' | 'high' | 'critical' {
-  if (score >= RISK_THRESHOLDS.CRITICAL) return 'critical';
-  if (score >= RISK_THRESHOLDS.HIGH) return 'high';
-  if (score >= RISK_THRESHOLDS.MEDIUM) return 'medium';
-  return 'low';
+  if (score >= RISK_THRESHOLDS.CRITICAL) return 'critical';    // score >= 2001
+  if (score >= RISK_THRESHOLDS.HIGH) return 'high';           // 1500 <= score < 2001
+  if (score >= RISK_THRESHOLDS.LOW) return 'medium';          // 1000 <= score < 1500
+  return 'low';                                               // score < 1000
 }
 
 /**

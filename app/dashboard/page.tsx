@@ -536,6 +536,15 @@ export default function DashboardPage() {
   const barBaseHeight = (count: number) => Math.max(minBarHeight, Math.min(maxBarHeight, (count / Math.max(...statusDistribution.map(e => e.count))) * maxBarHeight));
   const barHoverHeight = (count: number) => barBaseHeight(count) + 28;
 
+  // Severity Trend filters
+  const [severityTimeRange, setSeverityTimeRange] = useState('30');
+  const [severityFilters, setSeverityFilters] = useState({
+    critical: true,
+    high: true,
+    medium: true,
+    low: true
+  });
+
   const fetchActivities = async () => {
     try {
       console.log('Fetching activities data...');
@@ -726,7 +735,7 @@ export default function DashboardPage() {
     
     // Process data for existing charts
     setRiskTrendData(calculateActivityOverTime(activities));
-    setSeverityTrendData(calculateSeverityTrend(activities));
+    setSeverityTrendData(calculateSeverityTrend(activities, parseInt(severityTimeRange)));
     setPolicyBreachData(calculatePolicyBreaches(activities));
     setIntegrationData(calculateIntegrationBreakdown(activities));
     setUsersNeedingAttention(calculateUsersAtRisk(activities));
@@ -980,6 +989,45 @@ export default function DashboardPage() {
   const maxOuterRadius = (chartSize / 2) - padding; // e.g., 140
   const minInnerRadius = 80; // enough for text
   const ringThickness = (maxOuterRadius - minInnerRadius) / ringCount;
+
+  // Effect to recalculate severity trend when filters change
+  useEffect(() => {
+    if (activities.length > 0) {
+      setSeverityTrendData(calculateSeverityTrend(activities, parseInt(severityTimeRange)));
+    }
+  }, [severityTimeRange, activities]);
+
+  // Handler for time range changes
+  const handleSeverityTimeRangeChange = (event: React.ChangeEvent<HTMLSelectElement>) => {
+    setSeverityTimeRange(event.target.value);
+  };
+
+  // Handler for severity filter changes
+  const handleSeverityFilterChange = (severity: keyof typeof severityFilters) => {
+    setSeverityFilters(prev => ({
+      ...prev,
+      [severity]: !prev[severity]
+    }));
+  };
+
+  // Get filtered severity trend data
+  const getFilteredSeverityTrendData = () => {
+    return severityTrendData.map(item => {
+      const filteredItem: { 
+        date: string;
+        critical?: number;
+        high?: number;
+        medium?: number;
+        low?: number;
+      } = { date: item.date };
+      
+      if (severityFilters.critical) filteredItem.critical = item.critical;
+      if (severityFilters.high) filteredItem.high = item.high;
+      if (severityFilters.medium) filteredItem.medium = item.medium;
+      if (severityFilters.low) filteredItem.low = item.low;
+      return filteredItem;
+    });
+  };
 
   return (
     <div className="min-h-screen bg-[#121324] px-6 py-10 font-['IBM_Plex_Sans',Inter,sans-serif] flex flex-col">
@@ -1383,16 +1431,74 @@ export default function DashboardPage() {
                 {/* Left: Severity Trend, Status Distribution, Activity Status Distribution */}
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '2rem' }}>
                   {/* Severity Trend */}
-                  <div className="bg-[#1f1f2e] border border-[#2d2e44] rounded-[16px] shadow-lg p-10 flex flex-col w-full h-full" style={{ minHeight: 440, minWidth: 0 }}>
-                    <div className="flex items-center mb-4">
-                      <div className="w-1 h-6 rounded bg-[#6E5FFE] mr-3"></div>
-                      <h2 className="font-['Inter'] text-[18px] font-semibold tracking-wider text-[#A084E8] uppercase">Severity Trend</h2>
+                  <div className="bg-[#1f1f2e] border border-[#2d2e44] rounded-[16px] shadow-lg p-8 flex flex-col w-full" style={{ minWidth: 0, minHeight: 440 }}>
+                    <div className="flex justify-between items-center">
+                      <div className="flex items-center">
+                        <div className="w-1 h-6 rounded bg-[#6E5FFE] mr-3"></div>
+                        <h2 className="font-['Inter'] text-[18px] font-semibold tracking-wider text-[#9c7bed] uppercase">SEVERITY TREND</h2>
+                      </div>
+                      
+                      {/* Time Range Filter */}
+                      <div className="flex items-center space-x-4">
+                        <span className="text-sm text-gray-400">Time Range:</span>
+                        <select
+                          value={severityTimeRange}
+                          onChange={handleSeverityTimeRangeChange}
+                          className="bg-[#24243e] text-white border border-[#444] rounded-md px-2 py-1 text-sm focus:outline-none focus:border-[#6E5FFE]"
+                        >
+                          <option value="7">Last 7 Days</option>
+                          <option value="14">Last 14 Days</option>
+                          <option value="30">Last 30 Days</option>
+                          <option value="90">Last 90 Days</option>
+                        </select>
+                      </div>
                     </div>
+                    
+                    {/* Severity Level Filters */}
+                    <div className="flex flex-wrap gap-3 mt-4">
+                      <button
+                        className={`px-3 py-1 rounded-full text-xs font-medium transition-all flex items-center gap-1 ${severityFilters.critical 
+                          ? 'bg-[#FF4C4C]/20 text-[#FF4C4C] ring-2 ring-[#FF4C4C]/30' 
+                          : 'bg-[#333] text-gray-400 hover:bg-[#444]'}`}
+                        onClick={() => handleSeverityFilterChange('critical')}
+                      >
+                        <span className="w-2 h-2 rounded-full bg-[#FF4C4C]"></span>
+                        Critical
+                      </button>
+                      <button
+                        className={`px-3 py-1 rounded-full text-xs font-medium transition-all flex items-center gap-1 ${severityFilters.high 
+                          ? 'bg-[#FFB84C]/20 text-[#FFB84C] ring-2 ring-[#FFB84C]/30' 
+                          : 'bg-[#333] text-gray-400 hover:bg-[#444]'}`}
+                        onClick={() => handleSeverityFilterChange('high')}
+                      >
+                        <span className="w-2 h-2 rounded-full bg-[#FFB84C]"></span>
+                        High
+                      </button>
+                      <button
+                        className={`px-3 py-1 rounded-full text-xs font-medium transition-all flex items-center gap-1 ${severityFilters.medium 
+                          ? 'bg-[#4CBFFF]/20 text-[#4CBFFF] ring-2 ring-[#4CBFFF]/30' 
+                          : 'bg-[#333] text-gray-400 hover:bg-[#444]'}`}
+                        onClick={() => handleSeverityFilterChange('medium')}
+                      >
+                        <span className="w-2 h-2 rounded-full bg-[#4CBFFF]"></span>
+                        Medium
+                      </button>
+                      <button
+                        className={`px-3 py-1 rounded-full text-xs font-medium transition-all flex items-center gap-1 ${severityFilters.low 
+                          ? 'bg-[#4CFF8B]/20 text-[#4CFF8B] ring-2 ring-[#4CFF8B]/30' 
+                          : 'bg-[#333] text-gray-400 hover:bg-[#444]'}`}
+                        onClick={() => handleSeverityFilterChange('low')}
+                      >
+                        <span className="w-2 h-2 rounded-full bg-[#4CFF8B]"></span>
+                        Low
+                      </button>
+                    </div>
+                    
                     <Box sx={{ height: 440 }}>
                       {severityTrendData.length > 0 ? (
                         <ResponsiveContainer width="100%" height="100%">
                           <LineChart
-                            data={severityTrendData}
+                            data={getFilteredSeverityTrendData()}
                             margin={{ top: 20, right: 30, left: 0, bottom: 0 }}
                           >
                             <defs>
@@ -1422,58 +1528,66 @@ export default function DashboardPage() {
                               itemStyle={{ fontFamily: 'Inter', fontWeight: 600 }}
                               cursor={{ stroke: '#7B8BFF', strokeWidth: 2, opacity: 0.2 }}
                             />
-                            <Line
-                              type="monotone"
-                              dataKey="critical"
-                              stroke="#FF4C4C"
-                              strokeWidth={4}
-                              fill="url(#criticalGradient)"
-                              dot={{ r: 3, fill: '#FF4C4C', stroke: 'none', filter: 'none' }}
-                              activeDot={{ r: 4, fill: '#FF4C4C', stroke: 'none', filter: 'none' }}
-                              name="Critical"
-                              isAnimationActive={true}
-                              opacity={0.95}
-                              style={{ filter: 'drop-shadow(0 0 8px #FF4C4C88)' }}
-                            />
-                            <Line
-                              type="monotone"
-                              dataKey="high"
-                              stroke="#FFB84C"
-                              strokeWidth={4}
-                              fill="url(#highGradient)"
-                              dot={{ r: 3, fill: '#FFB84C', stroke: 'none', filter: 'none' }}
-                              activeDot={{ r: 4, fill: '#FFB84C', stroke: 'none', filter: 'none' }}
-                              name="High"
-                              isAnimationActive={true}
-                              opacity={0.95}
-                              style={{ filter: 'drop-shadow(0 0 8px #FFB84C88)' }}
-                            />
-                            <Line
-                              type="monotone"
-                              dataKey="medium"
-                              stroke="#4CBFFF"
-                              strokeWidth={4}
-                              fill="url(#mediumGradient)"
-                              dot={{ r: 3, fill: '#4CBFFF', stroke: 'none', filter: 'none' }}
-                              activeDot={{ r: 4, fill: '#4CBFFF', stroke: 'none', filter: 'none' }}
-                              name="Medium"
-                              isAnimationActive={true}
-                              opacity={0.95}
-                              style={{ filter: 'drop-shadow(0 0 8px #4CBFFF88)' }}
-                            />
-                            <Line
-                              type="monotone"
-                              dataKey="low"
-                              stroke="#4CFF8B"
-                              strokeWidth={4}
-                              fill="url(#lowGradient)"
-                              dot={{ r: 3, fill: '#4CFF8B', stroke: 'none', filter: 'none' }}
-                              activeDot={{ r: 4, fill: '#4CFF8B', stroke: 'none', filter: 'none' }}
-                              name="Low"
-                              isAnimationActive={true}
-                              opacity={0.95}
-                              style={{ filter: 'drop-shadow(0 0 8px #4CFF8B88)' }}
-                            />
+                            {severityFilters.critical && (
+                              <Line
+                                type="monotone"
+                                dataKey="critical"
+                                stroke="#FF4C4C"
+                                strokeWidth={4}
+                                fill="url(#criticalGradient)"
+                                dot={{ r: 3, fill: '#FF4C4C', stroke: 'none', filter: 'none' }}
+                                activeDot={{ r: 4, fill: '#FF4C4C', stroke: 'none', filter: 'none' }}
+                                name="Critical"
+                                isAnimationActive={true}
+                                opacity={0.95}
+                                style={{ filter: 'drop-shadow(0 0 8px #FF4C4C88)' }}
+                              />
+                            )}
+                            {severityFilters.high && (
+                              <Line
+                                type="monotone"
+                                dataKey="high"
+                                stroke="#FFB84C"
+                                strokeWidth={4}
+                                fill="url(#highGradient)"
+                                dot={{ r: 3, fill: '#FFB84C', stroke: 'none', filter: 'none' }}
+                                activeDot={{ r: 4, fill: '#FFB84C', stroke: 'none', filter: 'none' }}
+                                name="High"
+                                isAnimationActive={true}
+                                opacity={0.95}
+                                style={{ filter: 'drop-shadow(0 0 8px #FFB84C88)' }}
+                              />
+                            )}
+                            {severityFilters.medium && (
+                              <Line
+                                type="monotone"
+                                dataKey="medium"
+                                stroke="#4CBFFF"
+                                strokeWidth={4}
+                                fill="url(#mediumGradient)"
+                                dot={{ r: 3, fill: '#4CBFFF', stroke: 'none', filter: 'none' }}
+                                activeDot={{ r: 4, fill: '#4CBFFF', stroke: 'none', filter: 'none' }}
+                                name="Medium"
+                                isAnimationActive={true}
+                                opacity={0.95}
+                                style={{ filter: 'drop-shadow(0 0 8px #4CBFFF88)' }}
+                              />
+                            )}
+                            {severityFilters.low && (
+                              <Line
+                                type="monotone"
+                                dataKey="low"
+                                stroke="#4CFF8B"
+                                strokeWidth={4}
+                                fill="url(#lowGradient)"
+                                dot={{ r: 3, fill: '#4CFF8B', stroke: 'none', filter: 'none' }}
+                                activeDot={{ r: 4, fill: '#4CFF8B', stroke: 'none', filter: 'none' }}
+                                name="Low"
+                                isAnimationActive={true}
+                                opacity={0.95}
+                                style={{ filter: 'drop-shadow(0 0 8px #4CFF8B88)' }}
+                              />
+                            )}
                             <Legend
                               iconType="circle"
                               wrapperStyle={{ paddingTop: 16, fontFamily: 'Inter', fontWeight: 700, fontSize: 15 }}
@@ -1777,48 +1891,74 @@ function calculateActivityOverTime(activities: UserActivity[]) {
   });
 }
 
-// Calculate severity trend over time
-function calculateSeverityTrend(activities: UserActivity[]) {
+// Calculate severity trend over time with time range parameter
+function calculateSeverityTrend(activities: UserActivity[], days = 30) {
   if (!activities || activities.length === 0) {
     return [];
+  }
+  
+  // Get dates for the specified range
+  const today = new Date();
+  const dates: { dateStr: string, dateObj: Date }[] = [];
+  
+  for (let i = days - 1; i >= 0; i--) {
+    const date = new Date();
+    date.setDate(today.getDate() - i);
+    dates.push({ 
+      dateStr: date.toLocaleDateString('en-GB', { day: '2-digit', month: 'short' }), 
+      dateObj: date 
+    });
   }
   
   // Group by date and count severity levels
   const dateMap = new Map<string, { critical: number, high: number, medium: number, low: number }>();
   
+  // Initialize entries for all dates in range
+  dates.forEach(({ dateStr }) => {
+    dateMap.set(dateStr, { critical: 0, high: 0, medium: 0, low: 0 });
+  });
+  
   activities.forEach(activity => {
-    let dateStr = '';
+    let activityDate: Date | null = null;
     
     // Try to get date from activity
-    if (activity.date) {
-      dateStr = activity.date;
-    } else if (activity.timestamp) {
-      // Extract date from timestamp
-      const date = new Date(activity.timestamp);
-      dateStr = date.toLocaleDateString('en-GB', { day: '2-digit', month: 'short' });
+    if (activity.timestamp) {
+      activityDate = new Date(activity.timestamp);
+    } else if (activity.date) {
+      // Handle dates in format DD/MM/YYYY
+      const parts = activity.date.split('/');
+      if (parts.length === 3) {
+        // Convert to YYYY-MM-DD format for Date constructor
+        activityDate = new Date(`${parts[2]}-${parts[1]}-${parts[0]}`);
+      }
     }
     
-    // Skip if no date available
-    if (!dateStr) return;
+    // Skip if no valid date
+    if (!activityDate) return;
     
-    // Initialize entry if needed
-    if (!dateMap.has(dateStr)) {
-      dateMap.set(dateStr, { critical: 0, high: 0, medium: 0, low: 0 });
-    }
-    
-    // Get severity from risk score
-    const entry = dateMap.get(dateStr)!;
-    const riskScore = activity.riskScore || 0;
-    
-    if (riskScore >= RISK_THRESHOLDS.CRITICAL) {
-      entry.critical++;
-    } else if (riskScore >= RISK_THRESHOLDS.HIGH && riskScore < RISK_THRESHOLDS.CRITICAL) {
-      entry.high++;
-    } else if (riskScore >= RISK_THRESHOLDS.MEDIUM && riskScore < RISK_THRESHOLDS.HIGH) {
-      entry.medium++;
-    } else {
-      entry.low++;
-    }
+    // Check if activity date is within range
+    dates.forEach(({ dateStr, dateObj }) => {
+      if (
+        activityDate!.getDate() === dateObj.getDate() &&
+        activityDate!.getMonth() === dateObj.getMonth() &&
+        activityDate!.getFullYear() === dateObj.getFullYear()
+      ) {
+        // Get entry for this date
+        const entry = dateMap.get(dateStr)!;
+        const riskScore = activity.riskScore || 0;
+        
+        // Update counts based on risk score
+        if (riskScore >= RISK_THRESHOLDS.CRITICAL) {
+          entry.critical++;
+        } else if (riskScore >= RISK_THRESHOLDS.HIGH) {
+          entry.high++;
+        } else if (riskScore >= RISK_THRESHOLDS.MEDIUM) {
+          entry.medium++;
+        } else {
+          entry.low++;
+        }
+      }
+    });
   });
   
   // Convert to array and sort by date
@@ -1831,11 +1971,19 @@ function calculateSeverityTrend(activities: UserActivity[]) {
   return result.sort((a, b) => {
     // Try to compare dates
     try {
-      const dateA = new Date(a.date);
-      const dateB = new Date(b.date);
-      return dateA.getTime() - dateB.getTime();
+      const datePartsA = a.date.split(' ')[0].split('/');
+      const datePartsB = b.date.split(' ')[0].split('/');
+      
+      // Compare months first
+      const monthA = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"].indexOf(a.date.split(' ')[1]);
+      const monthB = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"].indexOf(b.date.split(' ')[1]);
+      
+      if (monthA !== monthB) return monthA - monthB;
+      
+      // Then compare days
+      return parseInt(datePartsA[0]) - parseInt(datePartsB[0]);
     } catch (e) {
-      // Fallback to string comparison if date parsing fails
+      // Fallback to string comparison
       return a.date.localeCompare(b.date);
     }
   });
