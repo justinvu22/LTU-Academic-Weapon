@@ -7,6 +7,7 @@ import {
 import { Box, Paper, Typography, List, ListItem, ListItemText, Divider, ListItemIcon } from '@mui/material';
 import { UserActivity } from '../types/activity';
 import { policyIcons } from '../constants/policyIcons';
+import { severityFromRisk } from '../utils/severity';
 
 interface ActivityChartsProps {
   activities: UserActivity[];
@@ -16,28 +17,20 @@ interface ActivityChartsProps {
  * Component to display overview charts for user activities
  */
 export const ActivityCharts: React.FC<ActivityChartsProps> = ({ activities }) => {
-  // Calculate risk score distribution
-  const riskScoreDistribution = {
-    low: activities.filter(a => a.riskScore < 40).length,
-    medium: activities.filter(a => a.riskScore >= 40 && a.riskScore < 70).length,
-    high: activities.filter(a => a.riskScore >= 70 && a.riskScore < 90).length,
-    critical: activities.filter(a => a.riskScore >= 90).length,
-  };
-
   // Calculate integration breakdown
   const integrations = activities.reduce((acc: Record<string, number>, activity) => {
-    const integration = activity.integration;
+    const integration = activity.integration || 'unknown';
     acc[integration] = (acc[integration] || 0) + 1;
     return acc;
   }, {});
 
-  // Prepare data for charts
-  const riskScoreData = [
-    { name: 'Low Risk', value: riskScoreDistribution.low, color: '#4caf50' },
-    { name: 'Medium Risk', value: riskScoreDistribution.medium, color: '#2196f3' },
-    { name: 'High Risk', value: riskScoreDistribution.high, color: '#ff9800' },
-    { name: 'Critical Risk', value: riskScoreDistribution.critical, color: '#f44336' },
-  ];
+  // // Prepare data for charts
+  // const riskScoreData = [
+  //   { name: 'Low Risk', value: riskScoreDistribution.low, color: '#4caf50' },
+  //   { name: 'Medium Risk', value: riskScoreDistribution.medium, color: '#2196f3' },
+  //   { name: 'High Risk', value: riskScoreDistribution.high, color: '#ff9800' },
+  //   { name: 'Critical Risk', value: riskScoreDistribution.critical, color: '#f44336' },
+  // ];
 
   const integrationData = Object.entries(integrations).map(([name, value], index) => ({
     name,
@@ -50,7 +43,7 @@ export const ActivityCharts: React.FC<ActivityChartsProps> = ({ activities }) =>
   activities.forEach(activity => {
     if (activity.policiesBreached) {
       Object.keys(activity.policiesBreached).forEach(category => {
-        const breaches = activity.policiesBreached[category];
+        const breaches = activity.policiesBreached?.[category];
         if (Array.isArray(breaches)) {
           breaches.forEach(breach => {
             breachCategories[breach] = (breachCategories[breach] || 0) + 1;
@@ -76,12 +69,7 @@ export const ActivityCharts: React.FC<ActivityChartsProps> = ({ activities }) =>
   
   // Calculate "fixed vulnerabilities" - show as count by date
   const fixedVulnerabilities = calculateFixedVulnerabilities(activities);
-  
-  // Calculate average time to fix/resolve issues - by category
-  const timeToFix = calculateTimeToFix(activities);
-  
-  // Calculate users needing attention (high risk activities)
-  const usersNeedingAttention = calculateUsersNeedingAttention(activities);
+
 
   return (
     <Box sx={{ mt: 2 }}>
@@ -177,64 +165,6 @@ export const ActivityCharts: React.FC<ActivityChartsProps> = ({ activities }) =>
           </ResponsiveContainer>
         </Paper>
 
-        {/* TARGETS NEEDING ATTENTION */}
-        <Paper elevation={3} sx={{ p: 3 }}>
-          <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
-            <Typography variant="h6">USERS NEEDING ATTENTION</Typography>
-          </Box>
-          {usersNeedingAttention.length > 0 ? (
-            <List>
-              {usersNeedingAttention.map((user, index) => (
-                <React.Fragment key={index}>
-                  <ListItem>
-                    <ListItemText 
-                      primary={user.username} 
-                      secondary={`${user.highRisk} high risk activities`} 
-                    />
-                    <Box sx={{ display: 'flex', gap: 1 }}>
-                      <Box sx={{ 
-                        bgcolor: '#eee', 
-                        px: 1, 
-                        borderRadius: 1, 
-                        display: 'flex', 
-                        alignItems: 'center',
-                        color: user.criticalCount > 0 ? '#f44336' : '#9e9e9e'
-                      }}>
-                        C: {user.criticalCount}
-                      </Box>
-                      <Box sx={{ 
-                        bgcolor: '#eee', 
-                        px: 1, 
-                        borderRadius: 1, 
-                        display: 'flex', 
-                        alignItems: 'center',
-                        color: user.highCount > 0 ? '#ff9800' : '#9e9e9e'
-                      }}>
-                        H: {user.highCount}
-                      </Box>
-                      <Box sx={{ 
-                        bgcolor: '#eee', 
-                        px: 1, 
-                        borderRadius: 1, 
-                        display: 'flex', 
-                        alignItems: 'center',
-                        color: user.mediumCount > 0 ? '#2196f3' : '#9e9e9e'
-                      }}>
-                        M: {user.mediumCount}
-                      </Box>
-                    </Box>
-                  </ListItem>
-                  {index < usersNeedingAttention.length - 1 && <Divider />}
-                </React.Fragment>
-              ))}
-            </List>
-          ) : (
-            <Typography variant="body1" align="center" sx={{ p: 5 }}>
-              No users have high risk activities
-            </Typography>
-          )}
-        </Paper>
-
         {/* TOP 5 VULNERABILITIES */}
         <Paper elevation={3} sx={{ p: 3 }}>
           <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
@@ -321,7 +251,7 @@ function calculateActivityOverTime(activities: UserActivity[], days: number) {
         activityDate!.getFullYear() === d.dateObj.getFullYear()
       ) {
         timeData[i].count++;
-        timeData[i].risk += activity.riskScore;
+        timeData[i].risk += activity.riskScore ?? 0;
       }
     });
   });
@@ -337,16 +267,47 @@ function calculateActivityOverTime(activities: UserActivity[], days: number) {
 }
 
 /**
- * Calculate severity trend over time
+ * Calculate severity trend over time with adaptive time range
  */
 function calculateSeverityTrend(activities: UserActivity[]) {
-  // Get dates for the last 7 days
-  const today = new Date();
+  // Get actual date range from the data
+  const activityDates = activities
+    .filter(a => a.timestamp || a.date)
+    .map(a => {
+      if (a.timestamp) return new Date(a.timestamp);
+      if (a.date) {
+        const parts = a.date.split('/');
+        if (parts.length === 3) return new Date(`${parts[2]}-${parts[1]}-${parts[0]}`);
+      }
+      return null;
+    })
+    .filter((d): d is Date => d !== null && !isNaN(d.getTime()))
+    .sort((a, b) => a.getTime() - b.getTime());
+
+  if (activityDates.length === 0) {
+    return [];
+  }
+
+  // Use actual data range instead of fixed 7-day window
+  const earliestDate = activityDates[0];
+  const latestDate = activityDates[activityDates.length - 1];
+  
+  // Calculate the span of the data
+  const dataSpanDays = Math.ceil((latestDate.getTime() - earliestDate.getTime()) / (1000 * 60 * 60 * 24)) + 1;
+  
+  // Use reasonable range: minimum 7 days, maximum 30 days, or actual data span
+  const effectiveDays = Math.min(Math.max(dataSpanDays, 7), 30);
+  
+  // Create date range based on actual data
+  const endDate = latestDate;
+  const startDate = new Date(endDate);
+  startDate.setDate(endDate.getDate() - (effectiveDays - 1));
+
   const dates: { date: string, dateObj: Date }[] = [];
   
-  for (let i = 6; i >= 0; i--) {
-    const date = new Date();
-    date.setDate(today.getDate() - i);
+  for (let i = 0; i < effectiveDays; i++) {
+    const date = new Date(startDate);
+    date.setDate(startDate.getDate() + i);
     dates.push({ 
       date: date.toLocaleDateString('en-GB', { day: '2-digit', month: 'short' }), 
       dateObj: date 
@@ -378,29 +339,35 @@ function calculateSeverityTrend(activities: UserActivity[]) {
       }
     }
     
-    // Skip if we couldn't parse the date
-    if (!activityDate) return;
+    if (!activityDate || isNaN(activityDate.getTime())) return;
     
-    // Check if activity date is within the last 7 days and categorize by severity
-    dates.forEach((d, i) => {
-      if (
-        activityDate!.getDate() === d.dateObj.getDate() &&
-        activityDate!.getMonth() === d.dateObj.getMonth() &&
-        activityDate!.getFullYear() === d.dateObj.getFullYear()
-      ) {
-        const riskScore = activity.riskScore;
-        
-        if (riskScore >= 90) {
-          severityData[i].critical++;
-        } else if (riskScore >= 70) {
-          severityData[i].high++;
-        } else if (riskScore >= 40) {
-          severityData[i].medium++;
-        } else {
-          severityData[i].low++;
+    // Only include activities within our calculated range
+    if (activityDate >= startDate && activityDate <= endDate) {
+      // Map activity date to one of the date buckets
+      dates.forEach((d, i) => {
+        if (
+          activityDate!.getDate() === d.dateObj.getDate() &&
+          activityDate!.getMonth() === d.dateObj.getMonth() &&
+          activityDate!.getFullYear() === d.dateObj.getFullYear()
+        ) {
+          const severity = severityFromRisk(activity.riskScore ?? 0);
+
+          switch (severity) {
+            case 'critical':
+              severityData[i].critical++;
+              break;
+            case 'high':
+              severityData[i].high++;
+              break;
+            case 'medium':
+              severityData[i].medium++;
+              break;
+            default:
+              severityData[i].low++;
+          }
         }
-      }
-    });
+      });
+    }
   });
   
   return severityData;
@@ -420,7 +387,7 @@ function calculateFixedVulnerabilities(activities: UserActivity[]) {
           breachCounts[category] = 0;
         }
         
-        const breaches = activity.policiesBreached[category];
+        const breaches = activity.policiesBreached?.[category];
         if (Array.isArray(breaches)) {
           breachCounts[category] += breaches.length;
         } else if (breaches) {
@@ -435,77 +402,4 @@ function calculateFixedVulnerabilities(activities: UserActivity[]) {
     .map(([category, count]) => ({ category, count }))
     .sort((a, b) => b.count - a.count)
     .slice(0, 5); // Top 5 categories
-}
-
-/**
- * Calculate time to fix by category (just a dummy calculation for demo)
- */
-function calculateTimeToFix(activities: UserActivity[]) {
-  // In a real application, this would calculate actual resolution times
-  // For demo, we'll just use the risk score as a proxy for "time to fix"
-  const categories = ['dataLeakage', 'pii', 'phi', 'pci', 'financial', 'sensitive'];
-  
-  const result = categories.map(category => {
-    let totalScore = 0;
-    let count = 0;
-    
-    activities.forEach(activity => {
-      if (activity.policiesBreached && activity.policiesBreached[category]) {
-        count++;
-        totalScore += activity.riskScore;
-      }
-    });
-    
-    return {
-      category,
-      avgTime: count > 0 ? Math.round(totalScore / count) : 0
-    };
-  });
-  
-  return result.filter(item => item.avgTime > 0);
-}
-
-/**
- * Calculate users needing attention based on high risk activities
- */
-function calculateUsersNeedingAttention(activities: UserActivity[]) {
-  const userMap = new Map();
-  
-  activities.forEach(activity => {
-    const username = activity.username || activity.userId || 'Unknown User';
-    
-    if (!userMap.has(username)) {
-      userMap.set(username, {
-        username,
-        highRisk: 0,
-        criticalCount: 0,
-        highCount: 0,
-        mediumCount: 0,
-        lowCount: 0
-      });
-    }
-    
-    const user = userMap.get(username);
-    const riskScore = activity.riskScore;
-    
-    if (riskScore >= 70) {
-      user.highRisk++;
-    }
-    
-    if (riskScore >= 90) {
-      user.criticalCount++;
-    } else if (riskScore >= 70) {
-      user.highCount++;
-    } else if (riskScore >= 40) {
-      user.mediumCount++;
-    } else {
-      user.lowCount++;
-    }
-  });
-  
-  // Get users with high risk activities, sorted by count
-  return Array.from(userMap.values())
-    .filter(user => user.highRisk > 0)
-    .sort((a, b) => b.highRisk - a.highRisk)
-    .slice(0, 5); // Top 5 users
 } 

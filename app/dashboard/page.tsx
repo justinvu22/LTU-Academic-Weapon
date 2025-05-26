@@ -1,28 +1,98 @@
 'use client';
 
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { 
   Box, 
   Tabs, 
   Tab, 
   Typography, 
   Paper, 
-  Container,
   CircularProgress,
   Alert,
   Button
 } from '@mui/material';
 import { 
-  LineChart, Line, BarChart, Bar, PieChart, Pie, Cell, AreaChart, Area, ScatterChart, Scatter,
+  LineChart, Line, Bar, PieChart, Pie, Cell, AreaChart, Area,
   XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, ComposedChart
 } from 'recharts';
-import { UserActivity, MLRecommendation, TimeDistribution } from '@/types';
+import { UserActivity } from '@/types';
 import { generateStatistics, RISK_THRESHOLDS } from '../../utils/dataProcessor';
-import { HeatmapCell } from '../../utils/ml/heatmapAnalysis';
-import { SequencePattern, SequenceStep } from '../../utils/ml/sequencePatterns';
 import { useMLProcessing } from '../../hooks/useMLProcessing';
 import { MdOutlineListAlt, MdOutlineGavel, MdOutlinePersonOff } from 'react-icons/md';
 import { FaSkull } from 'react-icons/fa';
+
+// Import the enhanced ML components
+import { 
+  AnomalyDetectionTimeline, 
+  RiskPatternHeatmap, 
+  SequentialPatternAnalysis, 
+  UserBehaviorClustering 
+} from './ideaforMLdashboard';
+
+// Move constants outside component to prevent recreation on every render
+const COLORS = {
+  risk: {
+    low: '#4caf50',
+    medium: '#2196f3',
+    high: '#ff9800',
+    critical: '#f44336',
+  },
+  status: {
+    underReview: '#2196f3',
+    trusted: '#4caf50',
+    concern: '#ff9800',
+    nonConcern: '#9e9e9e'
+  },
+  time: {
+    morning: '#2196f3',
+    afternoon: '#4caf50',
+    evening: '#ff9800',
+    night: '#9e9e9e'
+  },
+  integration: {
+    email: '#2196f3',
+    cloud: '#673ab7',
+    usb: '#ff5722',
+    application: '#009688'
+  },
+  policy: {}
+};
+
+const POLICY_COLORS: { [key: string]: string } = {
+  'Unusual Activity': '#FF4C4C',
+  'Monitoring': '#FFB84C',
+  'Data Security': '#4CBFFF',
+  'Critical Violations': '#4CFF8B',
+  'Access Violation': '#FF4C8B',
+};
+
+const DISTRIBUTION_TABS = [
+  { label: 'Status', key: 'status' },
+  { label: 'Time', key: 'time' },
+  { label: 'Risk', key: 'risk' },
+  { label: 'Integration', key: 'integration' },
+];
+
+// Types for chart data
+interface ChartDataPoint {
+  date: string;
+  count: number;
+  risk: number;
+}
+
+interface SeverityDataPoint extends ChartDataPoint {
+  critical: number;
+  high: number;
+  medium: number;
+  low: number;
+}
+
+interface DistributionData {
+  name: string;
+  count: number;
+  color: string;
+  category?: string;
+}
 
 /**
  * Tab Panel component for Dashboard tabs
@@ -89,34 +159,10 @@ function formatDateTime(activity: UserActivity): string {
   return '';
 }
 
-// Place this helper above the AdvancedAnalyticsTab function:
-function getHeatmapColor(intensity: number): string {
-  if (intensity === 0) return 'rgba(60,60,80,0.18)';
-  const stops = [
-    { pct: 0.0, color: [36, 99, 235] },   // blue
-    { pct: 0.33, color: [139, 92, 246] }, // purple
-    { pct: 0.66, color: [239, 68, 68] },  // red
-    { pct: 1.0, color: [253, 224, 71] }   // yellow
-  ];
-  let lower = stops[0], upper = stops[stops.length-1];
-  for (let i = 1; i < stops.length; i++) {
-    if (intensity <= stops[i].pct) {
-      lower = stops[i-1];
-      upper = stops[i];
-      break;
-    }
-  }
-  const range = upper.pct - lower.pct;
-  const pct = (intensity - lower.pct) / (range || 1);
-  const color = lower.color.map((c, i) => Math.round(c + (upper.color[i] - c) * pct));
-  return `rgba(${color[0]},${color[1]},${color[2]},${0.85 - 0.3 * (1-intensity)})`;
-}
-
 // Move AdvancedAnalyticsTab to top-level (outside DashboardPage):
 function AdvancedAnalyticsTab({ activities }: { activities: UserActivity[] }) {
   const [isMounted, setIsMounted] = useState(false);
   const [hasClientLoaded, setHasClientLoaded] = useState(false);
-  const [hoveredCell, setHoveredCell] = useState<{integration: string, hour: number} | null>(null);
   
   // Only run ML on client side after mount and only if we have enough data
   const shouldProcessML = isMounted && activities.length >= 10;
@@ -155,35 +201,36 @@ function AdvancedAnalyticsTab({ activities }: { activities: UserActivity[] }) {
     heatmapData?.length > 0;
   
   // Color constants for visuals
-  const COLORS = ['#0088FE', '#00C49F', '#FFBB28', '#FF8042', '#8884d8'];
-  const RISK_COLORS = {
-    low: '#00C49F',
-    medium: '#FFBB28',
-    high: '#FF8042', 
-    critical: '#FF0000',
-    normal: '#0088FE',
-    anomaly: '#FF0000'
-  };
+  // const RISK_COLORS = {
+  //   low: '#00C49F',
+  //   medium: '#FFBB28',
+  //   high: '#FF8042', 
+  //   critical: '#FF0000',
+  //   normal: '#0088FE',
+  //   anomaly: '#FF0000'
+  // };
   
-  // Custom label renderer for pie charts
-  const renderCustomizedLabel = (props: any) => {
-    const { cx, cy, midAngle, innerRadius, outerRadius, percent, name } = props;
-    const radius = innerRadius + (outerRadius - innerRadius) * 0.5;
-    const x = cx + radius * Math.cos(-midAngle * Math.PI / 180);
-    const y = cy + radius * Math.sin(-midAngle * Math.PI / 180);
-    
-    return (
-      <text 
-        x={x} 
-        y={y} 
-        fill="white" 
-        textAnchor={x > cx ? 'start' : 'end'} 
-        dominantBaseline="central"
-      >
-        {`${name}: ${(percent * 100).toFixed(0)}%`}
-      </text>
-    );
-  };
+  // Custom label renderer for pie charts - can be used with PieChart component's label prop
+  // Example usage: <PieChart><Pie label={renderCustomizedLabel} ... /></PieChart>
+  // This renders percentage labels inside pie chart segments
+  // const renderCustomizedLabel = (props: any) => {
+  //   const { cx, cy, midAngle, innerRadius, outerRadius, percent, name } = props;
+  //   const radius = innerRadius + (outerRadius - innerRadius) * 0.5;
+  //   const x = cx + radius * Math.cos(-midAngle * Math.PI / 180);
+  //   const y = cy + radius * Math.sin(-midAngle * Math.PI / 180);
+  //   
+  //   return (
+  //     <text 
+  //       x={x} 
+  //       y={y} 
+  //       fill="white" 
+  //       textAnchor={x > cx ? 'start' : 'end'} 
+  //       dominantBaseline="central"
+  //     >
+  //       {`${name}: ${(percent * 100).toFixed(0)}%`}
+  //     </text>
+  //   );
+  // };
   
   // Server-side or initial render placeholder
   if (!hasClientLoaded) {
@@ -258,196 +305,32 @@ function AdvancedAnalyticsTab({ activities }: { activities: UserActivity[] }) {
         <div className="w-1 h-6 rounded bg-[#6E5FFE] mr-3"></div>
         <h2 className="font-['Inter'] text-[1.5rem] font-extrabold tracking-wider text-[#A084E8] uppercase" style={{ letterSpacing: '0.04em', textShadow: '0 1px 8px #6E5FFE22' }}>Advanced ML Analytics</h2>
       </div>
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+      
+      {/* Enhanced ML Analytics Components */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 mb-8">
         {/* Anomaly Detection Timeline */}
-        <div className="bg-[#1f1f2e] border border-[#2d2e44] rounded-[16px] shadow-lg p-8 flex flex-col w-full h-full" style={{ minHeight: 340, minWidth: 0 }}>
-          <div className="flex items-center mb-2">
-            <div className="w-1 h-6 rounded bg-[#6E5FFE] mr-3"></div>
-            <h3 className="font-['Inter'] text-lg font-semibold tracking-wider text-[#A084E8] uppercase">Anomaly Detection Timeline</h3>
-          </div>
-          <span className="text-sm text-gray-400 mb-2">ML-detected anomalies in user activity over time</span>
-          <div className="flex-1 flex items-center justify-center w-full">
-            <ResponsiveContainer width="100%" height={220}>
-              {!isEmpty(anomalyTimelineData) ? (
-                <LineChart 
-                  data={anomalyTimelineData}
-                  margin={{ top: 5, right: 30, left: 20, bottom: 5 }}
-                >
-                  <CartesianGrid strokeDasharray="3 3" stroke="#232346" />
-                  <XAxis dataKey="date" tick={{ fill: '#bdbdfc', fontFamily: 'Inter', fontSize: 13 }} axisLine={false} tickLine={false} />
-                  <YAxis yAxisId="left" tick={{ fill: '#bdbdfc', fontFamily: 'Inter', fontSize: 13 }} axisLine={false} tickLine={false} />
-                  <YAxis yAxisId="right" orientation="right" tick={{ fill: '#bdbdfc', fontFamily: 'Inter', fontSize: 13 }} axisLine={false} tickLine={false} />
-                  <Tooltip contentStyle={{ background: 'rgba(30, 32, 48, 0.85)', border: 'none', borderRadius: 16, boxShadow: '0 4px 24px #8B5CF655', color: '#fff', fontFamily: 'Inter', backdropFilter: 'blur(8px)' }} labelStyle={{ color: '#A084E8', fontWeight: 700, fontFamily: 'Inter', fontSize: 15 }} itemStyle={{ fontFamily: 'Inter', fontWeight: 600, fontSize: 14 }} cursor={{ stroke: '#8B5CF6', strokeWidth: 2, opacity: 0.15 }} />
-                  <Legend iconType="circle" wrapperStyle={{ paddingTop: 16, fontFamily: 'Inter', fontWeight: 700, fontSize: 15, color: '#bdbdfc' }} />
-                  <Line yAxisId="left" type="monotone" dataKey="activities" stroke={RISK_COLORS.normal} name="Activities" strokeWidth={2} />
-                  <Line yAxisId="right" type="monotone" dataKey="anomalyScore" stroke={RISK_COLORS.high} strokeDasharray="5 5" name="Anomaly Score" />
-                  <Line yAxisId="left" type="monotone" dataKey="anomalies" stroke={RISK_COLORS.anomaly} strokeWidth={0} name="Detected Anomalies" dot={{ r: 6, fill: RISK_COLORS.anomaly }} />
-                </LineChart>
-              ) : (
-                <div className="flex flex-col items-center justify-center h-[220px]">
-                  <span className="text-gray-400">No anomaly data available</span>
-                </div>
-              )}
-            </ResponsiveContainer>
-          </div>
-        </div>
+        <AnomalyDetectionTimeline 
+          activities={activities}
+          anomalyResults={new Map()}
+          recommendations={[]}
+        />
+        
         {/* Risk Pattern Heatmap */}
-        <div className="bg-[#1f1f2e] border border-[#2d2e44] rounded-[16px] shadow-lg p-8 flex flex-col w-full h-full" style={{ minHeight: 340, minWidth: 0 }}>
-          <div className="flex items-center mb-2">
-            <div className="w-1 h-6 rounded bg-[#6E5FFE] mr-3"></div>
-            <h3 className="font-['Inter'] text-lg font-semibold tracking-wider text-[#A084E8] uppercase">Risk Pattern Heatmap</h3>
-          </div>
-          <span className="text-sm text-gray-400 mb-2">ML-identified risk hotspots by time and integration</span>
-          <div className="flex-1 flex flex-col justify-between w-full" style={{ height: 220, position: 'relative' }}>
-            {['email', 'cloud', 'usb', 'application', 'file', 'other'].map((integration) => {
-              const rowCells = heatmapData.filter(cell => cell.integration === integration);
-              return (
-                <div key={integration} className="flex items-center h-[16.66%] w-full relative group">
-                  <span className="w-20 text-right pr-2 text-xs text-gray-300 capitalize truncate font-semibold" style={{ fontFamily: 'Inter', letterSpacing: '0.04em' }}>{integration}</span>
-                  <div className="flex flex-row flex-grow h-full gap-[2px]">
-                    {rowCells.map((cell) => (
-                      <div
-                        key={`${cell.integration}-${cell.hour}`}
-                        className="relative cursor-pointer transition-all duration-200"
-                        style={{
-                          width: `calc((100% - 23px) / 24)`,
-                          height: '100%',
-                          background: getHeatmapColor(cell.intensity),
-                          borderRadius: 6,
-                          boxShadow: cell.intensity > 0 ? '0 2px 8px 0 #6E5FFE22' : 'none',
-                          border: cell.intensity > 0 ? '1.5px solid #fff3' : '1.5px solid #23243a',
-                          transition: 'background 0.3s, box-shadow 0.3s',
-                        }}
-                        onMouseEnter={() => setHoveredCell({integration, hour: cell.hour})}
-                        onMouseLeave={() => setHoveredCell(null)}
-                      >
-                        {hoveredCell && hoveredCell.integration === integration && hoveredCell.hour === cell.hour && (
-                          <div className="absolute z-30 left-1/2 -translate-x-1/2 -top-8 bg-[#23243a] text-white text-xs px-3 py-2 rounded-lg shadow-lg border border-[#A084E8] font-semibold whitespace-nowrap pointer-events-none" style={{ fontFamily: 'Inter', letterSpacing: '0.02em' }}>
-                            <span className="block text-[#A084E8] font-bold mb-1">{integration} @ {cell.hour}:00</span>
-                            <span>Risk Score: <span className="font-bold text-yellow-300">{cell.score.toFixed(0)}</span></span>
-                          </div>
-                        )}
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              );
-            })}
-            {/* Hour labels */}
-            <div className="absolute left-20 bottom-0 flex flex-row w-[calc(100%-5rem)] justify-between pr-2">
-              {[0, 6, 12, 18, 23].map(hour => (
-                <span key={hour} className="text-xs text-gray-400 font-semibold" style={{ fontFamily: 'Inter', letterSpacing: '0.02em' }}>{hour}:00</span>
-              ))}
-            </div>
-          </div>
-          {/* Color Legend */}
-          <div className="flex flex-row items-center gap-2 mt-4 ml-20">
-            <span className="text-xs text-gray-400 font-semibold mr-2" style={{ fontFamily: 'Inter' }}>Low</span>
-            <div className="flex flex-row gap-0.5">
-              {[0, 0.25, 0.5, 0.75, 1].map((v, i) => (
-                <div key={i} style={{ width: 32, height: 12, borderRadius: 4, background: (() => {
-                  const stops = [
-                    { pct: 0.0, color: [36, 99, 235] },
-                    { pct: 0.33, color: [139, 92, 246] },
-                    { pct: 0.66, color: [239, 68, 68] },
-                    { pct: 1.0, color: [253, 224, 71] }
-                  ];
-                  let lower = stops[0], upper = stops[stops.length-1];
-                  for (let j = 1; j < stops.length; j++) {
-                    if (v <= stops[j].pct) {
-                      lower = stops[j-1];
-                      upper = stops[j];
-                      break;
-                    }
-                  }
-                  const range = upper.pct - lower.pct;
-                  const pct = (v - lower.pct) / (range || 1);
-                  const color = lower.color.map((c, k) => Math.round(c + (upper.color[k] - c) * pct));
-                  return `rgba(${color[0]},${color[1]},${color[2]},0.85)`;
-                })() }}></div>
-              ))}
-            </div>
-            <span className="text-xs text-gray-400 font-semibold ml-2" style={{ fontFamily: 'Inter' }}>High</span>
-          </div>
-        </div>
+        <RiskPatternHeatmap activities={activities} />
+      </div>
+      
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
         {/* Sequential Pattern Analysis */}
-        <div className="bg-[#1f1f2e] border border-[#2d2e44] rounded-[16px] shadow-lg p-8 flex flex-col w-full h-full" style={{ minHeight: 340, minWidth: 0 }}>
-          <div className="flex items-center mb-2">
-            <div className="w-1 h-6 rounded bg-[#6E5FFE] mr-3"></div>
-            <h3 className="font-['Inter'] text-lg font-semibold tracking-wider text-[#A084E8] uppercase">Sequential Pattern Analysis</h3>
-          </div>
-          <span className="text-sm text-gray-400 mb-2">ML-detected activity sequences and risk patterns</span>
-          <div className="flex-1 flex flex-col overflow-y-auto" style={{ height: 220 }}>
-            {!isEmpty(sequentialPatternData) ? (
-              sequentialPatternData.map((pattern: SequencePattern, patternIndex: number) => (
-                <div key={patternIndex} className={`flex items-center mb-2 p-3 rounded-lg border ${pattern.isHighRisk ? 'border-red-500 bg-red-500/10 shadow-lg' : 'border-[#e0e0e0] bg-[#23243a]'} transition-all duration-200 hover:shadow-xl`}>
-                  <div className="flex items-center flex-grow">
-                    {pattern.steps.map((step: SequenceStep, stepIndex: number) => (
-                      <React.Fragment key={stepIndex}>
-                        <div className="flex flex-col items-center">
-                          <div className={`min-w-[120px] p-2 rounded-md border ${step.riskLevel === 'critical' ? 'bg-red-600 text-white' : step.riskLevel === 'high' ? 'bg-orange-400 text-white' : step.riskLevel === 'medium' ? 'bg-yellow-400 text-black' : 'bg-green-400 text-black'} flex flex-col items-center justify-center`}>
-                            <span className="font-semibold">{step.action}</span>
-                            <span className="text-xs opacity-90">({step.integration})</span>
-                          </div>
-                          <span className={`mt-1 text-xs ${step.riskLevel === 'critical' || step.riskLevel === 'high' ? 'text-red-500 font-bold' : 'text-gray-400'}`}>{step.riskLevel} risk</span>
-                        </div>
-                        {stepIndex < pattern.steps.length - 1 && (
-                          <span className="px-2 text-2xl text-[#A084E8]">→</span>
-                        )}
-                      </React.Fragment>
-                    ))}
-                  </div>
-                  <div className="ml-4 min-w-[120px] flex flex-col items-start">
-                    <span className="font-semibold text-white">{pattern.count} occurrences</span>
-                    <span className="text-xs text-[#A084E8]">Risk score: {Math.round(pattern.averageRiskScore)}</span>
-                    {pattern.isHighRisk && (
-                      <span className="flex items-center gap-1 text-xs text-red-500 font-bold mt-1"><span className="inline-block w-2 h-2 rounded-full bg-red-500"></span>ML-Flagged Risk</span>
-                    )}
-                  </div>
-                </div>
-              ))
-            ) : (
-              <div className="flex flex-col items-center justify-center h-full">
-                <span className="text-gray-400">No pattern data available</span>
-              </div>
-            )}
-          </div>
-        </div>
+        <SequentialPatternAnalysis 
+          activities={activities}
+          recommendations={[]}
+        />
+        
         {/* User Behavior Clustering */}
-        <div className="bg-[#1f1f2e] border border-[#2d2e44] rounded-[16px] shadow-lg p-8 flex flex-col w-full h-full" style={{ minHeight: 340, minWidth: 0 }}>
-          <div className="flex items-center mb-2">
-            <div className="w-1 h-6 rounded bg-[#6E5FFE] mr-3"></div>
-            <h3 className="font-['Inter'] text-lg font-semibold tracking-wider text-[#A084E8] uppercase">User Behavior Clustering</h3>
-          </div>
-          <span className="text-sm text-gray-400 mb-2">ML-detected user behavior groupings and outliers</span>
-          <div className="flex-1 flex items-center justify-center w-full">
-            <ResponsiveContainer width="100%" height={220}>
-              <ScatterChart margin={{ top: 20, right: 20, bottom: 20, left: 20 }}>
-                <CartesianGrid />
-                <XAxis type="number" dataKey="x" name="Risk Profile" label={{ value: 'Risk Profile', position: 'bottom', offset: 0 }} />
-                <YAxis type="number" dataKey="y" name="Behavior Diversity" label={{ value: 'Behavior Diversity', angle: -90, position: 'left' }} />
-                <Tooltip cursor={{ strokeDasharray: '3 3' }} content={({ active, payload }) => {
-                  if (active && payload && payload.length) {
-                    const data = payload[0].payload;
-                    return (
-                      <div className="bg-[#23243a] p-2 rounded-lg border border-[#A084E8] shadow-lg">
-                        <span className="font-semibold text-white">{data.name}</span>
-                        <span className="block text-xs text-[#A084E8]">Cluster: {data.cluster}</span>
-                        <span className={`block text-xs ${data.isOutlier ? 'text-red-500 font-bold' : 'text-gray-400'}`}>{data.isOutlier ? 'ML-Flagged Outlier' : 'Normal Behavior Pattern'}</span>
-                      </div>
-                    );
-                  }
-                  return null;
-                }} />
-                <Scatter name="Users" data={userClusteringData} fill={RISK_COLORS.normal}>
-                  {userClusteringData.map((entry: any, index: number) => (
-                    <Cell key={index} fill={entry.isOutlier ? RISK_COLORS.critical : RISK_COLORS.normal} />
-                  ))}
-                </Scatter>
-              </ScatterChart>
-            </ResponsiveContainer>
-          </div>
-        </div>
+        <UserBehaviorClustering 
+          activities={activities}
+          recommendations={[]}
+        />
       </div>
     </div>
   );
@@ -467,66 +350,18 @@ export default function DashboardPage() {
   const [highRiskActivities, setHighRiskActivities] = useState(0);
   const [policyBreaches, setPolicyBreaches] = useState(0);
   const [usersAtRisk, setUsersAtRisk] = useState(0);
-  const [averageRiskScore, setAverageRiskScore] = useState(0);
   
   // Distribution data
-  const [riskDistribution, setRiskDistribution] = useState<{name: string, count: number, color: string}[]>([]);
-  const [integrationDistribution, setIntegrationDistribution] = useState<{name: string, count: number, color: string}[]>([]);
-  const [statusDistribution, setStatusDistribution] = useState<{name: string, count: number, color: string}[]>([]);
-  const [timeDistribution, setTimeDistribution] = useState<{name: string, count: number, color: string}[]>([]);
+  const [riskDistribution, setRiskDistribution] = useState<DistributionData[]>([]);
+  const [integrationDistribution, setIntegrationDistribution] = useState<DistributionData[]>([]);
+  const [statusDistribution, setStatusDistribution] = useState<DistributionData[]>([]);
+  const [timeDistribution, setTimeDistribution] = useState<DistributionData[]>([]);
   
-  // Chart data states (for existing charts)
-  const [riskTrendData, setRiskTrendData] = useState<any[]>([]);
-  const [severityTrendData, setSeverityTrendData] = useState<any[]>([]);
-  const [policyBreachData, setPolicyBreachData] = useState<any[]>([]);
-  const [integrationData, setIntegrationData] = useState<any[]>([]);
-  const [usersNeedingAttention, setUsersNeedingAttention] = useState<any[]>([]);
+  // Chart data states
+  const [riskTrendData, setRiskTrendData] = useState<ChartDataPoint[]>([]);
+  const [severityTrendData, setSeverityTrendData] = useState<SeverityDataPoint[]>([]);
+  const [policyBreachData, setPolicyBreachData] = useState<DistributionData[]>([]);
   
-  // Colors for risk levels, status, etc.
-  const COLORS = {
-    risk: {
-      low: '#4caf50',
-      medium: '#2196f3',
-      high: '#ff9800',
-      critical: '#f44336',
-    },
-    status: {
-      underReview: '#2196f3',
-      trusted: '#4caf50',
-      concern: '#ff9800',
-      nonConcern: '#9e9e9e'
-    },
-    time: {
-      morning: '#2196f3',
-      afternoon: '#4caf50',
-      evening: '#ff9800'
-    },
-    integration: {
-      email: '#2196f3',
-      cloud: '#673ab7',
-      usb: '#ff5722',
-      application: '#009688'
-    },
-    policy: {
-      // This is a placeholder for the new policy color logic
-    }
-  };
-
-  // Add at the top of the component, after COLORS:
-  const POLICY_COLORS: { [key: string]: string } = {
-    'Unusual Activity': '#FF4C4C',
-    'Monitoring': '#FFB84C',
-    'Data Security': '#4CBFFF',
-    'Critical Violations': '#4CFF8B',
-    'Access Violation': '#FF4C8B',
-  };
-
-  const DISTRIBUTION_TABS = [
-    { label: 'Status', key: 'status', data: statusDistribution },
-    { label: 'Time', key: 'time', data: timeDistribution },
-    { label: 'Risk', key: 'risk', data: riskDistribution },
-    { label: 'Integration', key: 'integration', data: integrationDistribution },
-  ];
   const [selectedDistributionTab, setSelectedDistributionTab] = useState('status');
 
   // Add hoveredBar state for hover animation
@@ -545,85 +380,13 @@ export default function DashboardPage() {
     low: true
   });
 
-  const fetchActivities = async () => {
-    try {
-      console.log('Fetching activities data...');
-      setLoading(true);
-      let foundData = false;
-      
-      // Try IndexedDB first
-      try {
-        const { getActivitiesFromIndexedDB } = await import('../../utils/storage');
-        const indexedDBActivities = await getActivitiesFromIndexedDB();
-        
-        if (indexedDBActivities && indexedDBActivities.length > 0) {
-          console.log(`Successfully loaded ${indexedDBActivities.length} activities from IndexedDB`);
-          
-          // Additional log to debug data format issues
-          const firstFewActivities = indexedDBActivities.slice(0, 3);
-          console.log('Sample activities for debugging:', 
-            firstFewActivities.map(a => ({
-              id: a.id,
-              user: a.user,
-              username: a.username,
-              date: a.date,
-              time: a.time,
-              dateTime: formatDateTime(a),
-              riskScore: a.riskScore,
-              integration: a.integration
-            }))
-          );
-          
-          setActivities(indexedDBActivities);
-          processAllData(indexedDBActivities);
-          foundData = true;
-        } else {
-          console.log('No data found in IndexedDB');
-        }
-      } catch (idbError) {
-        console.error('Error accessing IndexedDB:', idbError);
-        setError('Error accessing data storage. Please try uploading data again.');
-        setLoading(false);
-        return;
-      }
-      
-      // If no data found, show error
-      if (!foundData) {
-        setError('No activity data found. Please upload data from the Upload page first.');
-      }
-    } catch (error) {
-      console.error('Error loading activity data:', error);
-      setError('Failed to load activity data. Please try uploading data from the Upload page.');
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  useEffect(() => {
-    fetchActivities();
-  }, []);
-
-  // Process all data metrics and statistics
-  const processAllData = (activities: UserActivity[]) => {
+  const processAllData = useCallback((activities: UserActivity[]) => {
     if (!activities || activities.length === 0) {
       resetAllData();
       return;
     }
     
     console.log('Processing all data for dashboard with', activities.length, 'activities');
-    
-    // Log a sample of activities for debugging
-    console.log('Sample activities for analysis:', 
-      activities.slice(0, 3).map(a => ({
-        user: a.user,
-        username: a.username,
-        date: a.date,
-        time: a.time,
-        hour: a.hour,
-        integration: a.integration,
-        riskScore: a.riskScore
-      }))
-    );
     
     // Use our data processor to calculate statistics
     const statistics = generateStatistics(activities);
@@ -639,7 +402,6 @@ export default function DashboardPage() {
     setHighRiskActivities(statistics.highRiskActivities);
     setPolicyBreaches(statistics.totalPolicyBreaches);
     setUsersAtRisk(statistics.usersAtRisk);
-    setAverageRiskScore(statistics.averageRiskScore);
     
     // Risk distribution
     const riskCounts = {
@@ -720,26 +482,126 @@ export default function DashboardPage() {
       })
     );
     
-    // Update time distribution from the statistics
+    // Time distribution
     setTimeDistribution([
       { name: 'Morning', count: statistics.timeDistribution.morning, color: COLORS.time.morning },
       { name: 'Afternoon', count: statistics.timeDistribution.afternoon, color: COLORS.time.afternoon },
-      { name: 'Evening', count: statistics.timeDistribution.evening, color: COLORS.time.evening }
-    ]);
-    
-    console.log('Time distribution set:', [
-      { name: 'Morning', count: statistics.timeDistribution.morning },
-      { name: 'Afternoon', count: statistics.timeDistribution.afternoon },
-      { name: 'Evening', count: statistics.timeDistribution.evening }
+      { name: 'Evening', count: statistics.timeDistribution.evening, color: COLORS.time.evening },
+      { name: 'Night', count: statistics.timeDistribution.night, color: COLORS.time.night }
     ]);
     
     // Process data for existing charts
     setRiskTrendData(calculateActivityOverTime(activities));
-    setSeverityTrendData(calculateSeverityTrend(activities, parseInt(severityTimeRange)));
-    setPolicyBreachData(calculatePolicyBreaches(activities));
-    setIntegrationData(calculateIntegrationBreakdown(activities));
-    setUsersNeedingAttention(calculateUsersAtRisk(activities));
-  };
+    
+    // Calculate severity trend data
+    const severityData = activities.reduce((acc, activity) => {
+      const date = activity.date || new Date().toISOString().split('T')[0];
+      if (!acc[date]) {
+        acc[date] = {
+          date,
+          count: 0,
+          risk: 0,
+          critical: 0,
+          high: 0,
+          medium: 0,
+          low: 0
+        };
+      }
+      
+      acc[date].count++;
+      acc[date].risk += activity.riskScore || 0;
+      
+      const score = activity.riskScore || 0;
+      if (score >= RISK_THRESHOLDS.CRITICAL) acc[date].critical++;
+      else if (score >= RISK_THRESHOLDS.HIGH) acc[date].high++;
+      else if (score >= RISK_THRESHOLDS.MEDIUM) acc[date].medium++;
+      else acc[date].low++;
+      
+      return acc;
+    }, {} as Record<string, SeverityDataPoint>);
+    
+    setSeverityTrendData(Object.values(severityData));
+    
+    // Policy breach data
+    setPolicyBreachData(
+      calculatePolicyBreaches(activities).map((entry, idx) => ({
+        name: entry.category, // normalize to 'name'
+        count: entry.count,
+        color: POLICY_COLORS[entry.category] || Object.values(COLORS.risk)[idx % 4] || '#9e9e9e',
+      }))
+    );
+  }, []); // Remove COLORS and POLICY_COLORS from dependencies since they're now constants
+
+  const fetchActivities = useCallback(async () => {
+    try {
+      console.log('Fetching activities data...');
+      setLoading(true);
+      let foundData = false;
+      
+      // Try IndexedDB first
+      try {
+        const { getActivitiesFromIndexedDB } = await import('../../utils/storage');
+        const indexedDBActivities = await getActivitiesFromIndexedDB();
+        
+        if (indexedDBActivities && indexedDBActivities.length > 0) {
+          console.log(`Successfully loaded ${indexedDBActivities.length} activities from IndexedDB`);
+          
+          // Additional log to debug data format issues
+          const firstFewActivities = indexedDBActivities.slice(0, 3);
+          console.log('Sample activities for debugging:', 
+            firstFewActivities.map(a => ({
+              id: a.id,
+              user: a.user,
+              username: a.username,
+              date: a.date,
+              time: a.time,
+              dateTime: formatDateTime(a),
+              riskScore: a.riskScore,
+              integration: a.integration
+            }))
+          );
+          
+          setActivities(indexedDBActivities);
+          processAllData(indexedDBActivities);
+          foundData = true;
+        } else {
+          console.log('No data found in IndexedDB');
+        }
+      } catch (idbError) {
+        console.error('Error accessing IndexedDB:', idbError);
+        setError('Error accessing data storage. Please try uploading data again.');
+        setLoading(false);
+        return;
+      }
+      
+      // If no data found, show error
+      if (!foundData) {
+        setError('No activity data found. Please upload data from the Upload page first.');
+      }
+    } catch (error) {
+      console.error('Error loading activity data:', error);
+      setError('Failed to load activity data. Please try uploading data from the Upload page.');
+    } finally {
+      setLoading(false);
+    }
+  }, [processAllData]);
+
+  useEffect(() => {
+    fetchActivities();
+    
+    // Listen for data upload events
+    const handleDataUpload = (event: CustomEvent) => {
+      console.log('[Dashboard] Detected new data upload, refreshing...', event.detail);
+      fetchActivities();
+    };
+    
+    window.addEventListener('dataUploaded', handleDataUpload as EventListener);
+    
+    // Cleanup event listener
+    return () => {
+      window.removeEventListener('dataUploaded', handleDataUpload as EventListener);
+    };
+  }, [fetchActivities]);
 
   // Reset all data when no activities are available
   const resetAllData = () => {
@@ -747,7 +609,6 @@ export default function DashboardPage() {
     setHighRiskActivities(0);
     setPolicyBreaches(0);
     setUsersAtRisk(0);
-    setAverageRiskScore(0);
     setRiskDistribution([]);
     setIntegrationDistribution([]);
     setStatusDistribution([]);
@@ -755,11 +616,9 @@ export default function DashboardPage() {
     setRiskTrendData([]);
     setSeverityTrendData([]);
     setPolicyBreachData([]);
-    setIntegrationData([]);
-    setUsersNeedingAttention([]);
   };
 
-  const handleTabChange = (event: React.SyntheticEvent, newValue: number) => {
+  const handleTabChange = (_: React.SyntheticEvent, newValue: number) => {
     setActiveTab(newValue);
   };
 
@@ -844,143 +703,159 @@ export default function DashboardPage() {
       );
     }
 
-    return (
-      <div className="space-y-4">
-        {data.map((item, index) => {
-          const { Ripple, triggerRipple } = useRipple();
-          const isHovered = hovered === index;
-          return (
-            <div key={index} className="space-y-2">
-              <div className="flex justify-between items-center">
+    // Child component for each bar
+    const DistributionBar = ({
+      item,
+      index,
+      isHovered,
+      animatedWidth,
+      onHover,
+      onLeave,
+      onClick
+    }: {
+      item: { name: string; count: number; color: string };
+      index: number;
+      isHovered: boolean;
+      animatedWidth: number;
+      onHover: () => void;
+      onLeave: () => void;
+      onClick: (e: React.MouseEvent<HTMLDivElement, MouseEvent>) => void;
+    }) => {
+      const { Ripple, triggerRipple } = useRipple();
+      return (
+        <div className="space-y-2">
+          <div className="flex justify-between items-center">
+            <span
+              className="font-medium"
+              style={{
+                fontFamily: 'IBM Plex Sans, Inter, sans-serif',
+                fontWeight: 600,
+                fontSize: '1.25rem',
+                color: '#EEE',
+                letterSpacing: '0.02em',
+                textShadow: '0 1px 8px #0008',
+              }}
+              id={`bar-label-${type}-${index}`}
+            >
+              {item.name}
+            </span>
+            <span
+              className="font-extrabold"
+              style={{
+                fontFamily: 'IBM Plex Sans, Inter, sans-serif',
+                fontWeight: 800,
+                fontSize: '1.5rem',
+                color: '#EEE',
+                textShadow: '0 1px 8px #0008',
+                letterSpacing: '0.02em',
+                lineHeight: 1.1,
+                verticalAlign: 'middle',
+              }}
+            >
+              {item.count}
+            </span>
+          </div>
+          <div
+            className="relative w-full cursor-pointer select-none"
+            style={{
+              height: isHovered ? 18 : 16,
+              transition: 'height 120ms cubic-bezier(.4,0,.2,1), transform 120ms cubic-bezier(.4,0,.2,1)',
+              transform: isHovered ? 'scale(1.015)' : 'scale(1)',
+              overflow: 'visible',
+            }}
+            onMouseEnter={onHover}
+            onMouseLeave={onLeave}
+            onClick={e => {
+              triggerRipple(e);
+              onClick(e);
+            }}
+            tabIndex={0}
+            role="progressbar"
+            aria-valuenow={item.count}
+            aria-valuemax={data.reduce((sum, d) => sum + d.count, 0)}
+            aria-label={`${item.name} ${type} count`}
+            aria-labelledby={`bar-label-${type}-${index}`}
+          >
+            {/* Track */}
+            <div
+              className="absolute top-0 left-0 w-full h-full rounded-full"
+              style={{
+                background: 'rgba(255,255,255,0.08)',
+                boxShadow: 'inset 0 1px 4px 0 rgba(110,95,254,0.10)',
+                borderRadius: 5,
+              }}
+            />
+            {/* Fill */}
+            <div
+              className="absolute top-0 left-0 h-full rounded-full transition-all duration-200 ease-out overflow-hidden"
+              style={{
+                width: `${animatedWidth}%`,
+                background: `linear-gradient(90deg, ${item.color} 80%, #fff2 100%)`,
+                boxShadow: `0 0 8px 0 ${item.color}55`,
+                borderRadius: 5,
+                zIndex: 2,
+                transition: 'width 200ms cubic-bezier(.4,0,.2,1)',
+                position: 'relative',
+              }}
+            >
+              {/* Shine effect on hover */}
+              {isHovered && (
                 <span
-                  className="font-medium"
+                  className="absolute top-0 left-0 h-full"
                   style={{
-                    fontFamily: 'IBM Plex Sans, Inter, sans-serif',
-                    fontWeight: 600,
-                    fontSize: '1.25rem', // 20px, bigger
-                    color: '#EEE',
-                    letterSpacing: '0.02em',
-                    textShadow: '0 1px 8px #0008',
-                  }}
-                  id={`bar-label-${type}-${index}`}
-                >
-                  {item.name}
-                </span>
-                <span
-                  className="font-extrabold"
-                  style={{
-                    fontFamily: 'IBM Plex Sans, Inter, sans-serif',
-                    fontWeight: 800,
-                    fontSize: '1.5rem', // 24px, bigger
-                    color: '#EEE',
-                    textShadow: '0 1px 8px #0008',
-                    letterSpacing: '0.02em',
-                    lineHeight: 1.1,
-                    verticalAlign: 'middle',
-                  }}
-                >
-                  {item.count}
-                </span>
-              </div>
-              <div
-                className="relative w-full cursor-pointer select-none"
-                style={{
-                  height: isHovered ? 18 : 16, // bigger bar height
-                  transition: 'height 120ms cubic-bezier(.4,0,.2,1), transform 120ms cubic-bezier(.4,0,.2,1)',
-                  transform: isHovered ? 'scale(1.015)' : 'scale(1)',
-                  overflow: 'visible',
-                }}
-                onMouseEnter={() => setHovered(index)}
-                onMouseLeave={() => setHovered(null)}
-                onClick={(e) => {
-                  triggerRipple(e);
-                  handleDistributionBarClick(type, item.name);
-                }}
-                tabIndex={0}
-                role="progressbar"
-                aria-valuenow={item.count}
-                aria-valuemax={data.reduce((sum, d) => sum + d.count, 0)}
-                aria-label={`${item.name} ${type} count`}
-                aria-labelledby={`bar-label-${type}-${index}`}
-              >
-                {/* Track */}
-                <div
-                  className="absolute top-0 left-0 w-full h-full rounded-full"
-                  style={{
-                    background: 'rgba(255,255,255,0.08)',
-                    boxShadow: 'inset 0 1px 4px 0 rgba(110,95,254,0.10)',
-                    borderRadius: 5,
+                    width: '100%',
+                    pointerEvents: 'none',
+                    background: 'linear-gradient(120deg, transparent 60%, rgba(255,255,255,0.25) 80%, transparent 100%)',
+                    animation: 'shine-move 900ms linear',
+                    zIndex: 3,
                   }}
                 />
-                {/* Fill */}
-                <div
-                  className="absolute top-0 left-0 h-full rounded-full transition-all duration-200 ease-out overflow-hidden"
-                  style={{
-                    width: `${animatedWidths[index]}%`,
-                    background: `linear-gradient(90deg, ${item.color} 80%, #fff2 100%)`,
-                    boxShadow: `0 0 8px 0 ${item.color}55`,
-                    borderRadius: 5,
-                    zIndex: 2,
-                    transition: 'width 200ms cubic-bezier(.4,0,.2,1)',
-                    position: 'relative',
-                  }}
-                >
-                  {/* Shine effect on hover */}
-                  {isHovered && (
-                    <span
-                      className="absolute top-0 left-0 h-full"
-                      style={{
-                        width: '100%',
-                        pointerEvents: 'none',
-                        background: 'linear-gradient(120deg, transparent 60%, rgba(255,255,255,0.25) 80%, transparent 100%)',
-                        animation: 'shine-move 900ms linear',
-                        zIndex: 3,
-                      }}
-                    />
-                  )}
-                  {/* Triangle indicator at the end of the bar */}
-                  <svg
-                    width="22"
-                    height="14"
-                    viewBox="0 0 22 14"
-                    style={{
-                      position: 'absolute',
-                      right: -11,
-                      top: '100%',
-                      marginTop: 2,
-                      zIndex: 4,
-                    }}
-                  >
-                    <polygon points="0,0 22,0 11,14" fill={item.color} />
-                  </svg>
-                </div>
-                {/* Ripple */}
-                {Ripple}
-                {/* Tooltip */}
-                {isHovered && <BarTooltip count={item.count} />}
-              </div>
+              )}
+              {/* Triangle indicator at the end of the bar */}
+              <svg
+                width="22"
+                height="14"
+                viewBox="0 0 22 14"
+                style={{
+                  position: 'absolute',
+                  right: -11,
+                  top: '100%',
+                  marginTop: 2,
+                  zIndex: 4,
+                }}
+              >
+                <polygon points="0,0 22,0 11,14" fill={item.color} />
+              </svg>
             </div>
-          );
-        })}
+            {/* Ripple */}
+            {Ripple}
+            {/* Tooltip */}
+            {isHovered && <BarTooltip count={item.count} />}
+          </div>
+        </div>
+      );
+    };
+
+    return (
+      <div className="space-y-4">
+        {data.map((item, index) => (
+          <DistributionBar
+            key={index}
+            item={item}
+            index={index}
+            isHovered={hovered === index}
+            animatedWidth={animatedWidths[index]}
+            onHover={() => setHovered(index)}
+            onLeave={() => setHovered(null)}
+            onClick={() => handleDistributionBarClick(type, item.name)}
+          />
+        ))}
       </div>
     );
   };
 
   const totalStatus = statusDistribution.reduce((a, b) => a + b.count, 0);
   const [drawnPercents, setDrawnPercents] = React.useState([0, 0, 0, 0]);
-  const [hoveredRing, setHoveredRing] = React.useState<number | null>(null);
-  React.useEffect(() => {
-    statusDistribution.forEach((entry, idx) => {
-      const percent = totalStatus > 0 ? Math.round((entry.count / totalStatus) * 100) : 0;
-      setTimeout(() => {
-        setDrawnPercents(prev => {
-          const next = [...prev];
-          next[idx] = percent;
-          return next;
-        });
-      }, 100 + idx * 120);
-    });
-  }, [statusDistribution, totalStatus]);
 
   // Dynamic sizing for multi-ring donut chart
   const ringCount = Math.min(policyBreachData.length, 5);
@@ -1012,22 +887,27 @@ export default function DashboardPage() {
 
   // Get filtered severity trend data
   const getFilteredSeverityTrendData = () => {
-    return severityTrendData.map(item => {
-      const filteredItem: { 
-        date: string;
-        critical?: number;
-        high?: number;
-        medium?: number;
-        low?: number;
-      } = { date: item.date };
-      
-      if (severityFilters.critical) filteredItem.critical = item.critical;
-      if (severityFilters.high) filteredItem.high = item.high;
-      if (severityFilters.medium) filteredItem.medium = item.medium;
-      if (severityFilters.low) filteredItem.low = item.low;
-      return filteredItem;
-    });
+    return severityTrendData.map(item => ({
+      date: item.date,
+      critical: severityFilters.critical ? item.critical : 0,
+      high: severityFilters.high ? item.high : 0,
+      medium: severityFilters.medium ? item.medium : 0,
+      low: severityFilters.low ? item.low : 0,
+    }));
   };
+
+  React.useEffect(() => {
+    statusDistribution.forEach((entry, idx) => {
+      const percent = totalStatus > 0 ? Math.round((entry.count / totalStatus) * 100) : 0;
+      setTimeout(() => {
+        setDrawnPercents(prev => {
+          const next = [...prev];
+          next[idx] = percent;
+          return next;
+        });
+      }, 100 + idx * 120);
+    });
+  }, [statusDistribution, totalStatus]);
 
   return (
     <div className="min-h-screen bg-[#121324] px-6 py-10 font-['IBM_Plex_Sans',Inter,sans-serif] flex flex-col">
@@ -1168,10 +1048,10 @@ export default function DashboardPage() {
                         <div className="relative flex items-center justify-center w-full shadow-[0_4px_32px_#8B5CF622] rounded-full" style={{ width: 300, height: 300, maxWidth: '100%', background: 'rgba(35,35,70,0.10)' }}>
                           <svg width="0" height="0">
                             {policyBreachData.slice(0, ringCount).map((entry, idx) => (
-                              <defs key={entry.category}>
+                              <defs key={entry.name}>
                                 <linearGradient id={`pb-gradient-${idx}`} x1="0" y1="0" x2="1" y2="1">
-                                  <stop offset="0%" stopColor={POLICY_COLORS[entry.category] || Object.values(COLORS.risk)[idx % 4]} stopOpacity="0.95" />
-                                  <stop offset="100%" stopColor={POLICY_COLORS[entry.category] || Object.values(COLORS.risk)[idx % 4]} stopOpacity="0.65" />
+                                  <stop offset="0%" stopColor={POLICY_COLORS[entry.name] || Object.values(COLORS.risk)[idx % 4]} stopOpacity="0.95" />
+                                  <stop offset="100%" stopColor={POLICY_COLORS[entry.name] || Object.values(COLORS.risk)[idx % 4]} stopOpacity="0.65" />
                                 </linearGradient>
                               </defs>
                             ))}
@@ -1180,9 +1060,9 @@ export default function DashboardPage() {
                             <PieChart>
                               {policyBreachData.slice(0, 5).map((entry, idx) => (
                                 <Pie
-                                  key={entry.category}
+                                  key={entry.name}
                                   data={[
-                                    { name: entry.category, value: entry.count },
+                                    { name: entry.name, value: entry.count },
                                     { name: 'remainder', value: Math.max(0, policyBreachData.reduce((sum, e) => sum + e.count, 0) - entry.count) }
                                   ]}
                                   dataKey="value"
@@ -1257,15 +1137,15 @@ export default function DashboardPage() {
                       {policyBreachData.length > 0 ? (
                         <div className="flex flex-col gap-4 w-full items-start justify-center">
                           {policyBreachData.map((entry, idx) => (
-                            <div key={entry.category} className="flex flex-row items-center gap-3">
+                            <div key={entry.name} className="flex flex-row items-center gap-3">
                               <span className="font-extrabold text-white text-lg" style={{ fontFamily: 'Inter', minWidth: 38, textAlign: 'right', letterSpacing: '0.01em' }}>{entry.count}</span>
                               <span
                                 className="px-4 py-1 rounded-full font-semibold text-sm shadow-md transition-transform duration-150 border"
                                 style={{
-                                  background: `${POLICY_COLORS[entry.category] || Object.values(COLORS.risk)[idx % 4]}`,
+                                  background: `${POLICY_COLORS[entry.name] || Object.values(COLORS.risk)[idx % 4]}`,
                                   color: '#fff',
                                   boxShadow: '0 2px 8px rgba(0,0,0,0.10)',
-                                  border: `1.5px solid ${(POLICY_COLORS[entry.category] || Object.values(COLORS.risk)[idx % 4])}`,
+                                  border: `1.5px solid ${(POLICY_COLORS[entry.name] || Object.values(COLORS.risk)[idx % 4])}`,
                                   letterSpacing: '0.04em',
                                   fontFamily: 'Inter',
                                   fontSize: 13,
@@ -1279,7 +1159,7 @@ export default function DashboardPage() {
                                 onMouseOver={e => e.currentTarget.style.transform = 'scale(1.06)'}
                                 onMouseOut={e => e.currentTarget.style.transform = 'scale(1)'}
                               >
-                                {entry.category}
+                                {entry.name}
                               </span>
               </div>
                           ))}
@@ -1647,7 +1527,16 @@ export default function DashboardPage() {
                         ))}
                       </div>
                       {/* Show the selected distribution's bars */}
-                      <DistributionBars data={DISTRIBUTION_TABS.find(tab => tab.key === selectedDistributionTab)?.data || riskDistribution} type={selectedDistributionTab} />
+                      <DistributionBars 
+                        data={
+                          selectedDistributionTab === 'status' ? statusDistribution :
+                          selectedDistributionTab === 'time' ? timeDistribution :
+                          selectedDistributionTab === 'risk' ? riskDistribution :
+                          selectedDistributionTab === 'integration' ? integrationDistribution :
+                          riskDistribution
+                        } 
+                        type={selectedDistributionTab} 
+                      />
                 </div>
                     {/* Activity Status Distribution - Premium Redesign */}
                     <div className="bg-[#1f1f2e] border border-[#2d2e44] rounded-[16px] shadow-lg p-10 flex flex-col w-full h-full" style={{ minWidth: 0, minHeight: 440, boxSizing: 'border-box' }}>
@@ -1716,7 +1605,7 @@ export default function DashboardPage() {
                       <h2 className="font-['Inter'] text-[18px] font-semibold tracking-wider text-[#9c7bed] uppercase">Integration Breakdown</h2>
                     </div>
                     <div className="grid grid-cols-2 gap-6 w-full flex-1 min-h-0">
-                      {integrationDistribution.map((integration, idx) => {
+                      {integrationDistribution.map((integration) => {
                         const total = integrationDistribution.reduce((sum, i) => sum + i.count, 0);
                         const percent = total > 0 ? Math.round((integration.count / total) * 100) : 0;
                         const color = integration.color;
@@ -1836,8 +1725,8 @@ export default function DashboardPage() {
   );
 }
 
-// Calculate activity data over time - simplified version that relies on processed dates
-function calculateActivityOverTime(activities: UserActivity[]) {
+// Calculate activity data over time
+function calculateActivityOverTime(activities: UserActivity[]): ChartDataPoint[] {
   if (!activities || activities.length === 0) {
     return [];
   }
@@ -1891,19 +1780,64 @@ function calculateActivityOverTime(activities: UserActivity[]) {
   });
 }
 
-// Calculate severity trend over time with time range parameter
-function calculateSeverityTrend(activities: UserActivity[], days = 30) {
+// Helper function to get data time range information
+function getDataTimeRange(activities: UserActivity[]): { startDate: Date | null, endDate: Date | null, spanDays: number } {
+  if (!activities || activities.length === 0) {
+    return { startDate: null, endDate: null, spanDays: 0 };
+  }
+
+  const activityDates = activities
+    .map(activity => {
+      if (activity.timestamp) {
+        return new Date(activity.timestamp);
+      } else if (activity.date) {
+        const parts = activity.date.split('/');
+        if (parts.length === 3) {
+          return new Date(`${parts[2]}-${parts[1]}-${parts[0]}`);
+        }
+      }
+      return null;
+    })
+    .filter((date): date is Date => date !== null && !isNaN(date.getTime()))
+    .sort((a, b) => a.getTime() - b.getTime());
+
+  if (activityDates.length === 0) {
+    return { startDate: null, endDate: null, spanDays: 0 };
+  }
+
+  const startDate = activityDates[0];
+  const endDate = activityDates[activityDates.length - 1];
+  const spanDays = Math.ceil((endDate.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24)) + 1;
+
+  return { startDate, endDate, spanDays };
+}
+
+// Calculate severity trend over time with adaptive time range based on actual data
+function calculateSeverityTrend(activities: UserActivity[], days = 30): SeverityDataPoint[] {
   if (!activities || activities.length === 0) {
     return [];
   }
   
-  // Get dates for the specified range
-  const today = new Date();
+  // Get actual date range from the data using helper function
+  const { startDate: earliestDate, endDate: latestDate, spanDays: dataSpanDays } = getDataTimeRange(activities);
+  
+  if (!earliestDate || !latestDate) {
+    return [];
+  }
+
+  // Use the smaller of: requested days, actual data span, or reasonable maximum (90 days)
+  const effectiveDays = Math.min(days, Math.max(dataSpanDays, 7), 90);
+  
+  // Create date range based on actual data, not today
+  const endDate = latestDate;
+  const startDate = new Date(endDate);
+  startDate.setDate(endDate.getDate() - (effectiveDays - 1));
+  
   const dates: { dateStr: string, dateObj: Date }[] = [];
   
-  for (let i = days - 1; i >= 0; i--) {
-    const date = new Date();
-    date.setDate(today.getDate() - i);
+  for (let i = 0; i < effectiveDays; i++) {
+    const date = new Date(startDate);
+    date.setDate(startDate.getDate() + i);
     dates.push({ 
       dateStr: date.toLocaleDateString('en-GB', { day: '2-digit', month: 'short' }), 
       dateObj: date 
@@ -1911,90 +1845,83 @@ function calculateSeverityTrend(activities: UserActivity[], days = 30) {
   }
   
   // Group by date and count severity levels
-  const dateMap = new Map<string, { critical: number, high: number, medium: number, low: number }>();
+  const dateMap = new Map<string, { critical: number; high: number; medium: number; low: number; totalRisk: number; count: number }>();
   
   // Initialize entries for all dates in range
   dates.forEach(({ dateStr }) => {
-    dateMap.set(dateStr, { critical: 0, high: 0, medium: 0, low: 0 });
+    dateMap.set(dateStr, { critical: 0, high: 0, medium: 0, low: 0, totalRisk: 0, count: 0 });
   });
   
   activities.forEach(activity => {
     let activityDate: Date | null = null;
-    
-    // Try to get date from activity
     if (activity.timestamp) {
       activityDate = new Date(activity.timestamp);
     } else if (activity.date) {
-      // Handle dates in format DD/MM/YYYY
       const parts = activity.date.split('/');
       if (parts.length === 3) {
-        // Convert to YYYY-MM-DD format for Date constructor
         activityDate = new Date(`${parts[2]}-${parts[1]}-${parts[0]}`);
       }
     }
+    if (!activityDate || isNaN(activityDate.getTime())) return;
     
-    // Skip if no valid date
-    if (!activityDate) return;
-    
-    // Check if activity date is within range
-    dates.forEach(({ dateStr, dateObj }) => {
-      if (
-        activityDate!.getDate() === dateObj.getDate() &&
-        activityDate!.getMonth() === dateObj.getMonth() &&
-        activityDate!.getFullYear() === dateObj.getFullYear()
-      ) {
-        // Get entry for this date
-        const entry = dateMap.get(dateStr)!;
-        const riskScore = activity.riskScore || 0;
-        
-        // Update counts based on risk score
-        if (riskScore >= RISK_THRESHOLDS.CRITICAL) {
-          entry.critical++;
-        } else if (riskScore >= RISK_THRESHOLDS.HIGH) {
-          entry.high++;
-        } else if (riskScore >= RISK_THRESHOLDS.MEDIUM) {
-          entry.medium++;
-        } else {
-          entry.low++;
+    // Only include activities within our calculated range
+    if (activityDate >= startDate && activityDate <= endDate) {
+      dates.forEach(({ dateStr, dateObj }) => {
+        if (
+          activityDate!.getDate() === dateObj.getDate() &&
+          activityDate!.getMonth() === dateObj.getMonth() &&
+          activityDate!.getFullYear() === dateObj.getFullYear()
+        ) {
+          const entry = dateMap.get(dateStr)!;
+          const riskScore = activity.riskScore || 0;
+          entry.count++;
+          entry.totalRisk += riskScore;
+          if (riskScore >= RISK_THRESHOLDS.CRITICAL) {
+            entry.critical++;
+          } else if (riskScore >= RISK_THRESHOLDS.HIGH) {
+            entry.high++;
+          } else if (riskScore >= RISK_THRESHOLDS.MEDIUM) {
+            entry.medium++;
+          } else {
+            entry.low++;
+          }
         }
-      }
-    });
+      });
+    }
   });
   
   // Convert to array and sort by date
   const result = Array.from(dateMap.entries()).map(([date, data]) => ({
     date,
-    ...data
+    count: data.count,
+    risk: data.count > 0 ? Math.round(data.totalRisk / data.count) : 0,
+    critical: data.critical,
+    high: data.high,
+    medium: data.medium,
+    low: data.low
   }));
   
-  // Sort by date
+  // Sort by date chronologically
   return result.sort((a, b) => {
-    // Try to compare dates
     try {
-      const datePartsA = a.date.split(' ')[0].split('/');
-      const datePartsB = b.date.split(' ')[0].split('/');
+      const datePartsA = a.date.split(' ');
+      const datePartsB = b.date.split(' ');
+      const dayA = parseInt(datePartsA[0]);
+      const dayB = parseInt(datePartsB[0]);
+      const monthIndexA = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"].indexOf(datePartsA[1]);
+      const monthIndexB = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"].indexOf(datePartsB[1]);
       
-      // Compare months first
-      const monthA = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"].indexOf(a.date.split(' ')[1]);
-      const monthB = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"].indexOf(b.date.split(' ')[1]);
-      
-      if (monthA !== monthB) return monthA - monthB;
-      
-      // Then compare days
-      return parseInt(datePartsA[0]) - parseInt(datePartsB[0]);
+      if (monthIndexA !== monthIndexB) return monthIndexA - monthIndexB;
+      return dayA - dayB;
     } catch (e) {
-      // Fallback to string comparison
       return a.date.localeCompare(b.date);
     }
   });
 }
 
 // Calculate policy breach categories
-function calculatePolicyBreaches(activities: UserActivity[]) {
-  console.log('Calculating policy breaches for', activities.length, 'activities');
-  
+function calculatePolicyBreaches(activities: UserActivity[]): { category: string; count: number }[] {
   if (!activities || activities.length === 0) {
-    console.log('No activities provided for policy breach calculation');
     return [];
   }
   
@@ -2002,16 +1929,8 @@ function calculatePolicyBreaches(activities: UserActivity[]) {
   const breachCounts: Record<string, number> = {};
   let totalBreachesFound = 0;
   
-  activities.forEach((activity, index) => {
+  activities.forEach((activity) => {
     if (!activity.policiesBreached) return;
-    
-    // Log first few activities for debugging
-    if (index < 3) {
-      console.log(`Activity ${index} policiesBreached:`, 
-        activity.policiesBreached,
-        'Keys:', Object.keys(activity.policiesBreached).length
-      );
-    }
     
     const policies = activity.policiesBreached;
     
@@ -2038,137 +1957,11 @@ function calculatePolicyBreaches(activities: UserActivity[]) {
     });
   });
   
-  console.log('Total policy breaches found:', totalBreachesFound, 
-    'Categories:', Object.keys(breachCounts).length
-  );
-  
   // Convert to array format for chart
   const result = Object.entries(breachCounts)
     .map(([category, count]) => ({ category, count }))
     .sort((a, b) => b.count - a.count)
-    .slice(0, 5); // Top 5 categories
+    .slice(0, 5);
     
-  console.log('Policy breach data for chart:', result);
-  return result;
-}
-
-// Calculate integration breakdown
-function calculateIntegrationBreakdown(activities: UserActivity[]) {
-  if (!activities || activities.length === 0) {
-    return [];
-  }
-  
-  // Create map of integration types and counts
-  const integrationCounts: Record<string, number> = {};
-  
-  activities.forEach(activity => {
-    if (!activity.integration) return;
-    
-    const integration = activity.integration;
-    if (!integrationCounts[integration]) {
-      integrationCounts[integration] = 0;
-    }
-    integrationCounts[integration]++;
-  });
-  
-  // Colors for different integration types
-  const colors = ['#FF6384', '#36A2EB', '#FFCE56', '#4BC0C0', '#9966FF', '#FF9F40'];
-  
-  // Convert to array format for pie chart
-  return Object.entries(integrationCounts)
-    .map(([name, value], index) => ({ 
-      name, 
-      value,
-      color: colors[index % colors.length]
-    }));
-}
-
-// Calculate users with high risk activities
-function calculateUsersAtRisk(activities: UserActivity[]) {
-  if (!activities || activities.length === 0) {
-    return [];
-  }
-  
-  const userMap = new Map();
-  
-  // Debug log to check the activities
-  console.log('Processing activities for users at risk:', activities.length);
-  
-  // Log a sample of users from the data (first 5 activities)
-  const userSample = activities.slice(0, 5).map(a => ({
-    user: a.user,
-    username: a.username,
-    userId: a.userId
-  }));
-  console.log('User field sample:', userSample);
-  
-  activities.forEach(activity => {
-    // Try to get username from various properties with more flexible handling
-    let username = 'Unknown User';
-    
-    // Check all possible user field variations with fallback chain
-    if (activity.user && typeof activity.user === 'string' && activity.user.trim()) {
-      username = activity.user.trim();
-    } else if (activity.username && typeof activity.username === 'string' && activity.username.trim()) {
-      username = activity.username.trim();
-    } else if (activity.userId && typeof activity.userId === 'string' && activity.userId.trim()) {
-      username = activity.userId.trim();
-    }
-    
-    // Normalize to lowercase for consistency
-    username = String(username).toLowerCase();
-    
-    if (!userMap.has(username)) {
-      userMap.set(username, {
-        username,
-        highRisk: 0,
-        criticalCount: 0,
-        highCount: 0,
-        mediumCount: 0,
-        lowCount: 0
-      });
-    }
-    
-    const user = userMap.get(username);
-    const riskScore = activity.riskScore || 0;
-    
-    // Count high and critical risk activities for sorting
-    if (riskScore >= RISK_THRESHOLDS.HIGH) {
-      user.highRisk++;
-    }
-    
-    // Count activities by severity category - use explicit range checks
-    if (riskScore >= RISK_THRESHOLDS.CRITICAL) {
-      user.criticalCount++;
-      // Log critical activities for debugging
-      console.log(`Critical activity found for ${username}:`, riskScore);
-    } else if (riskScore >= RISK_THRESHOLDS.HIGH && riskScore < RISK_THRESHOLDS.CRITICAL) {
-      user.highCount++;
-    } else if (riskScore >= RISK_THRESHOLDS.MEDIUM && riskScore < RISK_THRESHOLDS.HIGH) {
-      user.mediumCount++;
-    } else {
-      user.lowCount++;
-    }
-  });
-  
-  // Log users found with counts
-  console.log(`Found ${userMap.size} unique users in the data`);
-  
-  // Get users with high risk activities, sorted by critical count first, then high risk count
-  const result = Array.from(userMap.values())
-    .filter(user => user.highRisk > 0 || user.criticalCount > 0) // Include users with any high or critical activities
-    .sort((a, b) => {
-      // Sort by critical count first
-      if (b.criticalCount !== a.criticalCount) {
-        return b.criticalCount - a.criticalCount;
-      }
-      // If critical count is the same, sort by high count
-      return b.highCount - a.highCount;
-    })
-    .slice(0, 5); // Top 5 users
-  
-  // Debug log the result
-  console.log('Users at risk result:', result);
-  
   return result;
 } 
