@@ -1,4 +1,5 @@
 import { UserActivity } from '../types/activity';
+import { AlertsManager } from './alertsManager';
 
 /**
  * Check if code is running in browser
@@ -122,6 +123,18 @@ async function attemptRecoveryStorage(db: IDBDatabase, activities: UserActivity[
     localStorage.setItem('activityCount', activities.length.toString());
     localStorage.setItem('lastStorageTime', Date.now().toString());
     
+    // Store data version timestamp for consistency tracking
+    const dataVersion = Date.now().toString();
+    localStorage.setItem('data_version', dataVersion);
+    console.log(`Data version set: ${dataVersion}`);
+    
+    // Clear old ML data when storing new activities
+    AlertsManager.clearAllAlerts();
+    localStorage.removeItem('ml_recommendations_cache');
+    localStorage.removeItem('ml_last_processed');
+    localStorage.removeItem('ml_processing_timestamp');
+    console.log('Cleared ML data and recommendations cache');
+    
     console.log('Recovery storage completed successfully');
     return true;
   } catch (error) {
@@ -157,6 +170,18 @@ async function storeSubsetOfActivities(db: IDBDatabase, activities: UserActivity
     localStorage.setItem('activityCount', subset.length.toString());
     localStorage.setItem('lastStorageTime', Date.now().toString());
     localStorage.setItem('partialDataStored', 'true');
+    
+    // Store data version timestamp for consistency tracking
+    const dataVersion = Date.now().toString();
+    localStorage.setItem('data_version', dataVersion);
+    console.log(`Data version set: ${dataVersion}`);
+    
+    // Clear old ML data when storing new activities
+    AlertsManager.clearAllAlerts();
+    localStorage.removeItem('ml_recommendations_cache');
+    localStorage.removeItem('ml_last_processed');
+    localStorage.removeItem('ml_processing_timestamp');
+    console.log('Cleared ML data and recommendations cache');
     
     console.log(`Last resort storage: Successfully stored ${subset.length} critical activities`);
     return true;
@@ -231,6 +256,18 @@ async function storeActivitiesInChunks(db: IDBDatabase, activities: UserActivity
   localStorage.setItem('activityCount', activities.length.toString());
   localStorage.setItem('lastStorageTime', Date.now().toString());
   localStorage.removeItem('partialDataStored'); // Clear partial flag if it exists
+  
+  // Store data version timestamp for consistency tracking
+  const dataVersion = Date.now().toString();
+  localStorage.setItem('data_version', dataVersion);
+  console.log(`Data version set: ${dataVersion}`);
+  
+  // Clear old ML data when storing new activities
+  AlertsManager.clearAllAlerts();
+  localStorage.removeItem('ml_recommendations_cache');
+  localStorage.removeItem('ml_last_processed');
+  localStorage.removeItem('ml_processing_timestamp');
+  console.log('Cleared ML data and recommendations cache');
 }
 
 /**
@@ -476,7 +513,7 @@ function getIndividualActivities(db: IDBDatabase): Promise<UserActivity[]> {
       const activities: UserActivity[] = [];
       const request = store.openCursor();
       
-      request.onsuccess = (event) => {
+      request.onsuccess = () => {
         const cursor = request.result;
         if (cursor) {
           activities.push(cursor.value);
@@ -614,17 +651,89 @@ export async function clearStoredActivities(): Promise<void> {
     return;
   }
 
+  // Clear ALL database names to handle all legacy data sources
+  const databasesToClear = [
+    { name: 'ltu_academic_weapon', version: 1 }, // Root storage utility database
+    { name: 'ActivityDB', version: 1 }, // Legacy database name
+    { name: 'activityDatabase', version: 3 } // Current database
+  ];
+
+  console.log('[clearStoredActivities] Clearing all databases:', databasesToClear.map(db => db.name));
+
+  for (const db of databasesToClear) {
+    await clearDatabase(db.name, db.version);
+  }
+
+  // Clear localStorage flags and cached data
+  const localStorageKeys = [
+    'hasStoredActivities',
+    'activityCount',
+    'lastStorageTime',
+    'partialDataStored',
+    'lastDataUpload',
+    'dataUploadType',
+    'activities',
+    'mockActivityData',
+    'fallbackActivities',
+    'csvValidationCache',
+    'dataProcessingStats',
+    'uploadProgress',
+    'activitiesMetadata',
+    'processedActivityData'
+  ];
+  
+  localStorageKeys.forEach(key => {
+    localStorage.removeItem(key);
+  });
+  
+  // Clear ML alerts as well
+  localStorage.removeItem('ml_security_alerts');
+  
+  // Clear other ML-related data
+  localStorage.removeItem('ml_processing_timestamp');
+  localStorage.removeItem('ml_recommendations_cache');
+  
+  console.log('[clearStoredActivities] Cleared ML alerts and recommendations');
+  
+  console.log(`[clearStoredActivities] Cleared ${localStorageKeys.length} localStorage items`);
+  console.log('[clearStoredActivities] All activities and metadata cleared from storage');
+  
+  // Trigger a storage cleared event to notify components
+  window.dispatchEvent(new CustomEvent('storageCleared', { 
+    detail: { 
+      timestamp: Date.now(),
+      clearedStores: ['activities', 'metadata', 'individualActivities'],
+      clearedDatabases: databasesToClear.map(db => db.name)
+    }
+  }));
+}
+
+/**
+ * Clear a specific database by name and version
+ */
+async function clearDatabase(dbName: string, version: number): Promise<void> {
   return new Promise((resolve, reject) => {
     try {
-      const request = indexedDB.open('activityDatabase', 2);
+      console.log(`[clearDatabase] Opening database ${dbName} version ${version}`);
+      const request = indexedDB.open(dbName, version);
       
       request.onupgradeneeded = () => {
         const db = request.result;
+        console.log(`[clearDatabase] Upgrade needed for ${dbName}, ensuring object stores exist`);
+        
+        // Create object stores if they don't exist during upgrade
         if (!db.objectStoreNames.contains('activities')) {
           db.createObjectStore('activities', { keyPath: 'id' });
         }
         if (!db.objectStoreNames.contains('metadata')) {
           db.createObjectStore('metadata', { keyPath: 'id' });
+        }
+        if (!db.objectStoreNames.contains('individualActivities')) {
+          const individualStore = db.createObjectStore('individualActivities', { keyPath: 'id' });
+          individualStore.createIndex('riskScore', 'riskScore', { unique: false });
+          individualStore.createIndex('date', 'date', { unique: false });
+          individualStore.createIndex('username', 'username', { unique: false });
+          individualStore.createIndex('integration', 'integration', { unique: false });
         }
       };
       
@@ -632,26 +741,47 @@ export async function clearStoredActivities(): Promise<void> {
         const db = request.result;
         
         try {
-          await clearObjectStore(db, 'activities');
-          await clearObjectStore(db, 'metadata');
+          console.log(`[clearDatabase] Successfully opened ${dbName}, object stores:`, Array.from(db.objectStoreNames));
           
-          // Clear localStorage flags
-          localStorage.removeItem('hasStoredActivities');
-          localStorage.removeItem('activityCount');
-          localStorage.removeItem('lastStorageTime');
+          // Get all object store names from the database
+          const storeNames = Array.from(db.objectStoreNames);
           
-          console.log('All activities cleared from storage');
+          if (storeNames.length === 0) {
+            console.log(`[clearDatabase] No object stores found in ${dbName}`);
+            db.close();
+            resolve();
+            return;
+          }
+          
+          console.log(`[clearDatabase] Clearing object stores in ${dbName}: ${storeNames.join(', ')}`);
+          
+          for (const storeName of storeNames) {
+            try {
+              await clearObjectStore(db, storeName);
+              console.log(`[clearDatabase] Successfully cleared ${storeName} in ${dbName}`);
+            } catch (storeError) {
+              console.error(`[clearDatabase] Error clearing ${storeName} in ${dbName}:`, storeError);
+              // Continue with other stores even if one fails
+            }
+          }
+          
+          console.log(`[clearDatabase] Successfully cleared all data from ${dbName}`);
           resolve();
         } catch (error) {
+          console.error(`[clearDatabase] Error clearing ${dbName}:`, error);
           reject(error);
+        } finally {
+          db.close();
         }
       };
       
       request.onerror = () => {
-        reject(new Error('Failed to open database for clearing'));
+        console.error(`[clearDatabase] Failed to open database ${dbName} for clearing`);
+        // Don't reject here - the database might not exist, which is fine
+        resolve();
       };
     } catch (error) {
-      console.error('Error clearing activities:', error);
+      console.error(`[clearDatabase] Error clearing database ${dbName}:`, error);
       reject(error);
     }
   });
@@ -827,6 +957,27 @@ export async function appendActivities(
       remainingSpaceBytes: 0 
     };
   }
+}
+
+/**
+ * Get the current data version timestamp
+ */
+export function getDataVersion(): string | null {
+  if (!isBrowser()) {
+    return null;
+  }
+  return localStorage.getItem('data_version');
+}
+
+/**
+ * Check if data version has changed since a given timestamp
+ */
+export function hasDataVersionChanged(lastKnownVersion: string | null): boolean {
+  if (!isBrowser()) {
+    return false;
+  }
+  const currentVersion = getDataVersion();
+  return currentVersion !== lastKnownVersion;
 }
 
 /**
