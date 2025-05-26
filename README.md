@@ -104,7 +104,7 @@ LTU-Academic-Weapon/
 ### **✅ User Interface**
 - **Dark Theme** - Modern security-focused design
 - **Interactive Visualizations** - Charts, heatmaps, trend analysis
-- **Responsive Design** - Mobile and desktop compatibility
+- **Responsive Design** - Desktop compatibility
 - **Loading States** - Progress indicators for long operations
 - **Error Boundaries** - Graceful error handling
 - **Material UI Integration** - Professional component library
