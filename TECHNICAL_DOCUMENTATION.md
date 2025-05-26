@@ -252,4 +252,175 @@ The system implements a sophisticated rule-based machine learning approach that 
    - Deep learning integration
    - Real-time processing optimization
    - Advanced visualization techniques
-   - Enhanced user feedback systems 
+   - Enhanced user feedback systems
+
+## Rule-Based ML System: Visual Guide
+
+### System Overview
+```mermaid
+graph TD
+    A[User Activities] --> B[Data Preprocessing]
+    B --> C[Rule-Based Analysis]
+    C --> D1[Time Pattern Rules]
+    C --> D2[Volume Rules]
+    C --> D3[Behavior Rules]
+    D1 --> E[Anomaly Detection]
+    D2 --> E
+    D3 --> E
+    E --> F[Recommendation Engine]
+    F --> G[Security Insights]
+```
+
+### 1. How It Works: Step by Step
+
+#### Step 1: Data Collection
+- Collects user activities from IndexedDB
+- Tracks:
+  - Timestamps
+  - User IDs
+  - Activity types
+  - Data volumes
+  - Locations
+  - Applications used
+
+#### Step 2: Rule Application
+```mermaid
+graph LR
+    A[Activity] --> B{Time Check}
+    A --> C{Volume Check}
+    A --> D{Behavior Check}
+    B --> E[Score]
+    C --> E
+    D --> E
+    E --> F[Final Decision]
+```
+
+#### Step 3: Pattern Detection
+- **Time Patterns**:
+  ```
+  Normal Hours: 6 AM - 10 PM
+  Unusual Hours: 10 PM - 6 AM
+  Critical Hours: 1 AM - 3 AM
+  ```
+
+- **Volume Patterns**:
+  ```
+  Low: < 1000 units
+  Medium: 1000-1499 units
+  High: 1500-2000 units
+  Critical: > 2000 units
+  ```
+
+### 2. Real-World Examples
+
+#### Example 1: Unusual Time Access
+```typescript
+// Activity at 2 AM
+{
+  timestamp: "2024-03-15T02:00:00",
+  userId: "user123",
+  activity: "data_access"
+}
+
+// Rule Triggered:
+if (hour >= 22 || hour <= 6) {
+  score += 0.3;  // Unusual time bonus
+  if (hour >= 1 && hour <= 3) {
+    score += 0.2;  // Critical hours bonus
+  }
+}
+```
+
+#### Example 2: High Volume Activity
+```typescript
+// User accessing 2500 units of data
+{
+  volume: 2500,
+  userId: "user123",
+  activity: "data_download"
+}
+
+// Rule Triggered:
+if (volume > 2000) {
+  severity = "critical";
+  confidence = 0.9;
+  factors.push("Excessive data volume");
+}
+```
+
+### 3. Decision Making Process
+
+```mermaid
+graph TD
+    A[New Activity] --> B{Check Time}
+    B -->|Unusual| C[Add Time Score]
+    B -->|Normal| D[No Time Score]
+    A --> E{Check Volume}
+    E -->|High| F[Add Volume Score]
+    E -->|Normal| G[No Volume Score]
+    A --> H{Check Behavior}
+    H -->|Anomalous| I[Add Behavior Score]
+    H -->|Normal| J[No Behavior Score]
+    C --> K[Calculate Total Score]
+    D --> K
+    F --> K
+    G --> K
+    I --> K
+    J --> K
+    K --> L{Score > Threshold?}
+    L -->|Yes| M[Generate Alert]
+    L -->|No| N[No Action]
+```
+
+### 4. Confidence Scoring System
+
+```mermaid
+graph LR
+    A[Base Score] --> B[Add Time Factor]
+    B --> C[Add Volume Factor]
+    C --> D[Add Behavior Factor]
+    D --> E[Calculate Final Confidence]
+    E --> F{Confidence > 0.65?}
+    F -->|Yes| G[Generate Recommendation]
+    F -->|No| H[Ignore]
+```
+
+### 5. Key Benefits
+
+1. **Transparency**
+   - Clear rules and thresholds
+   - Easy to understand decisions
+   - Explainable results
+
+2. **Adaptability**
+   - Adjustable thresholds
+   - Learning from manager actions
+   - User-specific baselines
+
+3. **Performance**
+   - Fast processing
+   - Real-time detection
+   - Efficient resource usage
+
+### 6. Common Use Cases
+
+1. **After-Hours Access**
+   ```
+   Time: 2 AM
+   Action: Data Access
+   Result: High Severity Alert
+   ```
+
+2. **Data Volume Spike**
+   ```
+   Normal: 500 units/day
+   Current: 2500 units
+   Result: Critical Alert
+   ```
+
+3. **Unusual Behavior**
+   ```
+   Pattern: Multiple failed logins
+   Location: New IP address
+   Result: Medium Severity Alert
+   ``` 
