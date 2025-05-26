@@ -1,4 +1,3 @@
-import * as tf from '@tensorflow/tfjs';
 import { UserActivity } from '../../types/activity';
 
 /**
@@ -106,7 +105,7 @@ export class SequencePatternAnalyzer {
       const userSequences = this.extractUserSequences(activities);
       
       // Build Markov transition matrix
-      for (const [user, sequence] of userSequences.entries()) {
+      for (const [_user, sequence] of userSequences.entries()) {
         if (sequence.length < 2) continue;
         
         // Count activities
@@ -153,7 +152,7 @@ export class SequencePatternAnalyzer {
     
     // Generate common sequences using frequent activity types
     const frequentActivities = Array.from(this.activityCounts.entries())
-      .filter(([activity, count]) => count >= minCount)
+      .filter(([_activity, count]) => count >= minCount)
       .sort((a, b) => b[1] - a[1])
       .map(([activity]) => activity);
     

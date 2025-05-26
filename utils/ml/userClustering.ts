@@ -5,7 +5,6 @@ import { UserActivity } from '../../types/activity';
  * K-means clustering implementation for user behavior analysis
  */
 export class UserBehaviorClusterer {
-  private featureCount: number = 6;
   private clusters: number = 4; // Number of clusters to form
   private clusterCentroids: number[][] | null = null;
   private featureRanges: { min: number[]; max: number[] } | null = null;
@@ -362,7 +361,7 @@ export class UserBehaviorClusterer {
     const TIME_VAR_INDEX = 4;
     const VELOCITY_INDEX = 5;
     
-    return centroids.map((centroid, i) => {
+    return centroids.map((centroid, _i) => {
       // Denormalize centroid values
       const denormalized = centroid.map((value, j) => {
         const range = this.featureRanges!;
@@ -521,7 +520,7 @@ export async function generateUserClusteringData(activities: UserActivity[]): Pr
  */
 function generateSyntheticClusters(
   realUsers: [string, UserActivity[]][],
-  allActivities: UserActivity[]
+  _allActivities: UserActivity[]
 ): any[] {
   if (realUsers.length === 0) return [];
   

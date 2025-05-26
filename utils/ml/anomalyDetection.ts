@@ -395,7 +395,7 @@ async function detectAnomalies(timelineData: any[]): Promise<void> {
     // Calculate z-scores and mark anomalies (z-score > 2.0 is considered unusual)
     const threshold = 2.0;
     
-    timelineData.forEach((entry, i) => {
+    timelineData.forEach((entry, _i) => {
       const zScore = Math.abs((entry.activities - mean) / Math.max(0.1, stdDev));
       entry.anomalyScore = Math.min(100, Math.round(zScore * 33)); // Scale for visualization
       
@@ -436,7 +436,6 @@ function getStratifiedSample(activities: UserActivity[], maxSamples: number): Us
   const totalActivities = activities.length;
   const highRatio = high.length / totalActivities;
   const mediumRatio = medium.length / totalActivities;
-  const lowRatio = low.length / totalActivities;
   
   const highSamples = Math.ceil(maxSamples * highRatio);
   const mediumSamples = Math.ceil(maxSamples * mediumRatio);

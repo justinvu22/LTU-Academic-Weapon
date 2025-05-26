@@ -1,56 +1,57 @@
 // app/ml/page.tsx
 "use client";
 
-import React, { useState, useEffect } from 'react';
-import { Box, CircularProgress, Typography, Card, CardContent, Chip, Tooltip as MuiTooltip, LinearProgress, Button } from '@mui/material';
-import { FaExclamationTriangle, FaLightbulb } from 'react-icons/fa';
+import React, { useState, useEffect, useRef } from 'react';
 import { RecommendationEngine } from '../../ml/recommendationEngine';
 import { UserActivity, MLRecommendation } from '../../types/activity';
-import { useAdaptiveProcessing } from '../../hooks/useAdaptiveProcessing';
-import threatLearner from '../../utils/threatLearner';
-import adaptiveConfig from '../../utils/adaptiveConfig';
-import Link from 'next/link';
-import { EnhancedRecommendationEngine } from '../../ml/enhancedRecommendationEngine';
+import { UserReviewModal } from '../../components/UserReviewModal';
+import { AlertsManager } from '../../utils/alertsManager';
 
 export default function MLPage() {
   // State for loading stored activities
-  const [storedActivities, setStoredActivities] = useState<UserActivity[] | null>(null);
-  const [isLoadingData, setIsLoadingData] = useState(true);
-  const [dataError, setDataError] = useState<string | null>(null);
-  
-  // Use adaptive processing hook for optimized data loading
-  const {
-    activities,
-    normalizedCount,
-    isProcessing,
-    error: dataLoadError,
-    performanceMetrics,
-    mlResults,
-    mlProgress,
-    mlIsProcessing,
-    mlError
-  } = useAdaptiveProcessing(storedActivities); // Pass stored activities once loaded
-  
-  const [recommendations, setRecommendations] = useState<MLRecommendation[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [activities, setActivities] = useState<UserActivity[]>([]);
+
+  const [loading, setLoading] = useState(false);
+  const [mlProcessing, setMlProcessing] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [processingPhase, setProcessingPhase] = useState('initializing');
-  const [learnedPatterns, setLearnedPatterns] = useState(0);
-  const [processingComplete, setProcessingComplete] = useState(false);
+  const [recommendations, setRecommendations] = useState<any[]>([]);
   
-  // Create a single advanced engine instance
-  const advancedEngine = React.useMemo(() => new EnhancedRecommendationEngine({
-    useManagerActions: true, 
-    useStatusValues: true,
-    useAnomalyDetection: true
-  }), []);
+  // User Review Modal state
+  const [reviewModalOpen, setReviewModalOpen] = useState(false);
+  const [selectedUserReview, setSelectedUserReview] = useState<{
+    userId: string;
+    mlInsightTitle: string;
+    mlInsightDescription: string;
+    severity: 'low' | 'medium' | 'high' | 'critical';
+    confidence: number;
+    suggestedActions: string[];
+  } | null>(null);
+  
+  // Create a stable recommendation engine instance using useRef
+  const recommendationEngineRef = useRef<RecommendationEngine | null>(null);
+  if (!recommendationEngineRef.current) {
+    recommendationEngineRef.current = new RecommendationEngine({
+      sensitivityLevel: 'medium',
+      maxRecommendations: 100,
+      confidenceThreshold: 0.40,
+      useAnomalyDetection: true,
+      criticalHours: [1, 2, 3, 22, 23],
+      temporalBurstMultiplier: 1.5,
+      learnFromManagerActions: true,
+      includeAllRecommendations: true,
+      useAdvancedAnalysis: true
+    });
+  }
+  const recommendationEngine = recommendationEngineRef.current;
   
   // Load activities data from storage on component mount
   useEffect(() => {
     const loadActivitiesData = async () => {
       try {
-        setIsLoadingData(true);
-        setProcessingPhase('loading-data');
+        setLoading(true);
+        setError(null);
+        
+        console.log("Loading activities from storage...");
         
         // Load activities from storage
         const { getActivitiesFromIndexedDB } = await import('../../utils/storage');
@@ -60,106 +61,72 @@ export default function MLPage() {
           console.log(`Loaded ${activitiesData.length} activities from storage for ML analysis`);
           
           if (activitiesData.length === 0) {
-            setDataError('No activity data available. Please upload data from the Upload page first.');
-            setIsLoadingData(false);
+            setError('No activity data available. Please upload data from the Upload page first.');
             setLoading(false);
             return;
           }
           
-          // Set the loaded activities to state to trigger processing
-          setStoredActivities(activitiesData);
-          setIsLoadingData(false);
+          // Set activities directly without the hook
+          setActivities(activitiesData);
+          
+          // Create simple ML results
+          setRecommendations([]);
+          
+          // Set loading to false after successfully loading data
+          setLoading(false);
+          
         } catch (storageError) {
           console.error('Error accessing IndexedDB:', storageError);
-          setDataError('Error accessing data storage. Please try uploading data again.');
-          setIsLoadingData(false);
+          setError('Error accessing data storage. Please try uploading data again.');
           setLoading(false);
         }
       } catch (err) {
         console.error('Error loading activities data:', err);
-        setDataError('Error loading activity data. Please try refreshing the page.');
-        setIsLoadingData(false);
+        setError('Error loading activity data. Please try refreshing the page.');
         setLoading(false);
       }
     };
     
     loadActivitiesData();
-  }, []);
-  
-  // Generate ML insights using the advanced engine
-  useEffect(() => {
-    if (!activities || activities.length === 0 || !mlResults) {
-      console.log("No activities or ML results available", { 
-        activitiesLength: activities?.length || 0, 
-        mlResultsExists: !!mlResults 
-      });
-      return;
-    }
     
-    const generateSecurityInsights = () => {
-      setProcessingPhase('analyzing-data');
-      
-      // Ensure all activities have necessary fields
-      const augmentedActivities = activities.map((activity, index) => {
-        // Ensure activity has a valid ID
-        const activityWithId = {
-          ...activity,
-          id: activity.id || `generated-id-${index}-${Date.now()}`,
-        };
-        
-        // Ensure activity has a user - this is critical
-        const user = activity.user || activity.username || `unknown-user-${index % 5}`;
-        
-        // Add required fields for analysis
-        return {
-          ...activityWithId,
-          user, // Ensure user is defined
-          
-          // Add sensitiveData if undefined (preserve existing values)
-          sensitiveData: activity.sensitiveData !== undefined ? activity.sensitiveData : 
-                       Math.random() > 0.7,
-          
-          // Add managerAction if undefined (preserve existing values)
-          managerAction: activity.managerAction !== undefined ? activity.managerAction :
-                       Math.random() > 0.8 ? ['escalated', 'flagged', 'authorized', 'legitimate'][Math.floor(Math.random() * 4)] : undefined,
-          
-          // Add status if undefined (preserve existing values)
-          status: activity.status || 
-                (Math.random() > 0.8 ? 'concern' : 
-                 Math.random() > 0.6 ? 'trusted' : 
-                 Math.random() > 0.3 ? 'underReview' : 'nonConcern'),
-                 
-          // Add activity type if missing (preserve existing values)
-          activityType: activity.activityType || activity.activity || 
-                     ['download', 'view', 'export', 'edit', 'share'][Math.floor(Math.random() * 5)],
-                     
-          // Add timestamp if missing (preserve existing values)
-          timestamp: activity.timestamp || new Date().toISOString()
-        };
-      });
-      
-      console.log(`Analyzing ${augmentedActivities.length} activities for security risks`);
-      setProcessingPhase('analyzing-patterns');
-      
-      try {
-        // Use the advanced ML engine to analyze activities
-        const securityInsights = advancedEngine.generateRecommendations(augmentedActivities);
-        console.log(`Advanced security analysis identified ${securityInsights.length} potential risks`);
-        
-        // Update the UI with results
-        setRecommendations(securityInsights);
-        setProcessingComplete(true);
-        setProcessingPhase('complete');
-        setLoading(false);
-      } catch (error) {
-        console.error("Error analyzing security data:", error);
-        setError("An error occurred while analyzing security data. Please try again.");
-        setLoading(false);
-      }
+    // Listen for data upload events
+    const handleDataUpload = (event: CustomEvent) => {
+      console.log('ML Page: Detected new data upload, refreshing...', event.detail);
+      loadActivitiesData();
     };
     
-    generateSecurityInsights();
-  }, [activities, mlResults, advancedEngine]);
+    window.addEventListener('dataUploaded', handleDataUpload as EventListener);
+    
+    // Cleanup event listener
+    return () => {
+      window.removeEventListener('dataUploaded', handleDataUpload as EventListener);
+    };
+  }, []); // Only run once on mount and when data upload events occur
+  
+  // Generate ML insights using the recommendation engine
+  useEffect(() => {
+    if (activities.length === 0) return;
+    
+    console.log('Calculating ML results for', activities.length, 'activities');
+    
+    setMlProcessing(true);
+    
+    // Process ML analysis
+    const processedResults = recommendationEngine.generateRecommendations(activities);
+    setRecommendations(processedResults);
+    
+    // Create alerts from recommendations
+    if (processedResults.length > 0) {
+      // Clear old alerts and create new ones
+      AlertsManager.refreshAlertsFromRecommendations(processedResults);
+      console.log(`Created ${processedResults.length} new alerts`);
+    }
+    
+    console.log('ML processing complete');
+    
+    setLoading(false);
+    setMlProcessing(false);
+  }, [activities, recommendationEngine]);
   
   // Format confidence percentage
   const formatConfidence = (confidence: number): string => {
@@ -192,30 +159,22 @@ export default function MLPage() {
   
   // Get loading progress percentage
   const getLoadingProgress = (): number => {
-    switch (processingPhase) {
-      case 'initializing': return 10;
-      case 'loading-data': return 20;
-      case 'analyzing-data': return 30;
-      case 'analyzing-patterns': return 50;
-      case 'analyzing-anomalies': return 70;
-      case 'generating-recommendations': return 90;
-      case 'complete': return 100;
-      default: return 40;
+    if (loading && !mlProcessing) {
+      return 50; // Data loading phase
+    } else if (mlProcessing) {
+      return 85; // ML processing phase
     }
+    return 100; // Complete
   };
   
   // Render loading status message
   const getLoadingMessage = (): string => {
-    switch (processingPhase) {
-      case 'initializing': return 'Initializing advanced security engine...';
-      case 'loading-data': return 'Loading activity data...';
-      case 'analyzing-data': return 'Processing security data...';
-      case 'analyzing-patterns': return 'Analyzing activity patterns...';
-      case 'analyzing-anomalies': return 'Detecting anomalies in user behavior...';
-      case 'generating-recommendations': return 'Generating security insights...';
-      case 'complete': return 'Analysis complete!';
-      default: return 'Processing...';
+    if (loading && !mlProcessing) {
+      return 'Loading data...';
+    } else if (mlProcessing) {
+      return 'Processing ML insights...';
     }
+    return 'Analysis complete!';
   };
 
   // Calculate statistics for display
@@ -230,6 +189,24 @@ export default function MLPage() {
 
   const stats = getStatistics();
 
+  // User Review Modal handlers
+  const handleReviewUser = (userId: string, recommendation: MLRecommendation) => {
+    setSelectedUserReview({
+      userId,
+      mlInsightTitle: recommendation.title,
+      mlInsightDescription: recommendation.description,
+      severity: recommendation.severity,
+      confidence: recommendation.confidence,
+      suggestedActions: recommendation.suggestedActions
+    });
+    setReviewModalOpen(true);
+  };
+
+  const handleCloseReviewModal = () => {
+    setReviewModalOpen(false);
+    setSelectedUserReview(null);
+  };
+
   return (
     <div className="min-h-screen bg-[#121324] px-6 py-10 font-['IBM_Plex_Sans',Inter,sans-serif] flex flex-col">
       <div className="w-full bg-[#121324] rounded-2xl border border-[#333] shadow-[0_2px_12px_rgba(110,95,254,0.10)] px-8 py-10 flex flex-col gap-8 mx-auto">
@@ -237,7 +214,7 @@ export default function MLPage() {
           <h1 className="text-[2rem] font-extrabold tracking-wide text-[#EEE] pl-4 border-l-4 border-[#6E5FFE] uppercase" style={{ fontFamily: "'IBM Plex Sans', Inter, sans-serif", letterSpacing: '0.04em', textShadow: '0 1px 8px #6E5FFE22' }}>ML-POWERED SECURITY INSIGHTS</h1>
         </div>
 
-        {loading ? (
+        {(loading || mlProcessing) ? (
           <div className="flex flex-col justify-center items-center min-h-[50vh] w-full space-y-6">
             <div className="w-12 h-12 border-4 border-[#8B5CF6] border-t-transparent rounded-full animate-spin"></div>
             <div className="w-full max-w-md">
@@ -287,37 +264,6 @@ export default function MLPage() {
               </div>
             </div>
 
-            {/* Advanced Engine Information */}
-            <div className="bg-[#1F2030] border border-[#333] rounded-xl shadow-lg p-6 mb-8">
-              <div className="flex items-center gap-3 mb-3">
-                <svg className="w-5 h-5 text-yellow-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z" />
-                </svg>
-                <h3 className="text-lg font-bold text-white">Advanced ML Security Engine</h3>
-              </div>
-              <p className="text-gray-300 mb-4">
-                This analysis uses our advanced ML engine which incorporates user activity status, manager actions, 
-                and anomaly detection to provide comprehensive security insights. The system identifies patterns that 
-                may indicate potential security risks or policy violations.
-              </p>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div className="bg-[#232346] rounded-lg p-4">
-                  <h4 className="font-bold text-purple-300 mb-2">Activity Status Integration</h4>
-                  <p className="text-gray-400 text-sm">
-                    Activities marked as 'concern' are weighted higher in risk detection, while 'trusted' activities 
-                    establish normal behavior baselines to reduce false positives.
-                  </p>
-                </div>
-                <div className="bg-[#232346] rounded-lg p-4">
-                  <h4 className="font-bold text-purple-300 mb-2">Manager Action Analysis</h4>
-                  <p className="text-gray-400 text-sm">
-                    Manager actions like 'escalated' or 'authorized' are used to adjust confidence scores, with normalization 
-                    to account for inconsistent labeling and improve accuracy.
-                  </p>
-                </div>
-              </div>
-            </div>
-
             {/* ML Recommendations by Category */}
             {recommendations.length > 0 ? (
               <div className="space-y-8">
@@ -340,14 +286,39 @@ export default function MLPage() {
                               <span className="text-[#8B5CF6] font-bold text-base uppercase tracking-wider block mb-3">Affected Users:</span>
                               <div className="flex gap-2 overflow-x-auto whitespace-nowrap py-1 max-w-full">
                                 {rec.affectedUsers.map((user, i) => (
-                                  <span
+                                  <button
                                     key={i}
-                                    className="bg-[#1F2030] text-[#F472B6] font-semibold px-4 py-1.5 rounded-full text-sm break-all border border-[#333] shadow-sm"
+                                    onClick={() => handleReviewUser(user, rec)}
+                                    className="bg-[#1F2030] text-[#F472B6] font-semibold px-4 py-1.5 rounded-full text-sm break-all border border-[#333] shadow-sm hover:bg-[#2A2A46] hover:border-[#8B5CF6] transition-all duration-200 cursor-pointer group flex items-center gap-2"
+                                    title={`Click to review ${user}`}
                                   >
-                                    {user}
-                                  </span>
+                                    <span>{user}</span>
+                                    <svg className="w-3 h-3 opacity-0 group-hover:opacity-100 transition-opacity duration-200" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                                    </svg>
+                                  </button>
                                 ))}
                               </div>
+                              
+                              {/* Review All Button */}
+                              {rec.affectedUsers.length > 1 && (
+                                <div className="mt-4 pt-4 border-t border-[#333]">
+                                  <button
+                                    onClick={() => {
+                                      // For now, review the first user as a representative
+                                      if (rec.affectedUsers.length > 0) {
+                                        handleReviewUser(rec.affectedUsers[0], rec);
+                                      }
+                                    }}
+                                    className="w-full px-4 py-2 bg-gradient-to-r from-[#6E5FFE] to-[#8B5CF6] text-white font-bold rounded-lg hover:from-[#5B4FEE] hover:to-[#7C4FE4] transition-all duration-200 flex items-center justify-center gap-2 text-sm"
+                                  >
+                                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                    </svg>
+                                    Review Users ({rec.affectedUsers.length})
+                                  </button>
+                                </div>
+                              )}
                             </div>
                             <div className="flex gap-3 items-center mt-auto">
                               <span className="px-4 py-1.5 rounded-full text-sm font-bold bg-[#232346] text-purple-300 border border-[#333] shadow-sm">{formatConfidence(rec.confidence)}</span>
@@ -401,6 +372,21 @@ export default function MLPage() {
           </div>
         )}
       </div>
+      
+      {/* User Review Modal */}
+      {selectedUserReview && (
+        <UserReviewModal
+          isOpen={reviewModalOpen}
+          onClose={handleCloseReviewModal}
+          userId={selectedUserReview.userId}
+          mlInsightTitle={selectedUserReview.mlInsightTitle}
+          mlInsightDescription={selectedUserReview.mlInsightDescription}
+          severity={selectedUserReview.severity}
+          confidence={selectedUserReview.confidence}
+          suggestedActions={selectedUserReview.suggestedActions}
+          activities={activities}
+        />
+      )}
     </div>
   );
 }
