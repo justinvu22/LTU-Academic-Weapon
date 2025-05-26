@@ -53,18 +53,108 @@ The system employs sophisticated data processing techniques:
 
 ## Machine Learning Components
 
-### Core ML Architecture
-The system implements two main ML components:
+### Rule-Based ML Implementation
+The system implements a sophisticated rule-based machine learning approach that combines traditional rule-based detection with statistical analysis and pattern recognition:
 
-1. **Anomaly Detection** (`ml/anomalyDetector.ts`):
-   - Implements pattern recognition for unusual activities
-   - Uses adaptive thresholds based on historical data
-   - Incorporates user-specific behavior profiles
+#### Core Components
+
+1. **Anomaly Detection System** (`ml/anomalyDetector.ts`):
+   - **Rule-Based Thresholds**:
+     - Low: 0.6
+     - Medium: 0.75
+     - High: 0.9
+   - **Detection Features**:
+     - Time pattern analysis
+     - Data volume analysis
+     - User behavior analysis
+     - Activity sequence analysis
+     - Temporal burst detection
+     - Integration pattern analysis
 
 2. **Recommendation Engine** (`ml/recommendationEngine.ts`):
-   - Generates actionable security insights
-   - Groups recommendations by category and severity
-   - Implements caching for performance optimization
+   - **Pattern Detectors**:
+     - Activity pattern detection
+     - Unusual time pattern detection
+     - Sensitive data access detection
+     - Failed access attempt detection
+     - Multi-location access detection
+     - Unusual application usage detection
+     - Account sharing detection
+     - Sequential behavior detection
+     - High volume activity detection
+     - Frequency anomaly detection
+     - Data volume anomaly detection
+     - Integration anomaly detection
+
+#### Rule-Based Analysis Process
+
+1. **Baseline Establishment**:
+   ```typescript
+   // Example of baseline building
+   buildBaselines(activities: UserActivity[]): void {
+     // First pass: collect data points
+     activities.forEach(activity => {
+       this.updateGlobalBaseline(activity);
+       this.updateUserBaseline(activity);
+     });
+     
+     // Second pass: calculate statistics
+     this.finalizeBaselines();
+   }
+   ```
+
+2. **Pattern Detection Rules**:
+   - **Time-Based Rules**:
+     - Unusual hours (10 PM - 6 AM)
+     - Critical hours (1 AM - 3 AM)
+     - Temporal burst detection
+   - **Volume-Based Rules**:
+     - Data volume thresholds
+     - Activity frequency thresholds
+     - Burst detection multipliers
+   - **Behavior-Based Rules**:
+     - Sequential pattern detection
+     - Location-based rules
+     - Application usage patterns
+
+3. **Confidence Scoring**:
+   ```typescript
+   // Example of confidence calculation
+   calculateConfidence(score: number, threshold: number, factors: string[]): number {
+     const baseConfidence = score / threshold;
+     const factorBonus = factors.length * 0.1;
+     return Math.min(baseConfidence + factorBonus, 1.0);
+   }
+   ```
+
+#### Integration with Traditional ML
+
+1. **Statistical Analysis**:
+   - Z-score calculations for volume anomalies
+   - Standard deviation-based thresholds
+   - Moving averages for trend detection
+
+2. **Pattern Recognition**:
+   - User behavior profiling
+   - Activity sequence analysis
+   - Integration pattern detection
+
+3. **Adaptive Thresholds**:
+   ```typescript
+   // Example of adaptive threshold calculation
+   getAdaptiveThreshold(activity: UserActivity): number {
+     const baseThreshold = this.config.lowThreshold;
+     const userBaseline = this.userBaselines.get(activity.userId);
+     
+     if (userBaseline) {
+       const riskHistory = userBaseline.riskScoreHistory;
+       const avgRisk = riskHistory.reduce((a, b) => a + b, 0) / riskHistory.length;
+       return baseThreshold * (1 + avgRisk);
+     }
+     
+     return baseThreshold;
+   }
+   ```
 
 ### ML Enhancement Features
 
@@ -89,16 +179,19 @@ The system implements two main ML components:
    - Status and manager action filtering
    - Label normalization
    - Weighted training dataset creation
+   - Activity sanitization and validation
 
 2. **ML Pipeline**:
    - Extended `RecommendationEngine` integration
    - Confidence adjustment mechanisms
    - Performance tracking systems
+   - Real-time anomaly detection
 
 3. **Algorithm Features**:
    - Ensemble methods for multiple signal combination
    - Bias detection and correction
    - Active learning prioritization
+   - Rule-based pattern matching
 
 ## Data Processing Pipeline
 
