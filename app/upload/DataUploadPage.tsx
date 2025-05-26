@@ -2,11 +2,11 @@
 
 import React, { useState, useCallback, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import Papa from 'papaparse';
 import { UploadFile, Check } from '@mui/icons-material';
 import { useActivityContext } from '../../src/contexts/ActivityContext';
 import { useDropzone } from 'react-dropzone';
 import type { UserActivity } from '../../types/activity';
+import { AlertsManager } from '../../utils/alertsManager';
 
 /**
  * Component for uploading and processing CSV data
@@ -15,24 +15,16 @@ export default function DataUploadPage() {
   const router = useRouter();
   const { refreshActivities } = useActivityContext();
   const [file, setFile] = useState<File | null>(null);
-  const [fileContent, setFileContent] = useState<any[]>([]);
-  const [isUploading, setIsUploading] = useState(false);
-  const [isProcessing, setIsProcessing] = useState(false);
+  const [isUploading] = useState(false);
+  const [isProcessing] = useState(false);
   const [uploadComplete, setUploadComplete] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [uploadStats, setUploadStats] = useState<{ rows: number } | null>(null);
   const [isUploadHovered, setIsUploadHovered] = useState(false);
-  const [autoDetectColumns, setAutoDetectColumns] = useState<boolean>(true);
-  const [delimiter, setDelimiter] = useState<string>(',');
-  const [customColumns, setCustomColumns] = useState<string[]>([]);
-  const [dateFormat, setDateFormat] = useState<string>('YYYY-MM-DD');
-  const [progress, setProgress] = useState<number>(0);
-  const [status, setStatus] = useState<string>('');
-  const [statistics, setStatistics] = useState<any | null>(null);
-  const [activities, setActivities] = useState<UserActivity[]>([]);
-  const [uploadSuccess, setUploadSuccess] = useState<boolean>(false);
-  const [isLoading, setIsLoading] = useState<boolean>(false);
-  const [uploadedActivities, setUploadedActivities] = useState<UserActivity[]>([]);
+  const [autoDetectColumns] = useState<boolean>(true);
+  const [delimiter] = useState<string>(',');
+  const [customColumns] = useState<string[]>([]);
+  const [dateFormat] = useState<string>('YYYY-MM-DD');
   const [successMessage, setSuccessMessage] = useState<string>('');
   const [isAppendMode, setIsAppendMode] = useState<boolean>(false);
   const [currentStorageSize, setCurrentStorageSize] = useState<number>(0);
@@ -56,7 +48,7 @@ export default function DataUploadPage() {
     checkStorageSize();
   }, [maxStorageSize]);
 
-  const onDrop = useCallback((acceptedFiles: File[]) => {
+  const onDrop = useCallback(async (acceptedFiles: File[]) => {
     setErrorMessage(null);
     
     if (acceptedFiles.length > 0) {
@@ -74,7 +66,27 @@ export default function DataUploadPage() {
         return;
       }
       
-      setFile(selectedFile);
+      // Validate CSV headers
+      try {
+        const { CSVValidator } = await import('../../utils/csvValidator');
+        const validation = await CSVValidator.validateFile(selectedFile);
+        
+        if (!validation.isValid) {
+          const errorMessage = CSVValidator.getValidationMessage(validation);
+          setErrorMessage(errorMessage);
+          return;
+        }
+        
+        // Show warnings if there are extra headers
+        if (validation.warnings.length > 0) {
+          console.warn('CSV validation warnings:', validation.warnings);
+        }
+        
+        setFile(selectedFile);
+      } catch (validationError) {
+        setErrorMessage(`Error validating CSV file: ${validationError instanceof Error ? validationError.message : 'Unknown error'}`);
+        return;
+      }
     }
   }, []);
 
@@ -96,7 +108,6 @@ export default function DataUploadPage() {
       return;
     }
     try {
-      setIsLoading(true);
       console.log('Starting file processing...');
       const formatOptions = {
         autoDetect: autoDetectColumns,
@@ -114,43 +125,37 @@ export default function DataUploadPage() {
       // Use IndexedDB as main storage method
       const { 
         storeActivitiesInIndexedDB, 
-        getActivitiesFromIndexedDB, 
         appendActivities,
-        getStoredActivitiesSize 
+        getStoredActivitiesSize,
+        clearStoredActivities
       } = await import('../../utils/storage');
       
-      // Set a reasonable progress update interval
-      const totalFiles = 1;
-      let filesProcessed = 0;
       // Track total activities for statistics
       let totalActivities = 0;
       let allActivities: UserActivity[] = [];
       // Process the single file
       
       // Update progress
-      setProgress((filesProcessed / totalFiles) * 30); // First 30% is file reading
-      setStatus(`Reading file 1 of 1: ${file.name}`);
+      // setProgress((filesProcessed / totalFiles) * 30); // First 30% is file reading
+      // setStatus(`Reading file 1 of 1: ${file.name}`);
       try {
         const text = await readFileAsText(file);
-        setStatus(`Processing data from ${file.name}...`);
+        // setStatus(`Processing data from ${file.name}...`);
         const { parseCSV } = await import('../../utils/csvParser');
         const parsedActivities = await parseCSV(text, formatOptions);
-        setStatus(`Normalizing data format...`);
+        // setStatus(`Normalizing data format...`);
         if (!parsedActivities || !Array.isArray(parsedActivities) || parsedActivities.length === 0) {
           throw new Error('No valid activities found in file');
         }
         const schemaFormat = schemaAdapter.detectSchemaFormat(parsedActivities[0]);
         console.log(`Detected schema format: ${schemaFormat}`);
-        setStatus(`Normalizing ${parsedActivities.length} activities...`);
+        // setStatus(`Normalizing ${parsedActivities.length} activities...`);
         const chunkSize = Number(config.get('chunkSize')) || 500;
-        const chunks = Math.ceil(parsedActivities.length / chunkSize);
         const normalizedActivities: UserActivity[] = [];
         for (let j = 0; j < parsedActivities.length; j += chunkSize) {
           const chunk = parsedActivities.slice(j, j + chunkSize);
           const normalizedChunk = schemaAdapter.normalizeActivities(chunk);
           normalizedActivities.push(...normalizedChunk);
-          const fileProgress = 30 + (30 * (filesProcessed / totalFiles)) + (30 * (j / parsedActivities.length) / totalFiles);
-          setProgress(fileProgress);
           await new Promise(resolve => setTimeout(resolve, 0));
         }
         const processedActivities = normalizedActivities.map((activity, index) => ({
@@ -160,9 +165,9 @@ export default function DataUploadPage() {
         }));
         allActivities = [...allActivities, ...processedActivities];
         totalActivities += processedActivities.length;
-        filesProcessed++;
-        setProgress(30 + (60 * (filesProcessed / totalFiles)));
-        setStatus(`Processed ${processedActivities.length} activities from ${file.name}`);
+        // const fileProgress = 30 + (60 * (filesProcessed / totalFiles)); // removed unused variable
+        // setStatus(fileProgress.toFixed(0) + '%');
+        // setStatus(`Processed ${processedActivities.length} activities from ${file.name}`);
       } catch (fileError) {
         console.error(`Error processing file ${file.name}:`, fileError);
         setErrorMessage(`Error processing file ${file.name}: ${fileError instanceof Error ? fileError.message : 'Unknown error'}`);
@@ -179,7 +184,7 @@ export default function DataUploadPage() {
           
           if (isAppendMode) {
             // Append to existing activities
-            setStatus(`Appending ${activityCount} activities to existing data...`);
+            // setStatus(`Appending ${activityCount} activities to existing data...`);
             const { success, addedCount: added, remainingSpaceBytes } = await appendActivities(allActivities);
             storageSuccess = success;
             addedCount = added;
@@ -197,8 +202,28 @@ export default function DataUploadPage() {
             // Update the remaining storage size
             setRemainingStorageBytes(newRemainingSpaceBytes);
           } else {
-            // Replace existing activities
-            setStatus(`Storing ${activityCount} activities in database...`);
+            // Replace existing activities - CLEAR OLD DATA FIRST
+            console.log('Clearing existing data before storing new data');
+            
+            try {
+              // Clear existing data first
+              await clearStoredActivities();
+              console.log('Successfully cleared existing data');
+              
+              // Clear ML alerts as well
+              AlertsManager.clearAllAlerts();
+              console.log('Successfully cleared ML alerts');
+              
+              // Wait a moment to ensure the clear operation is complete
+              await new Promise(resolve => setTimeout(resolve, 100));
+              
+            } catch (clearError) {
+              console.error('Error clearing existing data:', clearError);
+              // Continue with storage even if clear fails
+            }
+            
+            setSuccessMessage('CSV uploaded and processed successfully!');
+            
             console.log(`Storing ${activityCount} activities in IndexedDB`);
             
             storageSuccess = await storeActivitiesInIndexedDB(allActivities);
@@ -206,6 +231,22 @@ export default function DataUploadPage() {
             
             if (storageSuccess) {
               console.log('Successfully stored activities in IndexedDB');
+              
+              // Wait a moment to ensure storage is complete
+              await new Promise(resolve => setTimeout(resolve, 100));
+              
+              // Trigger a storage event to notify other components
+              window.dispatchEvent(new CustomEvent('dataUploaded', { 
+                detail: { 
+                  activityCount: allActivities.length,
+                  timestamp: Date.now(),
+                  type: 'replace' // Indicate this is a replacement, not append
+                }
+              }));
+              
+              // Also set localStorage flag for immediate detection
+              localStorage.setItem('lastDataUpload', Date.now().toString());
+              localStorage.setItem('dataUploadType', 'replace');
               
               // Update storage size
               const newSize = await getStoredActivitiesSize();
@@ -216,35 +257,33 @@ export default function DataUploadPage() {
                 console.log('Falling back to localStorage due to IndexedDB failure');
                 localStorage.setItem('activities', JSON.stringify(allActivities));
                 console.log('Stored activities in localStorage');
+                
+                // Still trigger storage event for localStorage fallback
+                window.dispatchEvent(new CustomEvent('dataUploaded', { 
+                  detail: { 
+                    activityCount: allActivities.length,
+                    timestamp: Date.now(),
+                    fallbackMode: true
+                  }
+                }));
               } else {
                 console.warn('Dataset too large for localStorage. Only IndexedDB data will be available.');
               }
             }
           }
           
-          setStatus('Calculating statistics...');
+          // setStatus('Calculating statistics...');
           try {
             const { calculateStatistics } = await import('../../utils/dataProcessor');
             const stats = await calculateStatistics(allActivities);
-            setStatistics(stats);
+            // setStatistics(stats);
             console.log('Statistics calculated successfully:', stats);
           } catch (statsError) {
             console.error('Error calculating statistics:', statsError);
           }
           
-          setActivities(allActivities.slice(0, 100));
-          setUploadSuccess(true);
           setUploadComplete(true);
           setUploadStats({ rows: allActivities.length });
-          
-          if (isAppendMode) {
-            setSuccessMessage(`Successfully appended ${addedCount} activities to existing data!`);
-          } else {
-            setSuccessMessage('CSV uploaded and processed successfully!');
-          }
-          
-          setProgress(100);
-          setStatus(`Successfully ${isAppendMode ? 'appended' : 'uploaded'} ${totalActivities} activities from ${filesProcessed} files`);
         } catch (storageError) {
           console.error('Error storing activities:', storageError);
           setErrorMessage(`Error storing activities: ${storageError instanceof Error ? storageError.message : 'Unknown error'}`);
@@ -255,9 +294,6 @@ export default function DataUploadPage() {
     } catch (error) {
       console.error('Error processing files:', error);
       setErrorMessage(`Error processing files: ${error instanceof Error ? error.message : 'Unknown error'}`);
-      setUploadSuccess(false);
-    } finally {
-      setIsLoading(false);
     }
   };
   
@@ -272,195 +308,6 @@ export default function DataUploadPage() {
       reader.readAsText(file);
     });
   };
-  
-  /**
-   * Parse CSV file directly with custom logic for maximum compatibility
-   */
-  const parseCSVDirectly = async (file: File): Promise<any[]> => {
-    const text = await readFileAsText(file);
-    
-    // Split by lines and filter out empty lines
-    let lines = text.split(/\r?\n/).filter(line => line.trim().length > 0);
-    
-    if (lines.length === 0) {
-      throw new Error('CSV file is empty');
-    }
-    
-    console.log(`CSV has ${lines.length} lines`);
-    
-    // Try to detect if we have a header row
-    let headerRow = lines[0];
-    let dataStartIndex = 1;
-    
-    // If first row doesn't look like a header (contains mostly numeric values),
-    // we may need to look for headers elsewhere or generate our own
-    const firstRowCells = parseCSVLine(headerRow);
-    const nonNumericCells = firstRowCells.filter(cell => 
-      isNaN(Number(cell)) && cell.toLowerCase() !== 'true' && cell.toLowerCase() !== 'false'
-    );
-    
-    const hasHeaderRow = nonNumericCells.length > firstRowCells.length / 2;
-    
-    if (!hasHeaderRow) {
-      console.log('No header row detected, generating generic headers');
-      // Generate generic headers
-      headerRow = firstRowCells.map((_, i) => `column${i}`).join(',');
-      dataStartIndex = 0;
-    }
-    
-    // Parse the header to get column names
-    const headers = parseCSVLine(headerRow);
-    
-    // Parse each data row
-    const data = [];
-    
-    for (let i = dataStartIndex; i < lines.length; i++) {
-      try {
-        const line = lines[i];
-        if (!line.trim()) continue;
-        
-        const values = parseCSVLine(line);
-        
-        // Create object from values
-        const row: Record<string, any> = { id: `row_${i}` };
-        
-        // Map values to headers - handle case where we have fewer/more values than headers
-        headers.forEach((header, j) => {
-          if (j < values.length) {
-            // Try to parse as a number if possible
-            const value = values[j];
-            if (value === '') {
-              row[header] = null;
-            } else if (!isNaN(Number(value))) {
-              row[header] = Number(value);
-            } else if (value.toLowerCase() === 'true') {
-              row[header] = true;
-            } else if (value.toLowerCase() === 'false') {
-              row[header] = false;
-            } else if (value.startsWith('{') && value.endsWith('}')) {
-              // Try parsing as JSON
-              try {
-                row[header] = JSON.parse(value);
-              } catch {
-                row[header] = value;
-              }
-            } else {
-              row[header] = value;
-            }
-          }
-        });
-        
-        // Add missing fields we need for the UserActivity type
-        if (!row.username && (row.user || row.userId)) {
-          row.username = row.user || row.userId;
-        }
-        
-        if (!row.userId && (row.user || row.username)) {
-          row.userId = row.user || row.username;
-        }
-        
-        if (!row.timestamp && (row.date || row.time)) {
-          // Try to create a timestamp from date/time
-          try {
-            let dateStr = row.date;
-            let timeStr = row.time || '00:00';
-            
-            // Handle different date formats
-            if (dateStr && typeof dateStr === 'string' && dateStr.includes('/')) {
-              // Try to parse date in format DD/MM/YYYY
-              const parts = dateStr.split('/');
-              if (parts.length === 3) {
-                // Convert to YYYY-MM-DD format for Date constructor
-                dateStr = `${parts[2]}-${parts[1].padStart(2, '0')}-${parts[0].padStart(2, '0')}`;
-              }
-            }
-            
-            if (dateStr) {
-              try {
-                row.timestamp = new Date(`${dateStr}T${timeStr}`).toISOString();
-              } catch {
-                // Fallback to current date
-                row.timestamp = new Date().toISOString();
-              }
-            }
-          } catch (e) {
-            console.warn('Error parsing date:', e);
-          }
-        }
-        
-        if (!row.riskScore && row.risk) {
-          // Use risk field if available
-          row.riskScore = typeof row.risk === 'number' ? row.risk : parseInt(row.risk) || 0;
-        }
-        
-        data.push(row);
-      } catch (e) {
-        console.warn(`Error parsing line ${i}:`, e);
-      }
-    }
-    
-    // Convert special JSON fields
-    data.forEach(row => {
-      // Handle policiesBreached
-      if (row.policiesBreached && typeof row.policiesBreached === 'string') {
-        try {
-          row.policiesBreached = JSON.parse(row.policiesBreached);
-        } catch (e) {
-          row.policiesBreached = {};
-        }
-      }
-      
-      // Handle values
-      if (row.values && typeof row.values === 'string') {
-        try {
-          row.values = JSON.parse(row.values);
-        } catch (e) {
-          row.values = {};
-        }
-      }
-    });
-    
-    return data;
-  };
-  
-  /**
-   * Parse a CSV line with proper handling of quoted values
-   */
-  const parseCSVLine = (line: string): string[] => {
-    if (!line) return [];
-    
-    const values: string[] = [];
-    let inQuotes = false;
-    let currentValue = '';
-    
-    for (let i = 0; i < line.length; i++) {
-      const char = line[i];
-      
-      if (char === '"') {
-        // Toggle quote status
-        inQuotes = !inQuotes;
-      } else if (char === ',' && !inQuotes) {
-        // End of value
-        values.push(currentValue);
-        currentValue = '';
-      } else {
-        // Add character to current value
-        currentValue += char;
-      }
-    }
-    
-    // Add the last value
-    values.push(currentValue);
-    
-    // Clean up values - trim and remove enclosing quotes
-    return values.map(value => {
-      value = value.trim();
-      if (value.startsWith('"') && value.endsWith('"')) {
-        return value.substring(1, value.length - 1);
-      }
-      return value;
-    });
-  };
 
   /**
    * Process CSV data for analytics
@@ -468,7 +315,6 @@ export default function DataUploadPage() {
   const processForAnalytics = async () => {
     if (file) {
       try {
-        setIsLoading(true);
         setErrorMessage(null);
         
         // Call API to process the data
@@ -486,44 +332,18 @@ export default function DataUploadPage() {
         
         // Refresh activities context for live badge update
         await refreshActivities();
-        // Navigate to the dashboard page to see the processed data
-        router.push('/dashboard');
+        // Navigate to the ML page to generate new insights
+        router.push('/ml');
       } catch (error) {
         console.error('Error processing data:', error);
         setErrorMessage(error instanceof Error ? error.message : 'An unknown error occurred');
-      } finally {
-        setIsLoading(false);
       }
     } else {
       setErrorMessage("No file selected. Please upload a CSV file first.");
     }
   };
 
-  const handleButtonClick = () => {
-    // fileInputRef.current?.click();
-  };
-
-  // When the user clicks "Process Data & View Alerts"
-  const goToDashboard = async () => {
-    try {
-      // First check if we have data in IndexedDB
-      const { getActivitiesFromIndexedDB } = await import('../../utils/storage');
-      const activities = await getActivitiesFromIndexedDB();
-      
-      if (!activities || activities.length === 0) {
-        // No data in IndexedDB, show warning
-        setErrorMessage('No data available. Please upload and process data first.');
-        return;
-      }
-      
-      // Navigate to dashboard
-      router.push('/dashboard');
-    } catch (error) {
-      console.error('Error checking for data before navigation:', error);
-      // Navigate anyway, dashboard will handle the error
-      router.push('/dashboard');
-    }
-  };
+  
 
   return (
     <div className="min-h-screen bg-[#121324] px-6 py-10 font-['IBM_Plex_Sans',Inter,sans-serif] flex flex-col">
@@ -569,9 +389,20 @@ export default function DataUploadPage() {
                 : "New data will replace existing data"}
             </p>
           </div>
+          {/* Error Message */}
           {errorMessage && (
-            <div className="w-full mb-3 p-3 rounded-xl bg-red-500/10 text-red-400 text-center font-semibold shadow transition-all duration-300">
-              {errorMessage}
+            <div className="bg-red-900/20 border border-red-500/50 rounded-xl p-6 mb-6 animate-fadeIn">
+              <h3 className="text-red-400 font-bold text-lg mb-3 flex items-center">
+                <svg className="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                </svg>
+                CSV Validation Error
+              </h3>
+              <div className="text-red-300 text-sm leading-relaxed max-h-64 overflow-y-auto">
+                <pre className="whitespace-pre-wrap font-mono text-xs bg-red-900/10 p-3 rounded border border-red-500/20">
+                  {errorMessage}
+                </pre>
+              </div>
             </div>
           )}
           
@@ -666,18 +497,24 @@ export default function DataUploadPage() {
         {/* CSV Format Requirements Card */}
         <div className="bg-[#1F2030] border border-[#333] rounded-xl shadow-[0_2px_8px_rgba(110,95,254,0.08)] p-8 mb-10 animate-fadeIn transition-all duration-300 w-full">
           <h2 className="text-lg font-extrabold text-[#EEE] uppercase tracking-wide mb-4">CSV Format Requirements</h2>
+          <p className="text-gray-300 mb-4 leading-relaxed">Your CSV file must contain exactly these headers (case-sensitive):</p>
           <ul className="list-disc list-inside space-y-2 text-gray-300 leading-relaxed">
-            <li><span className="font-bold text-white">id</span> - Unique identifier for the activity</li>
-            <li><span className="font-bold text-white">userId</span> - User identifier</li>
-            <li><span className="font-bold text-white">username</span> - Username or email</li>
-            <li><span className="font-bold text-white">timestamp</span> - Date and time of activity</li>
-            <li><span className="font-bold text-white">integration</span> - Source integration (email, cloud, usb, etc.)</li>
-            <li><span className="font-bold text-white">activity</span> - Description of user activity</li>
-            <li><span className="font-bold text-white">status</span> - Status of the activity (underReview, trusted, concern, etc.)</li>
+            <li><span className="font-bold text-white">activityId</span> - Unique identifier for the activity</li>
+            <li><span className="font-bold text-white">user</span> - User identifier</li>
+            <li><span className="font-bold text-white">date</span> - Date of activity</li>
+            <li><span className="font-bold text-white">time</span> - Time of activity</li>
             <li><span className="font-bold text-white">riskScore</span> - Numeric risk score</li>
-            <li><span className="font-bold text-white">policiesBreached</span> - JSON object with policy breach information</li>
-            <li><span className="font-bold text-white">values</span> - JSON object with additional activity values</li>
+            <li><span className="font-bold text-white">integration</span> - Source integration (email, cloud, usb, etc.)</li>
+            <li><span className="font-bold text-white">policiesBreached</span> - Policy breach information</li>
+            <li><span className="font-bold text-white">values</span> - Additional activity values</li>
+            <li><span className="font-bold text-white">status</span> - Activity status (underReview, trusted, concern, etc.)</li>
+            <li><span className="font-bold text-white">managerAction</span> - Manager action taken</li>
           </ul>
+          <div className="mt-4 p-4 bg-[#8B5CF6]/10 border border-[#8B5CF6]/30 rounded-lg">
+            <p className="text-[#8B5CF6] text-sm font-medium">
+              ⚠️ Files with missing or incorrect headers will be rejected. All 10 headers are required.
+            </p>
+          </div>
         </div>
       </div>
     </div>

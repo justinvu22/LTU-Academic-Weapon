@@ -5,7 +5,7 @@ import { NextResponse } from 'next/server';
  * This is a dummy API that adheres to the "no backend" requirement
  * All actual data processing happens client-side
  */
-export async function GET(request: Request) {
+export async function GET(_request: Request) {
   return NextResponse.json({
     // Empty activities array to indicate no server-side data
     // Client should use IndexedDB/localStorage instead

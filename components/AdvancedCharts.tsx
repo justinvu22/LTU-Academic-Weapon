@@ -1,6 +1,6 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import {
-  PieChart, Pie, Cell, ResponsiveContainer, Tooltip, Legend,
+  ResponsiveContainer, Tooltip,
   BarChart, Bar, XAxis, YAxis, CartesianGrid,
   LineChart, Line, AreaChart, Area
 } from 'recharts';
@@ -44,6 +44,12 @@ const COLORS = {
   }
 };
 
+// Format date for display
+const formatDate = (dateStr: string) => {
+  const date = new Date(dateStr);
+  return date.toLocaleDateString('en-GB', { day: '2-digit', month: 'short' });
+};
+
 /**
  * Component to display advanced analytics charts for user activities
  */
@@ -53,15 +59,8 @@ export const AdvancedCharts: React.FC<AdvancedChartsProps> = ({ activities }) =>
   const [userActivity, setUserActivity] = useState<any[]>([]);
   const [breachTrend, setBreachTrend] = useState<any[]>([]);
   
-  // Calculate data when activities or time range changes
-  useEffect(() => {
-    calculateRiskTrend();
-    calculateUserActivity();
-    calculateBreachTrend();
-  }, [activities, timeRange]);
-  
   // Calculate risk score trends over time
-  const calculateRiskTrend = () => {
+  const calculateRiskTrend = useCallback(() => {
     const days = parseInt(timeRange);
     const dateMap = new Map();
     
@@ -96,7 +95,7 @@ export const AdvancedCharts: React.FC<AdvancedChartsProps> = ({ activities }) =>
       
       if (dateMap.has(dateStr)) {
         const entry = dateMap.get(dateStr);
-        entry.totalScore += activity.riskScore;
+        entry.totalScore += activity.riskScore ?? 0;
         entry.count++;
       }
     });
@@ -114,10 +113,10 @@ export const AdvancedCharts: React.FC<AdvancedChartsProps> = ({ activities }) =>
     result.sort((a, b) => a.date.localeCompare(b.date));
     
     setRiskTrend(result);
-  };
+  }, [activities, timeRange]);
   
   // Calculate top users by activity count
-  const calculateUserActivity = () => {
+  const calculateUserActivity = useCallback(() => {
     const userMap = new Map();
     
     activities.forEach(activity => {
@@ -135,11 +134,10 @@ export const AdvancedCharts: React.FC<AdvancedChartsProps> = ({ activities }) =>
       
       const entry = userMap.get(user);
       entry.activities++;
-      entry.totalScore += activity.riskScore;
-      
-      if (activity.riskScore >= 70) {
+      if (activity.riskScore !== undefined && activity.riskScore >= 70) {
         entry.highRisk++;
       }
+      entry.totalScore += activity.riskScore ?? 0;
     });
     
     // Calculate averages
@@ -153,10 +151,10 @@ export const AdvancedCharts: React.FC<AdvancedChartsProps> = ({ activities }) =>
     
     // Take top 10 users
     setUserActivity(result.slice(0, 10));
-  };
+  }, [activities]);
   
   // Calculate breach trends over time
-  const calculateBreachTrend = () => {
+  const calculateBreachTrend = useCallback(() => {
     const days = parseInt(timeRange);
     const dateMap = new Map();
     
@@ -196,27 +194,27 @@ export const AdvancedCharts: React.FC<AdvancedChartsProps> = ({ activities }) =>
       const entry = dateMap.get(dateStr);
       
       // Count policy breaches
-      if (activity.policiesBreached) {
-        Object.keys(activity.policiesBreached).forEach(category => {
-          const breaches = activity.policiesBreached[category];
-          const count = Array.isArray(breaches) ? breaches.length : (breaches ? 1 : 0);
-          
-          if (count === 0) return;
-          
-          entry.total += count;
-          
-          // Categorize common breach types
-          if (category === 'dataLeakage') {
-            entry.dataLeakage += count;
-          } else if (category === 'pii') {
-            entry.pii += count;
-          } else if (category === 'sensitive') {
-            entry.sensitive += count;
-          } else {
-            entry.other += count;
-          }
-        });
-      }
+      if (!activity.policiesBreached) return;
+      const breaches = activity.policiesBreached;
+      
+      Object.keys(breaches).forEach(category => {
+        const count = Array.isArray(breaches[category]) ? breaches[category].length : (breaches[category] ? 1 : 0);
+        
+        if (count === 0) return;
+        
+        entry.total += count;
+        
+        // Categorize common breach types
+        if (category === 'dataLeakage') {
+          entry.dataLeakage += count;
+        } else if (category === 'pii') {
+          entry.pii += count;
+        } else if (category === 'sensitive') {
+          entry.sensitive += count;
+        } else {
+          entry.other += count;
+        }
+      });
     });
     
     // Convert to array and sort by date
@@ -224,17 +222,18 @@ export const AdvancedCharts: React.FC<AdvancedChartsProps> = ({ activities }) =>
     result.sort((a, b) => a.date.localeCompare(b.date));
     
     setBreachTrend(result);
-  };
+  }, [activities, timeRange]);
+  
+  // Calculate data when activities or time range changes
+  useEffect(() => {
+    calculateRiskTrend();
+    calculateUserActivity();
+    calculateBreachTrend();
+  }, [calculateRiskTrend, calculateUserActivity, calculateBreachTrend]);
   
   // Handle time range change
   const handleTimeRangeChange = (event: SelectChangeEvent) => {
     setTimeRange(event.target.value);
-  };
-  
-  // Format date for display
-  const formatDate = (dateStr: string) => {
-    const date = new Date(dateStr);
-    return date.toLocaleDateString('en-GB', { day: '2-digit', month: 'short' });
   };
 
   return (
@@ -270,7 +269,6 @@ export const AdvancedCharts: React.FC<AdvancedChartsProps> = ({ activities }) =>
             <XAxis dataKey="date" />
             <YAxis domain={[0, 100]} />
             <Tooltip formatter={(value) => [`${value}`, 'Risk Score']} />
-            <Legend />
             <Line 
               type="monotone" 
               dataKey="avgRiskScore" 
@@ -298,7 +296,6 @@ export const AdvancedCharts: React.FC<AdvancedChartsProps> = ({ activities }) =>
             <XAxis type="number" />
             <YAxis type="category" dataKey="user" width={100} />
             <Tooltip formatter={(value) => [`${value}`, 'Count']} />
-            <Legend />
             <Bar 
               dataKey="activities" 
               name="Total Activities" 
@@ -327,7 +324,6 @@ export const AdvancedCharts: React.FC<AdvancedChartsProps> = ({ activities }) =>
             <XAxis dataKey="date" />
             <YAxis />
             <Tooltip formatter={(value) => [`${value}`, 'Breaches']} />
-            <Legend />
             <Area 
               type="monotone" 
               dataKey="dataLeakage" 

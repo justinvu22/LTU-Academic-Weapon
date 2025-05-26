@@ -1,12 +1,12 @@
 "use client";
 
 import React, { useState } from "react";
-import { FaInfoCircle, FaPlus, FaTrash, FaMinus, FaArrowLeft } from "react-icons/fa";
+import { FaInfoCircle, FaPlus, FaMinus, FaArrowLeft } from "react-icons/fa";
 import Tooltip from '@mui/material/Tooltip';
 import '@fontsource/ibm-plex-sans/400.css';
 import '@fontsource/ibm-plex-sans/500.css';
 import '@fontsource/ibm-plex-sans/600.css';
-import ComboBox, { ComboBoxOption } from '../../components/ComboBox';
+import ComboBox from '../../components/ComboBox';
 import Switch from '@mui/material/Switch';
 import Link from "next/link";
 import TextField from '@mui/material/TextField';

@@ -1,9 +1,8 @@
 import React, { useState } from 'react';
-import { Box, Typography, TextField, Button, IconButton, Paper, Divider, FormControl, InputLabel, Select, MenuItem, FormHelperText } from '@mui/material';
+import { Box, Typography, TextField, Button, IconButton, Paper, FormControl, InputLabel, Select, MenuItem, FormHelperText } from '@mui/material';
 import AddIcon from '@mui/icons-material/Add';
 import RemoveIcon from '@mui/icons-material/Remove';
 import { styled } from '@mui/material/styles';
-import { useTheme } from '@mui/material/styles';
 
 // Styled components for dark, minimal, professional look
 const StyledPaper = styled(Paper)(({ theme }) => ({
@@ -50,11 +49,6 @@ const StyledIconButton = styled(IconButton)(({ theme }) => ({
   },
 }));
 
-const StyledDivider = styled(Divider)(({ theme }) => ({
-  margin: theme.spacing(2, 0),
-  backgroundColor: '#333',
-}));
-
 const StyledFormControl = styled(FormControl)(({ theme }) => ({
   '& .MuiOutlinedInput-root': {
     '& fieldset': {
@@ -79,7 +73,6 @@ const StyledFormControl = styled(FormControl)(({ theme }) => ({
 }));
 
 const CustomAlerts: React.FC = () => {
-  const theme = useTheme();
   const [alertName, setAlertName] = useState('');
   const [description, setDescription] = useState('');
   const [conditions, setConditions] = useState([{ metric: '', operator: '', value: '' }]);

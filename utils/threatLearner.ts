@@ -445,7 +445,7 @@ class ThreatLearner {
     
     // Extract high-risk activities
     const highRiskActivities = activities
-      .filter(a => a.riskScore >= 75)
+      .filter(a => (a.riskScore || 0) >= 75)
       .slice(0, 200); // Limit to 200 for performance
     
     if (highRiskActivities.length < 10) {

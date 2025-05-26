@@ -1,22 +1,20 @@
 "use client";
 
-import * as tf from '@tensorflow/tfjs';
 import { 
   UserActivity, 
   MLRecommendation, 
   RecommendationCategory 
 } from '../types/activity';
 import { RISK_THRESHOLDS } from '../utils/dataProcessor';
+import { AnomalyDetector, AnomalyDetectionResult } from './anomalyDetector';
 
-// Remove risk threshold constants since we shouldn't calculate risk scores
+// Configuration constants
 const UNUSUAL_HOUR_START = 22; // 10 PM
 const UNUSUAL_HOUR_END = 6; // 6 AM
 const CONSECUTIVE_FAILURES_THRESHOLD = 3;
-const BULK_OPERATIONS_THRESHOLD = 5;
-const HIGH_DATA_VOLUME_THRESHOLD = 50; // MB
 
 /**
- * Configuration options for recommendation engine
+ * Enhanced configuration options for recommendation engine
  */
 export interface RecommendationEngineConfig {
   sensitivityLevel?: 'low' | 'medium' | 'high';
@@ -24,17 +22,25 @@ export interface RecommendationEngineConfig {
   confidenceThreshold?: number;
   maxRecommendations?: number;
   useAdvancedAnalysis?: boolean;
+  useAnomalyDetection?: boolean;
+  criticalHours?: number[];
+  temporalBurstMultiplier?: number;
+  learnFromManagerActions?: boolean;
 }
 
 /**
  * Default configuration for recommendation engine
  */
-const DEFAULT_CONFIG: RecommendationEngineConfig = {
+const DEFAULT_CONFIG: Required<RecommendationEngineConfig> = {
   sensitivityLevel: 'medium',
   includeAllRecommendations: false,
   confidenceThreshold: 0.65,
   maxRecommendations: 10,
   useAdvancedAnalysis: true,
+  useAnomalyDetection: true,
+  criticalHours: [1, 2, 3],
+  temporalBurstMultiplier: 5,
+  learnFromManagerActions: true,
 };
 
 /**
@@ -43,79 +49,54 @@ const DEFAULT_CONFIG: RecommendationEngineConfig = {
 type PatternDetector = (activities: UserActivity[], user: string) => MLRecommendation | null;
 
 /**
- * Recommendation Engine that analyzes user activities and generates ML-based recommendations
+ * Enhanced Recommendation Engine with integrated anomaly detection
  */
 export class RecommendationEngine {
   private config: Required<RecommendationEngineConfig>;
   private patternDetectors: PatternDetector[];
-  private model: tf.LayersModel | null = null;
-  private isModelLoaded = false;
+  private anomalyDetector: AnomalyDetector;
+  private isInitialized = false;
+  private anomalyResults: Map<string, AnomalyDetectionResult> = new Map();
 
-  /**
-   * Creates a new recommendation engine instance
-   * @param config Configuration options
-   */
-  constructor(config: RecommendationEngineConfig = DEFAULT_CONFIG) {
-    // Set defaults for required config
+  constructor(config: RecommendationEngineConfig = {}) {
+    // Merge with defaults
     this.config = {
-      sensitivityLevel: config.sensitivityLevel || 'medium',
-      confidenceThreshold: config.confidenceThreshold || 0.65,
-      maxRecommendations: config.maxRecommendations || 10,
-      useAdvancedAnalysis: config.useAdvancedAnalysis || false,
-      includeAllRecommendations: config.includeAllRecommendations || false
+      ...DEFAULT_CONFIG,
+      ...config
     };
+    
+    // Initialize anomaly detector with configuration
+    this.anomalyDetector = new AnomalyDetector({
+      lowThreshold: this.config.sensitivityLevel === 'low' ? 0.5 : 0.6,
+      mediumThreshold: this.config.sensitivityLevel === 'low' ? 0.65 : 0.75,
+      highThreshold: this.config.sensitivityLevel === 'low' ? 0.8 : 0.9,
+      analyzeTemporalBursts: true,
+      analyzeIntegrationPatterns: true,
+      learnFromManagerActions: this.config.learnFromManagerActions,
+      criticalHours: this.config.criticalHours,
+      burstMultiplier: this.config.temporalBurstMultiplier,
+    });
+    
     this.patternDetectors = this.initializePatternDetectors();
-    this.initializeModel();
   }
 
   /**
-   * Initializes the TensorFlow model for anomaly detection
-   * This is a lightweight client-side model
+   * Initialize the engine with historical data for baseline learning
    */
-  private async initializeModel(): Promise<void> {
-    try {
-      // In a production environment, we would load from a CDN or local storage
-      // For now, we'll create a simple model for anomaly detection
-      const model = tf.sequential();
-      
-      // Add layers to create a simple autoencoder for anomaly detection
-      model.add(tf.layers.dense({
-        inputShape: [10], // Input features
-        units: 6,
-        activation: 'relu'
-      }));
-      
-      model.add(tf.layers.dense({
-        units: 3,
-        activation: 'relu'
-      }));
-      
-      model.add(tf.layers.dense({
-        units: 6,
-        activation: 'relu'
-      }));
-      
-      model.add(tf.layers.dense({
-        units: 10,
-        activation: 'sigmoid'
-      }));
-      
-      model.compile({
-        optimizer: 'adam',
-        loss: 'meanSquaredError'
-      });
-      
-      this.model = model;
-      this.isModelLoaded = true;
-    } catch (error) {
-      console.error('Failed to initialize TensorFlow model:', error);
-      // Continue without ML model if it fails to load
-      this.isModelLoaded = false;
+  public async initialize(historicalActivities: UserActivity[]): Promise<void> {
+    console.log(`Initializing RecommendationEngine with ${historicalActivities.length} historical activities`);
+    
+    // Build anomaly detection baselines
+    if (this.config.useAnomalyDetection) {
+      this.anomalyDetector.buildBaselines(historicalActivities);
     }
+    
+    this.isInitialized = true;
+    console.log('RecommendationEngine initialization complete');
   }
 
   /**
-   * Initialize all pattern detectors used by the engine
+   * Initialize all pattern detectors
    */
   private initializePatternDetectors(): PatternDetector[] {
     return [
@@ -127,25 +108,51 @@ export class RecommendationEngine {
       this.detectUnusualApplicationUsage,
       this.detectAccountSharing,
       this.detectSequentialBehavior,
+      this.detectHighVolumeActivity,
+      this.detectFrequencyAnomalies,
+      this.detectDataVolumeAnomalies,
+      this.detectIntegrationAnomalies,
+      // NEW: Anomaly-based detectors
+      this.detectAnomalyBasedThreats,
+      this.detectTemporalBurstPatterns,
     ];
   }
 
   /**
    * Generate recommendations based on user activities
-   * @param activities Array of user activities to analyze
-   * @returns Array of ML-based recommendations
    */
   public generateRecommendations(activities: UserActivity[]): MLRecommendation[] {
     if (!activities || activities.length === 0) {
       return [];
     }
     
+    console.log(`🔍 Starting analysis of ${activities.length} activities`);
+    
+    // Run anomaly detection first if enabled
+    if (this.config.useAnomalyDetection) {
+      // Build baselines if not initialized
+      if (!this.isInitialized && activities.length >= 100) {
+        console.log('Auto-initializing anomaly detector with current activities');
+        this.anomalyDetector.buildBaselines(activities);
+        this.isInitialized = true;
+      }
+      
+      // Detect anomalies for all activities
+      this.anomalyResults = this.anomalyDetector.detectAnomalies(activities);
+      const anomalyCount = Array.from(this.anomalyResults.values()).filter(r => r.isAnomaly).length;
+      console.log(`🎯 Detected ${anomalyCount} anomalies out of ${activities.length} activities`);
+    }
+    
     const allRecommendations: MLRecommendation[] = [];
+    
+    // Check for global temporal burst first
+    const globalBurst = this.detectGlobalTemporalBurst(activities);
+    if (globalBurst) {
+      allRecommendations.push(globalBurst);
+    }
     
     // Group activities by user
     const usersMap = new Map<string, UserActivity[]>();
-    
-    // Group activities by user
     activities.forEach(activity => {
       const user = activity.username || activity.userId || activity.user || '';
       if (!user) return;
@@ -155,44 +162,367 @@ export class RecommendationEngine {
       usersMap.set(user, userActivities);
     });
     
+    console.log(`👥 Found ${usersMap.size} unique users`);
+    
     // Run pattern detection for each user
+    let detectorResults = new Map<string, number>();
     usersMap.forEach((userActivities, user) => {
-      this.patternDetectors.forEach(detector => {
+      this.patternDetectors.forEach((detector, index) => {
         try {
           const recommendation = detector.call(this, userActivities, user);
-          if (recommendation && 
-              recommendation.confidence >= this.config.confidenceThreshold) {
+          const detectorName = detector.name || `detector_${index}`;
+          detectorResults.set(detectorName, (detectorResults.get(detectorName) || 0) + (recommendation ? 1 : 0));
+          
+          if (recommendation) {
+            // Boost confidence with anomaly detection
+            if (this.config.useAnomalyDetection) {
+              this.boostRecommendationWithAnomalies(recommendation);
+            }
+            
+            // Apply dynamic confidence adjustment
+            const activityVolumeBonus = Math.min(userActivities.length / 100, 0.2);
+            recommendation.confidence = Math.min(recommendation.confidence + activityVolumeBonus, 1.0);
+            
+            if (recommendation.confidence >= this.config.confidenceThreshold) {
             allRecommendations.push(recommendation);
+            }
           }
         } catch (error) {
-          console.warn(`Pattern detector error for user ${user}:`, error);
+          console.warn(`⚠️ Pattern detector error for user ${user}:`, error);
         }
       });
     });
     
-    // Only run advanced analysis if enabled
-    if (this.config.useAdvancedAnalysis) {
-      console.log('Running advanced ML analysis');
-      // Add more advanced pattern detection here
-    }
+    console.log('🎯 Detection Results:', Object.fromEntries(detectorResults));
+    console.log(`📊 Generated ${allRecommendations.length} recommendations before filtering`);
     
-    // Sort by confidence and limit to maximum number
-    const filteredRecommendations = allRecommendations
-      .filter(rec => rec.confidence >= this.config.confidenceThreshold)
-      .sort((a, b) => b.confidence - a.confidence);
+    // Deduplicate and prioritize
+    const deduplicatedRecommendations = this.deduplicateRecommendations(allRecommendations);
     
-    // Limit to maximum number
-    return filteredRecommendations.slice(0, this.config.maxRecommendations);
+    // Sort by severity and confidence
+    const sortedRecommendations = deduplicatedRecommendations.sort((a, b) => {
+      const severityOrder = { critical: 4, high: 3, medium: 2, low: 1 };
+      const severityDiff = (severityOrder[b.severity] || 0) - (severityOrder[a.severity] || 0);
+      if (severityDiff !== 0) return severityDiff;
+      return b.confidence - a.confidence;
+    });
+    
+    console.log(`✅ Final recommendations: ${sortedRecommendations.length}`);
+    
+    return sortedRecommendations.slice(0, this.config.maxRecommendations);
   }
 
   /**
-   * Detect when a user has multiple high-risk activities based on their existing risk score
+   * NEW: Detect global temporal burst (system-wide anomaly)
    */
+  private detectGlobalTemporalBurst(activities: UserActivity[]): MLRecommendation | null {
+    const hourlyActivity = new Map<number, UserActivity[]>();
+    
+    activities.forEach(activity => {
+      const hour = this.extractHour(activity);
+      if (hour !== null) {
+        if (!hourlyActivity.has(hour)) {
+          hourlyActivity.set(hour, []);
+        }
+        hourlyActivity.get(hour)!.push(activity);
+      }
+    });
+    
+    const totalActivities = activities.length;
+    const expectedPerHour = totalActivities / 24;
+    
+    // Check critical hours
+    const criticalBursts: { hour: number; count: number; multiplier: number }[] = [];
+    
+    this.config.criticalHours.forEach(hour => {
+      const count = hourlyActivity.get(hour)?.length || 0;
+      const multiplier = count / expectedPerHour;
+      
+      if (multiplier >= this.config.temporalBurstMultiplier) {
+        criticalBursts.push({ hour, count, multiplier });
+      }
+    });
+    
+    if (criticalBursts.length > 0) {
+      const totalCriticalActivities = criticalBursts.reduce((sum, b) => sum + b.count, 0);
+      const affectedUsers = new Set<string>();
+      
+      criticalBursts.forEach(({ hour }) => {
+        hourlyActivity.get(hour)?.forEach(activity => {
+          const user = activity.username || activity.userId || activity.user || '';
+          if (user) affectedUsers.add(user);
+        });
+      });
+      
+      const criticalHourString = criticalBursts.map(b => `${b.hour}:00`).join(', ');
+      const maxMultiplier = Math.max(...criticalBursts.map(b => b.multiplier));
+      
+      return {
+        id: `global_critical_burst_${Date.now()}`,
+        title: 'CRITICAL: System-Wide Temporal Anomaly Detected',
+        description: `Massive activity spike detected during critical hours (${criticalHourString}). ${totalCriticalActivities} activities (${maxMultiplier.toFixed(1)}x normal) affecting ${affectedUsers.size} users. This matches known attack patterns.`,
+        severity: 'critical',
+        confidence: 0.99,
+        affectedUsers: Array.from(affectedUsers).slice(0, 10),
+        suggestedActions: [
+          'IMMEDIATE ACTION REQUIRED: Potential system-wide security breach',
+          'Activate incident response team',
+          'Review all activities during burst period for data exfiltration',
+          'Check for compromised service accounts or automated attacks',
+          'Consider temporary system-wide security measures',
+        ],
+        timestamp: new Date().toISOString(),
+        category: 'critical_anomaly' as RecommendationCategory,
+        relatedActivities: criticalBursts.flatMap(({ hour }) => 
+          (hourlyActivity.get(hour) || []).map(a => a.id).slice(0, 20)
+        ),
+      };
+    }
+    
+    return null;
+  }
+
+  /**
+   * NEW: Detect patterns based on anomaly scores
+   */
+  private detectAnomalyBasedThreats(activities: UserActivity[], user: string): MLRecommendation | null {
+    if (!this.config.useAnomalyDetection || this.anomalyResults.size === 0) {
+      return null;
+    }
+    
+    const criticalAnomalies: { activity: UserActivity; result: AnomalyDetectionResult }[] = [];
+    const highAnomalies: { activity: UserActivity; result: AnomalyDetectionResult }[] = [];
+    
+    activities.forEach(activity => {
+      if (!activity.id) return;
+      const anomalyResult = this.anomalyResults.get(activity.id);
+      if (anomalyResult && anomalyResult.isAnomaly) {
+        if (anomalyResult.severity === 'critical') {
+          criticalAnomalies.push({ activity, result: anomalyResult });
+        } else if (anomalyResult.severity === 'high') {
+          highAnomalies.push({ activity, result: anomalyResult });
+        }
+      }
+    });
+    
+    // Generate recommendation for critical anomalies
+    if (criticalAnomalies.length > 0) {
+      const factors = new Set<string>();
+      const suggestedActions = new Set<string>();
+      
+      criticalAnomalies.forEach(({ result }) => {
+        result.factors.forEach(f => factors.add(f));
+        if (result.suggestedAction) {
+          suggestedActions.add(result.suggestedAction);
+        }
+      });
+      
+      return {
+        id: `${user}_critical_anomalies_${Date.now()}`,
+        title: `Critical Security Anomalies: ${user}`,
+        description: `${criticalAnomalies.length} critical anomalies detected. Key factors: ${Array.from(factors).slice(0, 3).join('; ')}`,
+        severity: 'critical',
+        confidence: Math.max(...criticalAnomalies.map(({ result }) => result.confidence)),
+        affectedUsers: [user],
+        suggestedActions: [
+          ...Array.from(suggestedActions),
+          'Conduct immediate security review',
+          'Consider temporary access suspension',
+        ].slice(0, 4),
+        timestamp: new Date().toISOString(),
+        category: 'critical_anomaly' as RecommendationCategory,
+        relatedActivities: criticalAnomalies.map(({ activity }) => activity.id),
+      };
+    }
+    
+    // Generate recommendation for multiple high anomalies
+    if (highAnomalies.length >= 3) {
+      const factors = new Set<string>();
+      highAnomalies.forEach(({ result }) => {
+        result.factors.forEach(f => factors.add(f));
+      });
+      
+      return {
+        id: `${user}_high_anomalies_${Date.now()}`,
+        title: `Multiple Anomalies Detected: ${user}`,
+        description: `${highAnomalies.length} high-severity anomalies detected. Common factors: ${Array.from(factors).slice(0, 2).join('; ')}`,
+        severity: 'high',
+        confidence: 0.88,
+        affectedUsers: [user],
+        suggestedActions: [
+          'Review user activity history',
+          'Verify recent behavior changes',
+          'Consider enhanced monitoring',
+        ],
+        timestamp: new Date().toISOString(),
+        category: 'unusual_behavior',
+        relatedActivities: highAnomalies.map(({ activity }) => activity.id),
+      };
+    }
+    
+    return null;
+  }
+
+  /**
+   * NEW: Detect temporal burst patterns for individual users
+   */
+  private detectTemporalBurstPatterns(activities: UserActivity[], user: string): MLRecommendation | null {
+    const hourlyActivity = new Map<number, UserActivity[]>();
+    
+    activities.forEach(activity => {
+      const hour = this.extractHour(activity);
+      if (hour !== null) {
+        if (!hourlyActivity.has(hour)) {
+          hourlyActivity.set(hour, []);
+        }
+        hourlyActivity.get(hour)!.push(activity);
+      }
+    });
+    
+    const avgPerHour = activities.length / 24;
+    const burstHours: number[] = [];
+    const burstActivities: UserActivity[] = [];
+    
+    hourlyActivity.forEach((hourActivities, hour) => {
+      const multiplier = hourActivities.length / avgPerHour;
+      if (multiplier >= this.config.temporalBurstMultiplier) {
+        burstHours.push(hour);
+        burstActivities.push(...hourActivities);
+      }
+    });
+    
+    const criticalBurstHours = burstHours.filter(h => this.config.criticalHours.includes(h));
+    
+    if (criticalBurstHours.length > 0) {
+      const criticalActivities = activities.filter(a => {
+        const hour = this.extractHour(a);
+        return hour !== null && criticalBurstHours.includes(hour);
+      });
+      
+      return {
+        id: `${user}_critical_burst_${Date.now()}`,
+        title: `Critical Temporal Burst: ${user}`,
+        description: `User ${user} has excessive activity during critical hours ${criticalBurstHours.join(', ')}:00. ${criticalActivities.length} activities detected, which is ${(criticalActivities.length / avgPerHour).toFixed(1)}x normal volume`,
+        severity: 'critical',
+        confidence: 0.95,
+        affectedUsers: [user],
+        suggestedActions: [
+          'Immediate investigation required - possible automated attack or data exfiltration',
+          'Check if account has been compromised',
+          'Review all activities during burst period for malicious patterns',
+          'Consider suspending account access until investigation complete',
+        ],
+        timestamp: new Date().toISOString(),
+        category: 'temporal_burst' as RecommendationCategory,
+        relatedActivities: criticalActivities.map(a => a.id),
+      };
+    }
+    
+    return null;
+  }
+
+  /**
+   * Helper method to boost recommendation confidence based on anomaly detection
+   */
+  private boostRecommendationWithAnomalies(
+    recommendation: MLRecommendation
+  ): void {
+    if (!recommendation.relatedActivities) return;
+    
+    let anomalyCount = 0;
+    let maxAnomalyScore = 0;
+    let criticalCount = 0;
+    
+    recommendation.relatedActivities.forEach(activityId => {
+      const anomalyResult = this.anomalyResults.get(activityId);
+      if (anomalyResult && anomalyResult.isAnomaly) {
+        anomalyCount++;
+        maxAnomalyScore = Math.max(maxAnomalyScore, anomalyResult.anomalyScore);
+        if (anomalyResult.severity === 'critical') {
+          criticalCount++;
+        }
+      }
+    });
+    
+    if (anomalyCount > 0) {
+      const anomalyRatio = anomalyCount / recommendation.relatedActivities.length;
+      
+      // Boost confidence based on anomaly detection agreement
+      const boost = Math.min(0.15, anomalyRatio * 0.2 * maxAnomalyScore);
+      recommendation.confidence = Math.min(0.99, recommendation.confidence + boost);
+      
+      // Upgrade severity if many anomalies or critical anomalies
+      if (criticalCount > 0 && recommendation.severity !== 'critical') {
+        recommendation.severity = 'high';
+      } else if (anomalyRatio > 0.5 && recommendation.severity === 'medium') {
+        recommendation.severity = 'high';
+      }
+    }
+  }
+
+  /**
+   * Deduplicate recommendations
+   */
+  private deduplicateRecommendations(recommendations: MLRecommendation[]): MLRecommendation[] {
+    const seen = new Map<string, MLRecommendation>();
+    
+    recommendations.forEach(rec => {
+      const key = `${rec.affectedUsers.sort().join(',')}_${rec.category}`;
+      
+      if (!seen.has(key)) {
+        seen.set(key, rec);
+      } else {
+        const existing = seen.get(key)!;
+        
+        if (rec.confidence > existing.confidence || 
+            (rec.severity === 'critical' && existing.severity !== 'critical')) {
+          seen.set(key, rec);
+        } else {
+          existing.relatedActivities = [
+            ...new Set([
+              ...(existing.relatedActivities || []),
+              ...(rec.relatedActivities || [])
+            ])
+          ];
+        }
+      }
+    });
+    
+    return Array.from(seen.values());
+  }
+
+  /**
+   * Helper method to extract hour from activity
+   */
+  private extractHour(activity: UserActivity): number | null {
+    if (activity.hour !== undefined && activity.hour !== null) {
+      return activity.hour;
+    }
+    
+    if (activity.timestamp) {
+      try {
+        return new Date(activity.timestamp).getHours();
+      } catch (e) {
+        // Invalid timestamp
+      }
+    }
+    
+    if (activity.time) {
+      const match = /(\d{1,2})[:h]/i.exec(activity.time);
+      if (match && match[1]) {
+        return parseInt(match[1], 10);
+      }
+    }
+    
+    return null;
+  }
+
+  // Keep all existing pattern detectors
   private detectActivityPatterns(activities: UserActivity[], user: string): MLRecommendation | null {
-    // Filter for activities that already have high risk scores in the input data
+    const moderateRiskActivities = activities.filter(a => a.riskScore && a.riskScore > 40);
     const highRiskActivities = activities.filter(a => a.riskScore && a.riskScore > RISK_THRESHOLDS.HIGH);
     
-    if (highRiskActivities.length >= 2) {
+    if (highRiskActivities.length >= 1) {
       return {
         id: `${user}_high_risk_${Date.now()}`,
         title: 'Critical Risk Activity Pattern',
@@ -209,61 +539,88 @@ export class RecommendationEngine {
         category: 'high_risk_sequence',
         relatedActivities: highRiskActivities.map(a => a.id)
       };
-    }
-    
-    return null;
-  }
-  
-  /**
-   * Detect unusual time patterns (activities during non-business hours)
-   */
-  private detectUnusualTimePatterns(activities: UserActivity[], user: string): MLRecommendation | null {
-    const nightActivities = activities.filter(activity => {
-        let hour = -1;
-        
-        if (activity.timestamp) {
-          const date = new Date(activity.timestamp);
-          hour = date.getHours();
-        } else if (activity.time) {
-          const timeParts = activity.time.split(':');
-          if (timeParts.length >= 1) {
-          hour = parseInt(timeParts[0]);
-        }
-      }
-      
-      return hour >= 0 && (hour >= UNUSUAL_HOUR_START || hour < UNUSUAL_HOUR_END);
-    });
-    
-    if (nightActivities.length >= 2) {
+    } else if (moderateRiskActivities.length >= 3) {
       return {
-        id: `${user}_unusual_time_${Date.now()}`,
-        title: 'Off-Hours Activity Pattern',
-        description: `User ${user} has been active during non-business hours ${nightActivities.length} times`,
+        id: `${user}_moderate_risk_${Date.now()}`,
+        title: 'Moderate Risk Activity Pattern',
+        description: `User ${user} has performed ${moderateRiskActivities.length} activities with elevated risk scores`,
         severity: 'medium',
-        confidence: 0.75,
+        confidence: 0.65,
         affectedUsers: [user],
         suggestedActions: [
-          'Review access patterns and business justification',
-          'Consider requiring approval for off-hours access',
-          'Set up real-time alerts for future off-hours activity',
+          'Monitor user activity patterns',
+          'Review recent access patterns',
+          'Consider risk assessment interview',
         ],
         timestamp: new Date().toISOString(),
-        category: 'suspicious_timing',
-        relatedActivities: nightActivities.map(a => a.id)
+        category: 'unusual_behavior',
+        relatedActivities: moderateRiskActivities.slice(0, 10).map(a => a.id)
       };
     }
     
     return null;
   }
   
-  /**
-   * Detect sensitive data access patterns from existing policy breach flags
-   */
+  private detectUnusualTimePatterns(activities: UserActivity[], user: string): MLRecommendation | null {
+    const nightActivities = activities.filter(activity => {
+      const hour = this.extractHour(activity);
+      if (hour === null) return false;
+      
+      const isOffHour = hour >= UNUSUAL_HOUR_START || hour < UNUSUAL_HOUR_END;
+      const isCriticalHour = this.config.criticalHours.includes(hour);
+      
+      // Check anomaly score if available
+      let hasTimeAnomaly = false;
+      if (activity.id && this.anomalyResults.has(activity.id)) {
+        const anomalyResult = this.anomalyResults.get(activity.id)!;
+        hasTimeAnomaly = anomalyResult.isAnomaly && 
+          anomalyResult.factors.some(f => f.toLowerCase().includes('time') || f.toLowerCase().includes('hour'));
+      }
+      
+      return isOffHour || isCriticalHour || hasTimeAnomaly;
+    });
+    
+    if (nightActivities.length >= 1) {
+      const criticalHourActivities = nightActivities.filter(a => {
+        const hour = this.extractHour(a);
+        return hour !== null && this.config.criticalHours.includes(hour);
+      });
+      
+      const severity = criticalHourActivities.length > 0 ? 'high' : 
+                      nightActivities.length >= 5 ? 'high' : 'medium';
+      
+      return {
+        id: `${user}_unusual_time_${Date.now()}`,
+        title: criticalHourActivities.length > 0 ? 
+          `Critical Hours Activity: ${user}` : 
+          `Off-Hours Activity Pattern: ${user}`,
+        description: criticalHourActivities.length > 0 ?
+          `User ${user} has ${criticalHourActivities.length} activities during critical monitoring hours (1-3 AM)` :
+          `User ${user} has been active during non-business hours ${nightActivities.length} times`,
+        severity,
+        confidence: criticalHourActivities.length > 0 ? 0.90 : 0.70 + (nightActivities.length * 0.05),
+        affectedUsers: [user],
+        suggestedActions: criticalHourActivities.length > 0 ? [
+          'Investigate immediately - activity during known attack hours',
+          'Check for automated/scripted behavior',
+          'Review account for compromise indicators',
+        ] : [
+          'Review access patterns and business justification',
+          'Consider requiring approval for off-hours access',
+          'Set up real-time alerts for future off-hours activity',
+        ],
+        timestamp: new Date().toISOString(),
+        category: 'suspicious_timing',
+        relatedActivities: nightActivities.map(a => a.id),
+      };
+    }
+    
+    return null;
+  }
+  
   private detectSensitiveDataAccess(activities: UserActivity[], user: string): MLRecommendation | null {
     const sensitiveBreaches = activities.filter(activity => {
       if (!activity.policiesBreached) return false;
-      
-      // Use existing policy breach data
       return Object.keys(activity.policiesBreached).length > 0;
     });
     
@@ -289,11 +646,7 @@ export class RecommendationEngine {
     return null;
   }
   
-  /**
-   * Detect failed access attempts
-   */
   private detectFailedAccessAttempts(activities: UserActivity[], user: string): MLRecommendation | null {
-    // Look for activities that indicate failed access attempts
     const failedAccessAttempts = activities.filter(activity => {
       const activityLower = (activity.activity || '').toLowerCase();
       return (
@@ -326,32 +679,26 @@ export class RecommendationEngine {
     return null;
   }
   
-  /**
-   * Detect access from multiple locations in short timeframe
-   */
   private detectMultiLocationAccess(activities: UserActivity[], user: string): MLRecommendation | null {
-    // Filter activities with location data and sort by timestamp
     const activitiesWithLocation = activities
-      .filter(a => a.location)
-      .sort((a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime());
+      .filter(a => a.location && a.timestamp)
+      .sort((a, b) => new Date(a.timestamp!).getTime() - new Date(b.timestamp!).getTime());
     
     if (activitiesWithLocation.length < 2) {
       return null;
     }
     
-    // Check for impossible travel (different locations in short timeframe)
     const suspiciousActivities: UserActivity[] = [];
     
     for (let i = 0; i < activitiesWithLocation.length - 1; i++) {
       const currentActivity = activitiesWithLocation[i];
       const nextActivity = activitiesWithLocation[i + 1];
       
-      const currentTime = new Date(currentActivity.timestamp).getTime();
-      const nextTime = new Date(nextActivity.timestamp).getTime();
+      const currentTime = new Date(currentActivity.timestamp!).getTime();
+      const nextTime = new Date(nextActivity.timestamp!).getTime();
       
       const timeDifferenceHours = (nextTime - currentTime) / (1000 * 60 * 60);
       
-      // If locations are different and time difference is less than 4 hours
       if (currentActivity.location !== nextActivity.location && timeDifferenceHours < 4) {
         suspiciousActivities.push(currentActivity);
         suspiciousActivities.push(nextActivity);
@@ -359,7 +706,6 @@ export class RecommendationEngine {
     }
     
     if (suspiciousActivities.length >= 2) {
-      // Create a set of unique locations from suspicious activities
       const uniqueLocations = new Set<string>();
       suspiciousActivities.forEach(activity => {
         if (activity.location) {
@@ -367,7 +713,6 @@ export class RecommendationEngine {
         }
       });
       
-      // Create a set of unique activity IDs
       const uniqueIds = new Set<string>();
       suspiciousActivities.forEach(activity => {
         uniqueIds.add(activity.id);
@@ -394,11 +739,7 @@ export class RecommendationEngine {
     return null;
   }
   
-  /**
-   * Detect unusual application or system usage
-   */
   private detectUnusualApplicationUsage(activities: UserActivity[], user: string): MLRecommendation | null {
-    // Group by integration/application
     const integrationUsage = new Map<string, number>();
     
     activities.forEach(activity => {
@@ -407,11 +748,9 @@ export class RecommendationEngine {
       integrationUsage.set(integration, count + 1);
     });
     
-    // Check for unusual application usage patterns
     const unusualApplications: string[] = [];
     
     integrationUsage.forEach((count, integration) => {
-      // Simple rule: if a rarely used application is suddenly used a lot
       if (count > 5 && activities.length > 10 && (count / activities.length) > 0.3) {
         unusualApplications.push(integration);
       }
@@ -443,21 +782,17 @@ export class RecommendationEngine {
     return null;
   }
   
-  /**
-   * Detect potential account sharing
-   */
   private detectAccountSharing(activities: UserActivity[], user: string): MLRecommendation | null {
-    // Analyze multiple sessions or concurrent access
     if (activities.length < 5) {
       return null;
     }
     
-    // Sort by timestamp
-    const sortedActivities = [...activities].sort((a, b) => {
-      return new Date(a.timestamp || new Date().toISOString()).getTime() - new Date(b.timestamp || new Date().toISOString()).getTime();
-    });
+    const sortedActivities = activities
+      .filter(a => a.timestamp)
+      .sort((a, b) => {
+        return new Date(a.timestamp!).getTime() - new Date(b.timestamp!).getTime();
+      });
     
-    // Check for concurrent sessions or rapid location changes
     let possibleSharing = false;
     const relatedActivityIds = new Set<string>();
     
@@ -465,11 +800,10 @@ export class RecommendationEngine {
       const current = sortedActivities[i];
       const next = sortedActivities[i + 1];
       
-      const currentTime = new Date(current.timestamp || new Date().toISOString()).getTime();
-      const nextTime = new Date(next.timestamp || new Date().toISOString()).getTime();
+      const currentTime = new Date(current.timestamp!).getTime();
+      const nextTime = new Date(next.timestamp!).getTime();
       
-      // If activities are very close in time but from different devices/locations
-      if ((nextTime - currentTime) < (5 * 60 * 1000)) { // Within 5 minutes
+      if ((nextTime - currentTime) < (5 * 60 * 1000)) {
         if (
           (current.deviceId && next.deviceId && current.deviceId !== next.deviceId) ||
           (current.location && next.location && current.location !== next.location) ||
@@ -504,19 +838,13 @@ export class RecommendationEngine {
     return null;
   }
   
-  /**
-   * Detect behavior sequences without calculating risk scores
-   */
   private detectSequentialBehavior(activities: UserActivity[], user: string): MLRecommendation | null {
-    // Look for specific sequences of activities that indicate suspicious behavior
-    // For example: access sensitive data → download files → delete access logs
+    const sortedActivities = activities
+      .filter(a => a.timestamp)
+      .sort((a, b) => {
+        return new Date(a.timestamp!).getTime() - new Date(b.timestamp!).getTime();
+      });
     
-    // Sort by timestamp
-    const sortedActivities = [...activities].sort((a, b) => {
-      return new Date(a.timestamp || new Date().toISOString()).getTime() - new Date(b.timestamp || new Date().toISOString()).getTime();
-    });
-    
-    // Simplified pattern detection - in a real system this would be more sophisticated
     const hasAccessedSensitiveData = sortedActivities.some(a => {
       return a.policiesBreached && Object.keys(a.policiesBreached).length > 0;
     });
@@ -528,22 +856,15 @@ export class RecommendationEngine {
     
     const hasTriedToRemoveEvidence = sortedActivities.some(a => {
       const activity = (a.activity || '').toLowerCase();
-      return (
-        activity.includes('delet') || 
-        activity.includes('remov') || 
-        activity.includes('clear') ||
-        activity.includes('history') ||
-        activity.includes('log')
-      );
+      return activity.includes('delete') || activity.includes('remove') || activity.includes('clear');
     });
     
-    // If the sequence indicates a suspicious pattern
     if (hasAccessedSensitiveData && hasDownloadedFiles && hasTriedToRemoveEvidence) {
       return {
         id: `${user}_suspicious_sequence_${Date.now()}`,
         title: 'Suspicious Activity Sequence Detected',
         description: `User ${user} performed a sequence of activities that may require investigation: accessing sensitive data, downloading files, and attempting to remove evidence`,
-        severity: 'critical',
+        severity: 'high',
         confidence: 0.92,
         affectedUsers: [user],
         suggestedActions: [
@@ -560,19 +881,153 @@ export class RecommendationEngine {
     return null;
   }
   
-  /**
-   * Extract features for activity patterns without calculating risk
-   */
-  private extractFeatures(activities: UserActivity[]): any[][] {
-    return activities.map(activity => {
-      // Extract existing features without calculating risk
-      return [
-        activity.timestamp ? new Date(activity.timestamp).getHours() : 12,
-        activity.activity ? 1 : 0,
-        activity.integration ? 1 : 0,
-        activity.location ? 1 : 0,
-        activity.policiesBreached ? Object.keys(activity.policiesBreached).length : 0
-      ];
+  private detectHighVolumeActivity(activities: UserActivity[], user: string): MLRecommendation | null {
+    if (activities.length >= 50) {
+      const uniqueDays = new Set(activities.map(a => {
+        if (a.timestamp) {
+          return new Date(a.timestamp).toDateString();
+        }
+        return 'unknown';
+      })).size;
+      
+      const avgPerDay = activities.length / (uniqueDays || 1);
+      
+      if (avgPerDay >= 10) {
+        return {
+          id: `${user}_high_volume_${Date.now()}`,
+          title: 'High Activity Volume Pattern',
+          description: `User ${user} has ${activities.length} activities with an average of ${Math.round(avgPerDay)} per day`,
+          severity: avgPerDay >= 30 ? 'high' : 'medium',
+          confidence: 0.45 + Math.min(avgPerDay / 100, 0.3),
+          affectedUsers: [user],
+          suggestedActions: [
+            'Review if activity level is appropriate for user role',
+            'Check for potential automated or bulk operations',
+            'Monitor for signs of account compromise',
+          ],
+          timestamp: new Date().toISOString(),
+          category: 'unusual_behavior',
+          relatedActivities: activities.slice(0, 20).map(a => a.id)
+        };
+      }
+    }
+    return null;
+  }
+
+  private detectFrequencyAnomalies(activities: UserActivity[], user: string): MLRecommendation | null {
+    if (activities.length < 10) return null;
+
+    const hourlyActivity = new Map<string, UserActivity[]>();
+    activities.forEach(activity => {
+      if (activity.timestamp) {
+        const hourKey = new Date(activity.timestamp).toISOString().slice(0, 13);
+        const existing = hourlyActivity.get(hourKey) || [];
+        existing.push(activity);
+        hourlyActivity.set(hourKey, existing);
+      }
     });
+
+    const burstHours = Array.from(hourlyActivity.entries())
+      .filter(([_, hourActivities]) => hourActivities.length >= 5)
+      .sort((a, b) => b[1].length - a[1].length);
+
+    if (burstHours.length >= 1) {
+      const topBurst = burstHours[0];
+      return {
+        id: `${user}_frequency_burst_${Date.now()}`,
+        title: 'Activity Frequency Anomaly',
+        description: `User ${user} had ${topBurst[1].length} activities in a single hour, indicating potential automated behavior`,
+        severity: topBurst[1].length >= 15 ? 'high' : 'medium',
+        confidence: 0.50 + Math.min(topBurst[1].length / 50, 0.3),
+        affectedUsers: [user],
+        suggestedActions: [
+          'Investigate potential automated tools or scripts',
+          'Review if burst activity aligns with business processes',
+          'Check for signs of malicious automation',
+        ],
+        timestamp: new Date().toISOString(),
+        category: 'unusual_behavior',
+        relatedActivities: topBurst[1].map(a => a.id)
+      };
+    }
+    return null;
+  }
+
+  private detectDataVolumeAnomalies(activities: UserActivity[], user: string): MLRecommendation | null {
+    const activitiesWithData = activities.filter(a => a.dataVolume && a.dataVolume > 0);
+    if (activitiesWithData.length === 0) return null;
+
+    const totalDataVolume = activitiesWithData.reduce((sum, a) => sum + (a.dataVolume || 0), 0);
+    const maxDataVolume = Math.max(...activitiesWithData.map(a => a.dataVolume || 0));
+
+    if (totalDataVolume >= 1000 || maxDataVolume >= 500) {
+      const largeTransfers = activitiesWithData.filter(a => (a.dataVolume || 0) >= 100);
+      
+      return {
+        id: `${user}_data_volume_${Date.now()}`,
+        title: 'Large Data Volume Activity',
+        description: `User ${user} transferred ${Math.round(totalDataVolume)}MB of data with ${largeTransfers.length} large transfers`,
+        severity: totalDataVolume >= 5000 ? 'high' : 'medium',
+        confidence: 0.60 + Math.min(totalDataVolume / 10000, 0.25),
+        affectedUsers: [user],
+        suggestedActions: [
+          'Review business justification for large data transfers',
+          'Implement data loss prevention monitoring',
+          'Check for potential data exfiltration',
+        ],
+        timestamp: new Date().toISOString(),
+        category: 'data_exfiltration',
+        relatedActivities: largeTransfers.map(a => a.id)
+      };
+    }
+    return null;
+  }
+
+  private detectIntegrationAnomalies(activities: UserActivity[], user: string): MLRecommendation | null {
+    if (activities.length < 5) return null;
+
+    const integrationCounts = new Map<string, number>();
+    activities.forEach(activity => {
+      const integration = activity.integration || 'unknown';
+      integrationCounts.set(integration, (integrationCounts.get(integration) || 0) + 1);
+    });
+
+    const uniqueIntegrations = integrationCounts.size;
+    const mostUsed = Array.from(integrationCounts.entries())
+      .sort((a, b) => b[1] - a[1])
+      .slice(0, 3);
+
+    if (uniqueIntegrations >= 5 || (mostUsed[0] && mostUsed[0][1] >= activities.length * 0.7)) {
+      let severity: 'low' | 'medium' | 'high' = 'low';
+      let description = '';
+      
+      if (uniqueIntegrations >= 10) {
+        severity = 'medium';
+        description = `User ${user} accessed ${uniqueIntegrations} different integrations, indicating broad system access`;
+      } else if (mostUsed[0] && mostUsed[0][1] >= activities.length * 0.8) {
+        severity = 'medium';
+        description = `User ${user} shows heavy usage of ${mostUsed[0][0]} (${mostUsed[0][1]} activities)`;
+      } else {
+        description = `User ${user} shows diverse integration usage across ${uniqueIntegrations} systems`;
+      }
+
+      return {
+        id: `${user}_integration_anomaly_${Date.now()}`,
+        title: 'Integration Usage Pattern',
+        description,
+        severity,
+        confidence: 0.45 + Math.min(uniqueIntegrations / 20, 0.25),
+        affectedUsers: [user],
+        suggestedActions: [
+          'Review user\'s authorized system access',
+          'Verify business need for broad integration access',
+          'Consider principle of least privilege review',
+        ],
+        timestamp: new Date().toISOString(),
+        category: 'access_violation',
+        relatedActivities: activities.slice(0, 15).map(a => a.id)
+      };
+    }
+    return null;
   }
 } 

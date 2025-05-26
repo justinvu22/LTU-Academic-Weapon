@@ -1,18 +1,5 @@
-import { useState, useEffect, useCallback, useRef } from 'react';
+import { useState, useCallback, useRef, useEffect } from 'react';
 import { UserActivity } from '../types/activity';
-
-/**
- * Check if code is running in browser
- */
-const isBrowser = () => typeof window !== 'undefined';
-
-/**
- * Check if web workers are supported
- */
-const isWebWorkerSupported = () => {
-  if (!isBrowser()) return false;
-  return typeof Worker !== 'undefined';
-};
 
 // Initialize the ML worker for browser environments
 const initWorker = () => {
@@ -35,14 +22,24 @@ const initWorker = () => {
   }
 };
 
-// Create a debounce function to limit how often a function can be called
-const debounce = (fn: Function, ms = 300) => {
+// Progress tracking interface
+interface ProgressState {
+  [key: string]: number;
+  anomaly: number;
+  heatmap: number;
+  sequences: number;
+  clustering: number;
+  overall: number;
+}
+
+// Debounce utility function
+function debounce<T extends (...args: any[]) => any>(fn: T, ms: number): T {
   let timeoutId: ReturnType<typeof setTimeout>;
-  return function(...args: any[]) {
+  return function(this: any, ...args: any[]) {
     clearTimeout(timeoutId);
     timeoutId = setTimeout(() => fn.apply(this, args), ms);
-  };
-};
+  } as T;
+}
 
 interface MLProcessingResult {
   anomalyTimelineData: any[];
@@ -89,7 +86,7 @@ export const useMLProcessing = (initialActivities: UserActivity[] = []) => {
   });
   
   const [isProcessing, setIsProcessing] = useState(false);
-  const [progress, setProgress] = useState({
+  const [progress, setProgress] = useState<ProgressState>({
     anomaly: 0,
     heatmap: 0,
     sequences: 0,
@@ -138,14 +135,13 @@ export const useMLProcessing = (initialActivities: UserActivity[] = []) => {
         case 'progress':
           setProgress(prev => {
             const newProgress = { ...prev };
-            if (task) {
-              newProgress[task] = taskProgress || 0;
+            if (task && typeof task === 'string' && task in prev) {
+              newProgress[task as keyof ProgressState] = taskProgress || 0;
             }
             
             // Calculate overall progress based on all tasks
-            const keys = ['anomaly', 'heatmap', 'sequences', 'clustering'];
-            const sum = keys.reduce((acc, key) => acc + (task === key ? taskProgress : prev[key]), 0);
-            newProgress.overall = sum / keys.length;
+            const sum = prev.anomaly + prev.heatmap + prev.sequences + prev.clustering;
+            newProgress.overall = sum / 4;
             
             return newProgress;
           });
@@ -371,9 +367,10 @@ export const useMLProcessing = (initialActivities: UserActivity[] = []) => {
       }
       
       // Calculate overall progress
-      const keys = ['anomaly', 'heatmap', 'sequences', 'clustering'];
-      const sum = keys.reduce((acc, key) => acc + progress[key], 0);
-      setProgress(prev => ({ ...prev, overall: sum / keys.length }));
+      setProgress(prev => {
+        const sum = prev.anomaly + prev.heatmap + prev.sequences + prev.clustering;
+        return { ...prev, overall: sum / 4 };
+      });
       
       setStatusMessage('ML processing complete');
       setIsProcessing(false);

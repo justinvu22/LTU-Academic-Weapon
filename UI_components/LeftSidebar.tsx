@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState } from 'react';
+import React from 'react';
 import Link from 'next/link';
 import '@fontsource/poppins/600.css';
 import {
@@ -17,6 +17,7 @@ import {
   IoChevronBackOutline,
   IoChevronForwardOutline
 } from "react-icons/io5";
+import Image from 'next/image';
 
 interface LeftSidebarProps {
   activeLink: string;
@@ -60,7 +61,7 @@ const LeftSidebar: React.FC<LeftSidebarProps> = ({ activeLink, alertCount = 0, c
         <div className={`flex flex-col items-center justify-center pt-6 pb-2 ${collapsed ? 'px-2' : 'px-4'}`}>
           <div className={`flex items-center w-full bg-gradient-to-r from-[#181c2f] via-[#232846] to-[#181c2f] rounded-2xl mb-2 shadow-[0_4px_16px_#181c2fcc,inset_0_2px_8px_#232846ee] border border-[#232846]/40 ${collapsed ? 'p-1 justify-center' : 'p-3'}`}>
             <div className="h-12 w-12 flex items-center justify-center rounded-2xl bg-sidebar-dark shadow-[0_4px_16px_#232846cc,inset_0_2px_8px_#181c2fcc] border border-[#232846]/40 overflow-hidden">
-              <img src="/icon.png" alt="ShadowSight Icon" className="h-12 w-12 object-contain" />
+              <Image src="/icon.png" alt="ShadowSight Icon" className="h-12 w-12 object-contain" width={48} height={48} />
             </div>
             {!collapsed && (
               <span className="ml-3 text-2xl font-extrabold tracking-widest text-white drop-shadow select-none font-poppins">

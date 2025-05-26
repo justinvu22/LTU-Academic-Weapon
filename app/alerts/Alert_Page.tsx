@@ -202,10 +202,6 @@ export default function AlertPage() {
     window.location.reload();
   };
 
-  const handleActivitySelect = (activity: UserActivity) => {
-    setSelectedActivity(activity);
-  };
-
   return (
     <div className="transition-all duration-300">
       <div className="w-full mx-auto">
@@ -279,9 +275,8 @@ export default function AlertPage() {
                           <ActivityDetail activity={selectedActivity} />
                         </div>
                       ) : (
-                        <ActivityList 
-                          activities={activities} 
-                          onActivitySelect={handleActivitySelect}
+                        <ActivityList
+                          activities={activities}
                           policyIcons={globalPolicyIcons}
                         />
                       )}

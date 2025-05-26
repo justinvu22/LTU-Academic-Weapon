@@ -4,16 +4,6 @@ import adaptiveConfig from '../utils/adaptiveConfig';
 import schemaAdapter from '../utils/schemaAdapter';
 import { useMLProcessing } from './useMLProcessing';
 
-// Define ProgressState interface with index signature for tasks
-interface ProgressState {
-  [key: string]: number;
-  anomaly: number;
-  heatmap: number;
-  sequences: number;
-  clustering: number;
-  overall: number;
-}
-
 interface ProcessingOptions {
   enableAdaptiveLearning: boolean;
   sampleData: boolean;

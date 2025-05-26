@@ -5,7 +5,7 @@
  * It should be updated to reference the external directory once project structure is finalized
  */
 
-import type { TimelineDataPoint } from '../../../app/dashboard/DashboardPage';
+import type { TimelineDataPoint } from '../../../types';
 
 // Mock data for risk distribution
 export const getRiskDistribution = () => [

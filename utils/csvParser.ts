@@ -391,6 +391,23 @@ function processResults(results: any[]): UserActivity[] {
       console.log(`Found integration field: ${integrationField}`);
     }
     
+    // Find field for policies breached
+    const policiesBreachedField = headers.find(h => 
+      h.toLowerCase() === 'policiesbreached' || 
+      h.toLowerCase() === 'policies breached' ||
+      h.toLowerCase() === 'policies_breached' ||
+      h.toLowerCase().includes('policies') ||
+      h.toLowerCase().includes('breach') ||
+      h.toLowerCase().includes('violation') ||
+      h.toLowerCase().includes('policy')
+    );
+    if (policiesBreachedField) {
+      fieldMapping.policiesBreached = policiesBreachedField;
+      console.log(`Found policies breached field: ${policiesBreachedField}`);
+    } else {
+      console.warn('No policies breached field found in CSV. Available headers:', headers);
+    }
+    
     // Process each row with the detected field mapping
     return results.map((row, index) => {
       try {
@@ -450,42 +467,200 @@ function processResults(results: any[]): UserActivity[] {
           try {
             // Try to standardize date format
             let isoDate = date;
+            console.log(`Processing date: ${date}, time: ${time} for row ${index}`);
+            
+            // Handle DD/MM/YYYY format (like "13/01/2025")
+            if (typeof date === 'string' && date.includes('/')) {
+              const parts = date.split('/');
+              if (parts.length === 3) {
+                const day = parseInt(parts[0], 10);
+                const month = parseInt(parts[1], 10);
+                const year = parseInt(parts[2], 10);
+                
+                // Validate the date parts
+                if (day >= 1 && day <= 31 && month >= 1 && month <= 12 && year >= 1000) {
+                  if (day > 12) {
+                    // Definitely DD/MM/YYYY format
+                    isoDate = `${year}-${month.toString().padStart(2, '0')}-${day.toString().padStart(2, '0')}`;
+                    console.log(`Converted DD/MM/YYYY: ${date} -> ${isoDate}`);
+                  } else if (month > 12) {
+                    // MM/DD/YYYY format
+                    isoDate = `${year}-${day.toString().padStart(2, '0')}-${month.toString().padStart(2, '0')}`;
+                    console.log(`Converted MM/DD/YYYY: ${date} -> ${isoDate}`);
+                  } else {
+                    // Ambiguous, assume DD/MM/YYYY (European format) based on CSV content
+                    isoDate = `${year}-${month.toString().padStart(2, '0')}-${day.toString().padStart(2, '0')}`;
+                    console.log(`Assumed DD/MM/YYYY: ${date} -> ${isoDate}`);
+                  }
+                } else {
+                  console.warn(`Invalid date parts: day=${day}, month=${month}, year=${year}`);
+                }
+              }
+            }
+            
+            // Handle DD-MM-YYYY format
+            else if (typeof date === 'string' && date.includes('-') && date.length === 10) {
+              const parts = date.split('-');
+              if (parts.length === 3 && parts[0].length === 2) {
+                // Assume DD-MM-YYYY format, convert to YYYY-MM-DD
+                const day = parseInt(parts[0], 10);
+                const month = parseInt(parts[1], 10);
+                const year = parseInt(parts[2], 10);
+                isoDate = `${year}-${month.toString().padStart(2, '0')}-${day.toString().padStart(2, '0')}`;
+                console.log(`Converted DD-MM-YYYY: ${date} -> ${isoDate}`);
+              }
+            }
+            // Handle YYYY-MM-DD format (already correct)
+            else if (typeof date === 'string' && date.includes('-') && date.length === 10) {
+              const parts = date.split('-');
+              if (parts.length === 3 && parts[0].length === 4) {
+                // Already in YYYY-MM-DD format
+                isoDate = date;
+                console.log(`Date already in ISO format: ${date}`);
+              }
+            }
+            
+            // Ensure time is in HH:MM format
+            let formattedTime = time;
+            if (typeof time === 'string') {
+              if (time.includes('h')) {
+                // Handle "9h30" format
+                formattedTime = time.replace('h', ':');
+              }
+              // Ensure two-digit formatting
+              const timeParts = formattedTime.split(':');
+              if (timeParts.length >= 2) {
+                formattedTime = `${timeParts[0].padStart(2, '0')}:${timeParts[1].padStart(2, '0')}`;
+              }
+              console.log(`Formatted time: ${time} -> ${formattedTime}`);
+            }
+            
+            timestamp = `${isoDate}T${formattedTime}:00`;
+            
+            // Validate the generated timestamp
+            const testDate = new Date(timestamp);
+            if (isNaN(testDate.getTime())) {
+              console.warn(`Invalid timestamp generated: ${timestamp} from date: ${date}, time: ${time}`);
+              timestamp = '';
+            } else {
+              // Log successful timestamp generation for debugging
+              if (index < 3) {
+                console.log(`✓ Generated valid timestamp: ${timestamp} from date: ${date}, time: ${time}`);
+              }
+            }
+          } catch (e) {
+            console.warn(`Error generating timestamp from date: ${date}, time: ${time}`, e);
+            timestamp = '';
+          }
+        }
+        
+        // If we couldn't generate a timestamp from date/time, try to use just the date
+        if (!timestamp && date) {
+          try {
+            let isoDate = date;
             // Handle DD/MM/YYYY format
             if (typeof date === 'string' && date.includes('/')) {
               const parts = date.split('/');
               if (parts.length === 3) {
-                isoDate = `${parts[2]}-${parts[1].padStart(2, '0')}-${parts[0].padStart(2, '0')}`;
+                // Support both DD/MM/YYYY and MM/DD/YYYY formats
+                if (parseInt(parts[0]) > 12) {
+                  // DD/MM/YYYY format
+                  isoDate = `${parts[2]}-${parts[1].padStart(2, '0')}-${parts[0].padStart(2, '0')}`;
+                } else if (parseInt(parts[1]) > 12) {
+                  // MM/DD/YYYY format
+                  isoDate = `${parts[2]}-${parts[0].padStart(2, '0')}-${parts[1].padStart(2, '0')}`;
+                } else {
+                  // Ambiguous, assume DD/MM/YYYY (European format)
+                  isoDate = `${parts[2]}-${parts[1].padStart(2, '0')}-${parts[0].padStart(2, '0')}`;
+                }
               }
             }
-            timestamp = `${isoDate}T${time}:00`;
+            // Handle DD-MM-YYYY format
+            else if (typeof date === 'string' && date.includes('-') && date.length === 10) {
+              const parts = date.split('-');
+              if (parts.length === 3 && parts[0].length === 2) {
+                isoDate = `${parts[2]}-${parts[1]}-${parts[0]}`;
+              }
+            }
+            // Handle YYYY-MM-DD format (already correct)
+            else if (typeof date === 'string' && date.includes('-') && date.length === 10) {
+              const parts = date.split('-');
+              if (parts.length === 3 && parts[0].length === 4) {
+                isoDate = date;
+              }
+            }
+            
+            // Use default time of 09:00 if no time is provided
+            timestamp = `${isoDate}T09:00:00`;
+            
+            // Validate the generated timestamp
+            const testDate = new Date(timestamp);
+            if (isNaN(testDate.getTime())) {
+              console.warn(`Invalid timestamp generated from date only: ${timestamp} from date: ${date}`);
+              timestamp = '';
+            }
           } catch (e) {
-            // Ignore timestamp generation errors
+            console.warn(`Error generating timestamp from date only: ${date}`, e);
+            timestamp = '';
           }
         }
         
-        // Generate synthetic policy breaches based on risk score
-        const policiesBreached: Record<string, boolean | string[] | number> = {};
+        // Handle policies breached field if present in CSV
+        let policiesBreached: Record<string, any> = {};
         
-        // Add policy breaches based on risk score - make sure to handle all scores
-        if (riskScore > 2000) {
-          policiesBreached['Data Security'] = true;
-          policiesBreached['Unusual Activity'] = true;
-          policiesBreached['Access Violation'] = true;
-          policiesBreached['Critical Violations'] = ['Unauthorized Access', 'Data Exfiltration Attempt'];
-        } else if (riskScore > 1600) {
-          policiesBreached['Data Security'] = true;
-          policiesBreached['Unusual Activity'] = true;
-          policiesBreached['Access Violation'] = true;
-        } else if (riskScore > 1200) {
-          policiesBreached['Data Security'] = true;
-          policiesBreached['Unusual Activity'] = true;
-        } else if (riskScore > 800) {
-          policiesBreached['Unusual Activity'] = true;
-        } else if (riskScore > 500) {
-          policiesBreached['Low Risk Alert'] = true;
+        if (fieldMapping.policiesBreached && row[fieldMapping.policiesBreached]) {
+          const policiesData = row[fieldMapping.policiesBreached];
+          
+          try {
+            // Parse the JSON string from CSV
+            if (typeof policiesData === 'string') {
+              // Remove escaped quotes and parse
+              const cleanedData = policiesData.replace(/\\"/g, '"').replace(/^"|"$/g, '');
+              policiesBreached = JSON.parse(cleanedData);
+              if (index < 3) {
+                console.log(`Successfully parsed policies from CSV for row ${index}:`, policiesBreached);
+              }
+            } else if (typeof policiesData === 'object') {
+              policiesBreached = policiesData;
+              if (index < 3) {
+                console.log(`Used object policies from CSV for row ${index}:`, policiesBreached);
+              }
+            }
+          } catch (parseError) {
+            console.warn(`Error parsing policies breached for row ${index}:`, parseError);
+            console.log(`Raw policies data:`, policiesData);
+            // Fallback to empty object
+            policiesBreached = {};
+          }
         } else {
-          // Even for low risk scores, add at least one breach for visibility testing
-          policiesBreached['Monitoring'] = true;
+          if (index < 3) {
+            console.log(`No policies field found for row ${index}. Field mapping:`, fieldMapping);
+            console.log(`Available row keys:`, Object.keys(row));
+          }
+        }
+        
+        // If no policies found in CSV, generate basic synthetic policies based on risk score
+        if (Object.keys(policiesBreached).length === 0) {
+          if (riskScore > 2000) {
+            policiesBreached['Data Security'] = true;
+            policiesBreached['Unusual Activity'] = true;
+            policiesBreached['Access Violation'] = true;
+            policiesBreached['Critical Violations'] = ['Unauthorized Access', 'Data Exfiltration Attempt'];
+          } else if (riskScore > 1600) {
+            policiesBreached['Data Security'] = true;
+            policiesBreached['Unusual Activity'] = true;
+            policiesBreached['Access Violation'] = true;
+          } else if (riskScore > 1200) {
+            policiesBreached['Data Security'] = true;
+            policiesBreached['Unusual Activity'] = true;
+          } else if (riskScore > 800) {
+            policiesBreached['Unusual Activity'] = true;
+          } else if (riskScore > 500) {
+            policiesBreached['Low Risk Alert'] = true;
+          } else {
+            // Even for low risk scores, add at least one breach for visibility testing
+            policiesBreached['Monitoring'] = true;
+          }
         }
         
         // Debug logging for first few rows
@@ -509,7 +684,7 @@ function processResults(results: any[]): UserActivity[] {
           date: date || '',
           time: time || '',
           hour: hour >= 0 ? hour : null,
-          timestamp: timestamp || new Date().toISOString(),
+          timestamp: timestamp || `${new Date().toISOString().split('T')[0]}T09:00:00.000Z`, // Use today's date with default time if no timestamp could be generated
           integration: integration || 'unknown',
           riskScore: riskScore,
           activityType: row.activityType || row.activity || row.type || '',
@@ -529,7 +704,7 @@ function processResults(results: any[]): UserActivity[] {
           date: '',
           time: '',
           hour: null,
-          timestamp: new Date().toISOString(),
+          timestamp: `${new Date().toISOString().split('T')[0]}T09:00:00.000Z`, // Use today's date with default time for error cases
           integration: 'unknown',
           riskScore: 0,
           activityType: 'error',

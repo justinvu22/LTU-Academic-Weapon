@@ -5,27 +5,38 @@ import { UserActivity } from '../types/activity';
  */
 export interface AnomalyDetectorConfig {
   // Thresholds
-  lowThreshold: number;  // Low sensitivity threshold (catches more anomalies)
-  mediumThreshold: number; // Balanced threshold
-  highThreshold: number; // High sensitivity threshold (fewer false positives)
+  lowThreshold: number;  
+  mediumThreshold: number; 
+  highThreshold: number;
   
   // Features to analyze
   analyzeTimePatterns: boolean;
   analyzeDataVolume: boolean;  
   analyzeUserBehavior: boolean;
   analyzeActivitySequences: boolean;
+  analyzeTemporalBursts: boolean; // NEW
+  analyzeIntegrationPatterns: boolean; // NEW
   
-  // Status weighting (how much to factor in user status)
+  // Status weighting
   trustTrustedActivities: boolean;
-  concernWeight: number; // How much to factor in "concern" status
-
+  concernWeight: number;
+  
+  // Manager action learning - NEW
+  learnFromManagerActions: boolean;
+  managerActionWeight: number;
+  
   // Advanced options
-  adaptiveThreshold: boolean; // Auto-adjust thresholds based on learning
-  minimumBaselineSize: number; // Minimum data points needed for baseline
+  adaptiveThreshold: boolean;
+  minimumBaselineSize: number;
+  
+  // Temporal burst detection - NEW
+  burstWindowMinutes: number;
+  burstMultiplier: number;
+  criticalHours: number[];
 }
 
 /**
- * Anomaly detection results
+ * Enhanced anomaly detection results
  */
 export interface AnomalyDetectionResult {
   isAnomaly: boolean;
@@ -33,26 +44,22 @@ export interface AnomalyDetectionResult {
   anomalyType?: string;
   confidence: number;
   factors: string[];
+  severity?: 'low' | 'medium' | 'high' | 'critical'; // NEW
   relatedActivities?: string[];
+  suggestedAction?: string; // NEW
 }
 
 /**
  * Enhanced Anomaly Detection System
- * Provides ML-powered anomaly detection with configurable thresholds
- * and various analysis types.
  */
 export class AnomalyDetector {
   private config: AnomalyDetectorConfig;
   private userBaselines: Map<string, UserBaseline> = new Map();
-  private globalBaseline: GlobalBaseline = {
-    timeOfDayDistribution: Array(24).fill(0),
-    activityTypeFrequency: {},
-    dataVolumeStats: { mean: 0, stdDev: 0, samples: [] },
-    totalActivities: 0
-  };
+  private globalBaseline: GlobalBaseline;
+  private managerActionPatterns: Map<string, ManagerActionPattern> = new Map();
+  private temporalBurstHistory: Map<number, BurstInfo> = new Map();
   
   constructor(config?: Partial<AnomalyDetectorConfig>) {
-    // Default configuration
     this.config = {
       lowThreshold: 0.6,
       mediumThreshold: 0.75,
@@ -61,16 +68,37 @@ export class AnomalyDetector {
       analyzeDataVolume: true,
       analyzeUserBehavior: true,
       analyzeActivitySequences: true,
+      analyzeTemporalBursts: true,
+      analyzeIntegrationPatterns: true,
       trustTrustedActivities: true,
       concernWeight: 2.0,
+      learnFromManagerActions: true,
+      managerActionWeight: 1.5,
       adaptiveThreshold: true,
       minimumBaselineSize: 10,
+      burstWindowMinutes: 60,
+      burstMultiplier: 5,
+      criticalHours: [1, 2, 3],
       ...config
+    };
+    
+    this.globalBaseline = {
+      timeOfDayDistribution: Array(24).fill(0),
+      activityTypeFrequency: {},
+      integrationDistribution: {},
+      dataVolumeStats: { mean: 0, stdDev: 0, samples: [] },
+      totalActivities: 0,
+      hourlyVolumeStats: Array(24).fill(null).map(() => ({
+        mean: 0,
+        stdDev: 0,
+        max: 0,
+        samples: []
+      }))
     };
   }
   
   /**
-   * Initialize and build baselines from historical activities
+   * Enhanced baseline building with manager action learning
    */
   public buildBaselines(activities: UserActivity[]): void {
     if (!activities || activities.length === 0) {
@@ -78,45 +106,31 @@ export class AnomalyDetector {
       return;
     }
     
-    // Log and sanitize activity data
-    const sanitizedActivities = activities.map(activity => {
-      // Ensure each activity has a valid user property
-      if (!activity.user) {
-        // Attempt to find a user identifier
-        if (activity.username) {
-          activity.user = activity.username;
-        } else if (activity.userId) {
-          activity.user = activity.userId;
-        } else {
-          // Generate a dummy user if none found
-          activity.user = `unknown-user-${Math.floor(Math.random() * 5)}`; 
-        }
-      }
-      return activity;
-    });
+    const sanitizedActivities = this.sanitizeActivities(activities);
+    console.log(`Building enhanced baselines with ${sanitizedActivities.length} activities`);
     
-    console.log(`Building baselines with ${sanitizedActivities.length} activities, found ${new Set(sanitizedActivities.filter(a => a.user).map(a => a.user)).size} unique users`);
-    
-    this.userBaselines.clear();
-    
-    // Reset global baseline
-    this.globalBaseline = {
-      timeOfDayDistribution: Array(24).fill(0),
-      activityTypeFrequency: {},
-      dataVolumeStats: { mean: 0, stdDev: 0, samples: [] },
-      totalActivities: 0
-    };
+    this.resetBaselines();
     
     // First pass: collect all data points
     sanitizedActivities.forEach(activity => {
       this.updateGlobalBaseline(activity);
       this.updateUserBaseline(activity);
+      
+      if (this.config.learnFromManagerActions && activity.managerAction) {
+        this.updateManagerActionPatterns(activity);
+      }
     });
     
     // Second pass: calculate statistics
     this.finalizeBaselines();
     
-    console.log(`Built baselines for ${this.userBaselines.size} users with ${activities.length} activities`);
+    // Detect temporal burst patterns
+    if (this.config.analyzeTemporalBursts) {
+      this.detectTemporalBurstPatterns(sanitizedActivities);
+    }
+    
+    console.log(`Built baselines: ${this.userBaselines.size} users, ${this.managerActionPatterns.size} manager patterns`);
+    console.log(`Detected ${this.temporalBurstHistory.size} temporal burst patterns`);
   }
   
   /**
@@ -136,7 +150,7 @@ export class AnomalyDetector {
   }
   
   /**
-   * Detect if a single activity is anomalous
+   * Enhanced anomaly detection with all features
    */
   public detectAnomaly(activity: UserActivity): AnomalyDetectionResult {
     if (!activity) {
@@ -148,120 +162,205 @@ export class AnomalyDetector {
       };
     }
     
-    // Skip analysis if trusted & configured to trust
-    if (this.config.trustTrustedActivities && 
-        activity.status === 'trusted') {
-      return {
-        isAnomaly: false,
-        anomalyScore: 0,
-        confidence: 0.95,
-        factors: ['Activity is explicitly trusted']
-      };
-    }
-    
-    // Initial concern level based on activity status
-    let initialConcernLevel = 0;
-    if (activity.status === 'concern') {
-      initialConcernLevel = 0.3 * this.config.concernWeight;
-    } else if (activity.status === 'underReview') {
-      initialConcernLevel = 0.1;
+    // Check for critical anomalies even in trusted activities
+    if (this.config.trustTrustedActivities && activity.status === 'trusted') {
+      const criticalCheck = this.checkCriticalAnomalies(activity);
+      if (!criticalCheck.isCritical) {
+        return {
+          isAnomaly: false,
+          anomalyScore: 0,
+          confidence: 0.95,
+          factors: ['Activity is explicitly trusted']
+        };
+      }
     }
     
     const factors: string[] = [];
-    let anomalyScore = initialConcernLevel;
-    let weight = 0;
+    const scores: { [key: string]: number } = {};
     
-    // Analyze time patterns
+    // Base score from status
+    let baseScore = 0;
+    if (activity.status === 'concern') {
+      baseScore = 0.3 * this.config.concernWeight;
+      factors.push('Status: concern');
+    } else if (activity.status === 'underReview') {
+      baseScore = 0.1;
+      factors.push('Status: under review');
+    }
+    
+    // 1. Enhanced time pattern analysis
     if (this.config.analyzeTimePatterns) {
-      const timeScore = this.detectTimeAnomaly(activity);
-      if (timeScore > 0) {
-        anomalyScore += timeScore * 0.3;
-        weight += 0.3;
-        factors.push(`Unusual time pattern (score: ${timeScore.toFixed(2)})`);
+      const timeResult = this.detectEnhancedTimeAnomaly(activity);
+      if (timeResult.score > 0) {
+        scores.time = timeResult.score;
+        factors.push(...timeResult.factors);
       }
     }
     
-    // Analyze data volume
+    // 2. Temporal burst detection
+    if (this.config.analyzeTemporalBursts) {
+      const burstResult = this.detectTemporalBurst(activity);
+      if (burstResult.score > 0) {
+        scores.burst = burstResult.score;
+        factors.push(...burstResult.factors);
+      }
+    }
+    
+    // 3. Data volume anomaly
     if (this.config.analyzeDataVolume) {
       const volumeScore = this.detectVolumeAnomaly(activity);
       if (volumeScore > 0) {
-        anomalyScore += volumeScore * 0.25;
-        weight += 0.25;
-        factors.push(`Unusual data volume (score: ${volumeScore.toFixed(2)})`);
+        scores.volume = volumeScore;
+        factors.push(`Unusual data volume (z-score: ${volumeScore.toFixed(2)})`);
       }
     }
     
-    // Analyze user behavior
+    // 4. User behavior anomaly
     if (this.config.analyzeUserBehavior) {
       const behaviorScore = this.detectBehaviorAnomaly(activity);
       if (behaviorScore > 0) {
-        anomalyScore += behaviorScore * 0.35;
-        weight += 0.35;
+        scores.behavior = behaviorScore;
         factors.push(`Unusual user behavior (score: ${behaviorScore.toFixed(2)})`);
       }
     }
     
-    // Normalize the score if we have weights
-    if (weight > 0) {
-      anomalyScore = (anomalyScore / weight) * (1 - initialConcernLevel) + initialConcernLevel;
+    // 5. Integration-specific anomaly
+    if (this.config.analyzeIntegrationPatterns) {
+      const integrationResult = this.detectIntegrationAnomaly(activity);
+      if (integrationResult.score > 0) {
+        scores.integration = integrationResult.score;
+        factors.push(...integrationResult.factors);
+      }
     }
     
-    // Get threshold based on sensitivity
-    const threshold = this.getThreshold();
-    
-    // Calculate confidence based on how far above threshold
-    const confidence = Math.min(0.99, Math.max(0.1, 
-      threshold > 0 ? Math.min(1, anomalyScore / threshold) : 0));
+    // Calculate weighted score
+    const anomalyScore = this.calculateWeightedScore(baseScore, scores);
+    const severity = this.calculateSeverity(anomalyScore, factors);
+    const threshold = this.getAdaptiveThreshold(activity);
+    const confidence = this.calculateConfidence(anomalyScore, threshold, factors);
+    const suggestedAction = this.getSuggestedAction(activity);
     
     return {
       isAnomaly: anomalyScore >= threshold,
-      anomalyScore,
+      anomalyScore: Math.min(1.0, anomalyScore),
       anomalyType: this.determineAnomalyType(factors),
       confidence,
-      factors
+      factors,
+      severity,
+      suggestedAction
     };
   }
   
   /**
-   * Detect time-based anomalies
+   * Enhanced time anomaly detection
    */
-  private detectTimeAnomaly(activity: UserActivity): number {
-    if (!activity.timestamp && !activity.hour) return 0;
+  private detectEnhancedTimeAnomaly(activity: UserActivity): { score: number; factors: string[] } {
+    const factors: string[] = [];
+    let score = 0;
     
-    let hourOfDay: number;
+    const hour = this.extractHour(activity);
+    if (hour === null) return { score: 0, factors: [] };
     
-    if (activity.hour !== undefined && activity.hour !== null) {
-      hourOfDay = activity.hour;
-    } else if (activity.timestamp) {
-      hourOfDay = new Date(activity.timestamp).getHours();
-    } else {
-      return 0;
+    // Critical hour check (1-3 AM)
+    if (this.config.criticalHours.includes(hour)) {
+      score += 0.3;
+      factors.push(`Activity during critical hour: ${hour}:00`);
     }
     
-    // Check against global baseline
-    const expectedFrequency = this.globalBaseline.timeOfDayDistribution[hourOfDay] / 
-      Math.max(1, this.globalBaseline.totalActivities);
-    
-    // Higher score for less common times
-    const unusualTimeScore = 1 - Math.min(1, expectedFrequency * 24 * 3);
-    
-    // Check if user has a baseline
-    let userUnusualTimeScore = 0;
+    // User pattern check
     if (activity.user) {
       const userBaseline = this.userBaselines.get(activity.user);
-      if (userBaseline && userBaseline.timeOfDayDistribution) {
-        const userExpectedFrequency = userBaseline.timeOfDayDistribution[hourOfDay] / 
-          Math.max(1, userBaseline.totalActivities);
-        userUnusualTimeScore = 1 - Math.min(1, userExpectedFrequency * 24 * 3);
+      if (userBaseline && userBaseline.totalActivities >= this.config.minimumBaselineSize) {
+        const userHourlyRate = userBaseline.timeOfDayDistribution[hour] / userBaseline.totalActivities;
+        
+        if (userHourlyRate < 0.02) {
+          score += 0.4;
+          factors.push(`Unusual hour for user (${(userHourlyRate * 100).toFixed(1)}% of their activity)`);
+        }
       }
     }
     
-    // Return maximum of global and user-specific scores
-    return Math.max(unusualTimeScore, userUnusualTimeScore);
+    // Global pattern check
+    const globalHourlyRate = this.globalBaseline.timeOfDayDistribution[hour] / 
+                           Math.max(1, this.globalBaseline.totalActivities);
+    const expectedRate = 1 / 24;
+    
+    if (globalHourlyRate > expectedRate * 3) {
+      score += 0.2;
+      factors.push(`High-activity hour globally (${(globalHourlyRate * 100).toFixed(1)}% of all activity)`);
+    }
+    
+    return { score: Math.min(1.0, score), factors };
   }
   
   /**
-   * Detect volume-based anomalies (large file transfers, etc.)
+   * Detect temporal bursts
+   */
+  private detectTemporalBurst(activity: UserActivity): { score: number; factors: string[] } {
+    const factors: string[] = [];
+    let score = 0;
+    
+    const hour = this.extractHour(activity);
+    if (hour === null) return { score: 0, factors: [] };
+    
+    const burstInfo = this.temporalBurstHistory.get(hour);
+    if (!burstInfo) return { score: 0, factors: [] };
+    
+    if (burstInfo.isBurst) {
+      score += 0.5;
+      factors.push(`Temporal burst detected at ${hour}:00 (${burstInfo.multiplier.toFixed(1)}x normal)`);
+      
+      if (this.config.criticalHours.includes(hour)) {
+        score += 0.3;
+        factors.push('Burst during critical monitoring period');
+      }
+    }
+    
+    return { score: Math.min(1.0, score), factors };
+  }
+  
+  /**
+   * Detect integration-specific anomalies
+   */
+  private detectIntegrationAnomaly(activity: UserActivity): { score: number; factors: string[] } {
+    const factors: string[] = [];
+    let score = 0;
+    
+    if (!activity.integration) return { score: 0, factors: [] };
+    
+    // USB activities are higher risk
+    if (activity.integration.toLowerCase().includes('usb')) {
+      score += 0.3;
+      factors.push('USB activity detected (higher risk category)');
+      
+      if (activity.user) {
+        const userBaseline = this.userBaselines.get(activity.user);
+        if (userBaseline && !userBaseline.integrationFrequency['usb']) {
+          score += 0.4;
+          factors.push('First USB usage for this user');
+        }
+      }
+    }
+    
+    // Check for unusual integration for the user
+    if (activity.user) {
+      const userBaseline = this.userBaselines.get(activity.user);
+      if (userBaseline && userBaseline.totalActivities >= this.config.minimumBaselineSize) {
+        const integrationRate = (userBaseline.integrationFrequency[activity.integration] || 0) / 
+                               userBaseline.totalActivities;
+        
+        if (integrationRate < 0.05) {
+          score += 0.2;
+          factors.push(`Unusual integration for user: ${activity.integration}`);
+        }
+      }
+    }
+    
+    return { score: Math.min(1.0, score), factors };
+  }
+  
+  /**
+   * Detect volume-based anomalies
    */
   private detectVolumeAnomaly(activity: UserActivity): number {
     const dataSize = activity.dataVolume || activity.fileSize || 0;
@@ -269,186 +368,427 @@ export class AnomalyDetector {
     
     const { mean, stdDev } = this.globalBaseline.dataVolumeStats;
     
-    // Skip if we don't have enough data
     if (stdDev === 0 || this.globalBaseline.dataVolumeStats.samples.length < 2) return 0;
     
-    // Calculate z-score (how many standard deviations from mean)
     const zScore = (dataSize - mean) / stdDev;
     
-    // Only interested in abnormally large volumes
     if (zScore <= 2) return 0;
     
-    // Score between 0-1 based on how extreme the z-score is
     return Math.min(1, (zScore - 2) / 6);
   }
   
   /**
-   * Detect behavior anomalies (unusual patterns for specific user)
+   * Detect behavior anomalies
    */
   private detectBehaviorAnomaly(activity: UserActivity): number {
     if (!activity.user || !activity.activityType) return 0;
     
     const userBaseline = this.userBaselines.get(activity.user);
     if (!userBaseline || userBaseline.totalActivities < this.config.minimumBaselineSize) {
-      // Not enough baseline data for this user
       return 0;
     }
     
-    // Check if activity type is unusual for this user
     const userActivityFreq = userBaseline.activityTypeFrequency[activity.activityType] || 0;
     const userActivityScore = 1 - Math.min(1, userActivityFreq / Math.max(1, userBaseline.totalActivities) * 10);
     
-    // If a user that rarely performs an action suddenly does it, that's suspicious
     return userActivityScore;
   }
   
   /**
-   * Update global baseline with a new activity
+   * Detect temporal burst patterns in historical data
    */
-  private updateGlobalBaseline(activity: UserActivity): void {
-    this.globalBaseline.totalActivities++;
+  private detectTemporalBurstPatterns(activities: UserActivity[]): void {
+    const hourlyGroups = new Map<number, UserActivity[]>();
     
-    // Update time distribution
+    activities.forEach(activity => {
+      const hour = this.extractHour(activity);
+      if (hour !== null) {
+        if (!hourlyGroups.has(hour)) {
+          hourlyGroups.set(hour, []);
+        }
+        hourlyGroups.get(hour)!.push(activity);
+      }
+    });
+    
+    const avgActivitiesPerHour = activities.length / 24;
+    
+    hourlyGroups.forEach((hourActivities, hour) => {
+      const multiplier = hourActivities.length / avgActivitiesPerHour;
+      const isBurst = multiplier >= this.config.burstMultiplier;
+      
+      this.temporalBurstHistory.set(hour, {
+        hour,
+        count: hourActivities.length,
+        multiplier,
+        isBurst,
+        isCritical: this.config.criticalHours.includes(hour) && isBurst
+      });
+      
+      if (isBurst) {
+        console.log(`Temporal burst detected at ${hour}:00 - ${hourActivities.length} activities (${multiplier.toFixed(1)}x average)`);
+      }
+    });
+  }
+  
+  /**
+   * Update manager action patterns
+   */
+  private updateManagerActionPatterns(activity: UserActivity): void {
+    if (!activity.managerAction) return;
+    
+    const key = this.getActivityPatternKey(activity);
+    
+    if (!this.managerActionPatterns.has(key)) {
+      this.managerActionPatterns.set(key, {
+        patternKey: key,
+        actions: {},
+        totalCount: 0
+      });
+    }
+    
+    const pattern = this.managerActionPatterns.get(key)!;
+    pattern.actions[activity.managerAction] = (pattern.actions[activity.managerAction] || 0) + 1;
+    pattern.totalCount++;
+  }
+  
+  /**
+   * Get suggested action based on manager patterns
+   */
+  private getSuggestedAction(activity: UserActivity): string | undefined {
+    if (!this.config.learnFromManagerActions) return undefined;
+    
+    const key = this.getActivityPatternKey(activity);
+    const pattern = this.managerActionPatterns.get(key);
+    
+    if (!pattern || pattern.totalCount < 5) return undefined;
+    
+    const mostCommonAction = Object.entries(pattern.actions)
+      .sort((a, b) => b[1] - a[1])[0];
+    
+    if (!mostCommonAction) return undefined;
+    
+    const [action, count] = mostCommonAction;
+    const confidence = count / pattern.totalCount;
+    
+    if (confidence > 0.6) {
+      return `Based on ${count} similar past activities: ${action}`;
+    }
+    
+    return undefined;
+  }
+  
+  /**
+   * Calculate weighted anomaly score
+   */
+  private calculateWeightedScore(baseScore: number, scores: { [key: string]: number }): number {
+    const weights = {
+      time: 0.25,
+      burst: 0.35,
+      volume: 0.15,
+      behavior: 0.15,
+      integration: 0.10
+    };
+    
+    let totalScore = baseScore;
+    let totalWeight = 0;
+    
+    Object.entries(scores).forEach(([type, score]) => {
+      const weight = weights[type as keyof typeof weights] || 0.1;
+      totalScore += score * weight;
+      totalWeight += weight;
+    });
+    
+    if (totalWeight > 0) {
+      return baseScore + (totalScore - baseScore) * (totalWeight / 1.0);
+    }
+    
+    return totalScore;
+  }
+  
+  /**
+   * Calculate severity
+   */
+  private calculateSeverity(score: number, factors: string[]): 'low' | 'medium' | 'high' | 'critical' {
+    if (score >= 0.8 && factors.some(f => 
+      f.includes('burst') || f.includes('critical hour') || f.includes('USB'))) {
+      return 'critical';
+    }
+    
+    if (score >= 0.8) return 'high';
+    if (score >= 0.6) return 'medium';
+    return 'low';
+  }
+  
+  /**
+   * Helper methods
+   */
+  private extractHour(activity: UserActivity): number | null {
+    if (activity.hour !== undefined && activity.hour !== null) {
+      return activity.hour;
+    }
+    
     if (activity.timestamp) {
-      const hour = new Date(activity.timestamp).getHours();
-      this.globalBaseline.timeOfDayDistribution[hour]++;
-    } else if (activity.hour !== undefined && activity.hour !== null) {
-      const hour = activity.hour;
-      if (hour >= 0 && hour < 24) {
-        this.globalBaseline.timeOfDayDistribution[hour]++;
+      try {
+        return new Date(activity.timestamp).getHours();
+      } catch (e) {
+        return null;
       }
     }
     
-    // Update activity type frequency
+    if (activity.time) {
+      const match = /(\d{1,2})[:h]/i.exec(activity.time);
+      if (match && match[1]) {
+        return parseInt(match[1], 10);
+      }
+    }
+    
+    return null;
+  }
+  
+  private getActivityPatternKey(activity: UserActivity): string {
+    const hour = this.extractHour(activity);
+    const hourBucket = hour !== null ? Math.floor(hour / 6) : 'unknown';
+    const riskBucket = activity.riskScore ? 
+      (activity.riskScore >= 2000 ? 'critical' : 
+       activity.riskScore >= 1500 ? 'high' : 
+       activity.riskScore >= 1000 ? 'medium' : 'low') : 'unknown';
+    const integration = activity.integration || 'unknown';
+    
+    return `${hourBucket}-${riskBucket}-${integration}`;
+  }
+  
+  private sanitizeActivities(activities: UserActivity[]): UserActivity[] {
+    return activities.map(activity => {
+      if (!activity.user) {
+        if (activity.username) {
+          activity.user = activity.username;
+        } else if (activity.userId) {
+          activity.user = activity.userId;
+        } else {
+          activity.user = `unknown-user-${Math.floor(Math.random() * 100)}`;
+        }
+      }
+      return activity;
+    });
+  }
+  
+  private resetBaselines(): void {
+    this.userBaselines.clear();
+    this.managerActionPatterns.clear();
+    this.temporalBurstHistory.clear();
+    
+    this.globalBaseline = {
+      timeOfDayDistribution: Array(24).fill(0),
+      activityTypeFrequency: {},
+      integrationDistribution: {},
+      dataVolumeStats: { mean: 0, stdDev: 0, samples: [] },
+      totalActivities: 0,
+      hourlyVolumeStats: Array(24).fill(null).map(() => ({
+        mean: 0,
+        stdDev: 0,
+        max: 0,
+        samples: []
+      }))
+    };
+  }
+  
+  private checkCriticalAnomalies(activity: UserActivity): { isCritical: boolean; reason?: string } {
+    const hour = this.extractHour(activity);
+    
+    if (hour !== null && this.config.criticalHours.includes(hour)) {
+      const burstInfo = this.temporalBurstHistory.get(hour);
+      if (burstInfo && burstInfo.isCritical) {
+        return { isCritical: true, reason: 'Activity during critical temporal burst' };
+      }
+    }
+    
+    if (activity.integration?.toLowerCase().includes('usb') && 
+        activity.riskScore && activity.riskScore >= 2000) {
+      return { isCritical: true, reason: 'High-risk USB activity' };
+    }
+    
+    return { isCritical: false };
+  }
+  
+  private calculateConfidence(score: number, threshold: number, factors: string[]): number {
+    let confidence = Math.min(0.99, Math.max(0.1, score / threshold));
+    
+    if (factors.length >= 3) confidence = Math.min(0.99, confidence * 1.1);
+    if (factors.some(f => f.includes('burst'))) confidence = Math.min(0.99, confidence * 1.15);
+    if (factors.some(f => f.includes('USB'))) confidence = Math.min(0.99, confidence * 1.1);
+    
+    return confidence;
+  }
+  
+  private getAdaptiveThreshold(activity: UserActivity): number {
+    let threshold = this.config.mediumThreshold;
+    
+    const hour = this.extractHour(activity);
+    if (hour !== null && this.config.criticalHours.includes(hour)) {
+      threshold = this.config.lowThreshold;
+    }
+    
+    if (activity.integration?.toLowerCase().includes('usb')) {
+      threshold = Math.min(threshold, this.config.lowThreshold + 0.05);
+    }
+    
+    return threshold;
+  }
+  
+  private determineAnomalyType(factors: string[]): string {
+    if (factors.some(f => f.includes('burst'))) return 'temporal_burst';
+    if (factors.some(f => f.includes('critical hour'))) return 'unusual_timing';
+    if (factors.some(f => f.includes('USB'))) return 'high_risk_integration';
+    if (factors.some(f => f.includes('volume'))) return 'data_exfiltration';
+    if (factors.some(f => f.includes('behavior'))) return 'unusual_behavior';
+    return 'unknown';
+  }
+  
+  private updateGlobalBaseline(activity: UserActivity): void {
+    this.globalBaseline.totalActivities++;
+    
+    const hour = this.extractHour(activity);
+    if (hour !== null) {
+      this.globalBaseline.timeOfDayDistribution[hour]++;
+      
+      const dataSize = activity.dataVolume || activity.fileSize || 0;
+      if (dataSize > 0) {
+        this.globalBaseline.hourlyVolumeStats[hour].samples.push(dataSize);
+      }
+    }
+    
     if (activity.activityType) {
       this.globalBaseline.activityTypeFrequency[activity.activityType] = 
         (this.globalBaseline.activityTypeFrequency[activity.activityType] || 0) + 1;
     }
     
-    // Update data volume stats
+    if (activity.integration) {
+      this.globalBaseline.integrationDistribution[activity.integration] = 
+        (this.globalBaseline.integrationDistribution[activity.integration] || 0) + 1;
+    }
+    
     const dataSize = activity.dataVolume || activity.fileSize || 0;
     if (dataSize > 0) {
       this.globalBaseline.dataVolumeStats.samples.push(dataSize);
     }
   }
   
-  /**
-   * Update user-specific baseline with a new activity
-   */
   private updateUserBaseline(activity: UserActivity): void {
-    // Skip activities without user information
-    if (!activity.user) {
-      console.log("Warning: Activity without user field encountered:", 
-                  activity.id || 'No ID');
-      return;
-    }
+    if (!activity.user) return;
     
     if (!this.userBaselines.has(activity.user)) {
       this.userBaselines.set(activity.user, {
         timeOfDayDistribution: Array(24).fill(0),
         activityTypeFrequency: {},
-        totalActivities: 0
+        integrationFrequency: {},
+        totalActivities: 0,
+        riskScoreHistory: [],
+        lastSeen: new Date()
       });
     }
     
     const userBaseline = this.userBaselines.get(activity.user)!;
     userBaseline.totalActivities++;
+    userBaseline.lastSeen = new Date();
     
-    // Update time distribution
-    if (activity.timestamp) {
-      try {
-        const hour = new Date(activity.timestamp).getHours();
-        if (!isNaN(hour) && hour >= 0 && hour < 24) {
-          userBaseline.timeOfDayDistribution[hour]++;
-        }
-      } catch (error) {
-        // Invalid timestamp format, try to use hour directly
-        if (activity.hour !== undefined && activity.hour !== null) {
-          const hour = activity.hour;
-          if (hour >= 0 && hour < 24) {
-            userBaseline.timeOfDayDistribution[hour]++;
-          }
-        }
-      }
-    } else if (activity.hour !== undefined && activity.hour !== null) {
-      const hour = activity.hour;
-      if (hour >= 0 && hour < 24) {
-        userBaseline.timeOfDayDistribution[hour]++;
-      }
+    const hour = this.extractHour(activity);
+    if (hour !== null) {
+      userBaseline.timeOfDayDistribution[hour]++;
     }
     
-    // Update activity type frequency
     if (activity.activityType) {
       userBaseline.activityTypeFrequency[activity.activityType] = 
         (userBaseline.activityTypeFrequency[activity.activityType] || 0) + 1;
     }
+    
+    if (activity.integration) {
+      userBaseline.integrationFrequency[activity.integration] = 
+        (userBaseline.integrationFrequency[activity.integration] || 0) + 1;
+    }
+    
+    if (activity.riskScore) {
+      userBaseline.riskScoreHistory.push(activity.riskScore);
+    }
   }
   
-  /**
-   * Calculate final statistics for baselines
-   */
   private finalizeBaselines(): void {
-    // Calculate data volume statistics
     const samples = this.globalBaseline.dataVolumeStats.samples;
     if (samples.length > 0) {
-      // Calculate mean
-      const sum = samples.reduce((a, b) => a + b, 0);
-      const mean = sum / samples.length;
-      
-      // Calculate standard deviation
-      const squaredDiffs = samples.map(x => Math.pow(x - mean, 2));
-      const variance = squaredDiffs.reduce((a, b) => a + b, 0) / samples.length;
-      const stdDev = Math.sqrt(variance);
-      
-      this.globalBaseline.dataVolumeStats.mean = mean;
-      this.globalBaseline.dataVolumeStats.stdDev = stdDev;
+      const stats = this.calculateStats(samples);
+      this.globalBaseline.dataVolumeStats = { ...stats, samples };
     }
+    
+    this.globalBaseline.hourlyVolumeStats.forEach((hourStats, hour) => {
+      if (hourStats.samples.length > 0) {
+        const stats = this.calculateStats(hourStats.samples);
+        this.globalBaseline.hourlyVolumeStats[hour] = { 
+          ...stats, 
+          max: Math.max(...hourStats.samples),
+          samples: hourStats.samples 
+        };
+      }
+    });
+  }
+  
+  private calculateStats(samples: number[]): { mean: number; stdDev: number } {
+    const sum = samples.reduce((a, b) => a + b, 0);
+    const mean = sum / samples.length;
+    
+    const squaredDiffs = samples.map(x => Math.pow(x - mean, 2));
+    const variance = squaredDiffs.reduce((a, b) => a + b, 0) / samples.length;
+    const stdDev = Math.sqrt(variance);
+    
+    return { mean, stdDev };
   }
   
   /**
-   * Get the anomaly threshold based on current configuration
+   * Check if baselines have been built
    */
-  private getThreshold(): number {
-    const { lowThreshold, mediumThreshold, highThreshold } = this.config;
-    // For now just return medium threshold
-    return mediumThreshold;
-  }
-  
-  /**
-   * Determine the type of anomaly based on contributing factors
-   */
-  private determineAnomalyType(factors: string[]): string {
-    if (factors.some(f => f.includes('time'))) {
-      return 'unusual_timing';
-    } else if (factors.some(f => f.includes('volume'))) {
-      return 'data_exfiltration';
-    } else if (factors.some(f => f.includes('behavior'))) {
-      return 'unusual_behavior';
-    } else {
-      return 'unknown';
-    }
+  public hasBaselines(): boolean {
+    return this.userBaselines.size > 0 || this.globalBaseline.totalActivities > 0;
   }
 }
 
 /**
- * User-specific baseline information
+ * Enhanced interfaces
  */
 interface UserBaseline {
   timeOfDayDistribution: number[];
   activityTypeFrequency: Record<string, number>;
+  integrationFrequency: Record<string, number>;
   totalActivities: number;
+  riskScoreHistory: number[];
+  lastSeen: Date;
 }
 
-/**
- * Global baseline information across all users
- */
 interface GlobalBaseline {
   timeOfDayDistribution: number[];
   activityTypeFrequency: Record<string, number>;
+  integrationDistribution: Record<string, number>;
   dataVolumeStats: {
     mean: number;
     stdDev: number;
     samples: number[];
   };
   totalActivities: number;
-} 
+  hourlyVolumeStats: {
+    mean: number;
+    stdDev: number;
+    max: number;
+    samples: number[];
+  }[];
+}
+
+interface ManagerActionPattern {
+  patternKey: string;
+  actions: Record<string, number>;
+  totalCount: number;
+}
+
+interface BurstInfo {
+  hour: number;
+  count: number;
+  multiplier: number;
+  isBurst: boolean;
+  isCritical: boolean;
+}

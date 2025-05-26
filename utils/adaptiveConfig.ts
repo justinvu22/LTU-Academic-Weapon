@@ -1,5 +1,3 @@
-import { UserActivity } from '../types/activity';
-
 // Default configuration with initial conservative values
 const DEFAULT_CONFIG: Record<string, any> = {
   // Performance settings

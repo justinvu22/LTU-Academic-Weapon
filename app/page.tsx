@@ -2,17 +2,16 @@
 "use client";
 
 import { useState, useEffect } from 'react';
-import { MdOutlineListAlt, MdOutlineWarningAmber, MdOutlineGavel, MdOutlinePersonOff, MdArrowForward, MdCloudUpload, MdDashboard } from 'react-icons/md';
-import { Box, CircularProgress, Typography, Card, CardContent, Grid, Button, Paper } from '@mui/material';
+import { MdOutlineListAlt, MdOutlineGavel, MdOutlinePersonOff, MdCloudUpload, MdDashboard } from 'react-icons/md';
+import { CircularProgress, Button } from '@mui/material';
 import { ActivityList } from '../components/ActivityList';
 import { policyIcons } from '../constants/policyIcons';
 import { UserActivity } from '../types/activity';
-import { generateStatistics, RISK_THRESHOLDS } from '../utils/dataProcessor';
+import { generateStatistics } from '../utils/dataProcessor';
 import { useAdaptiveProcessing } from '../hooks/useAdaptiveProcessing';
 import adaptiveConfig from '../utils/adaptiveConfig';
 import Link from 'next/link';
 import { FaMicrochip, FaSkull } from "react-icons/fa";
-import { useRouter } from 'next/navigation';
 
 export default function Page() {
   // State for activities and their statistics
@@ -23,44 +22,33 @@ export default function Page() {
   const [highRiskActivities, setHighRiskActivities] = useState(0);
   const [policyBreaches, setPolicyBreaches] = useState(0);
   const [usersAtRisk, setUsersAtRisk] = useState(0);
-  const [averageRiskScore, setAverageRiskScore] = useState(0);
   
   // Most recent activities for quick view
   const [recentActivities, setRecentActivities] = useState<UserActivity[]>([]);
   
   // Loading states
   const [loading, setLoading] = useState(true);
-  const [loadingPhase, setLoadingPhase] = useState<string>('initializing');
-  const [loadingProgress, setLoadingProgress] = useState(0);
   const [error, setError] = useState<string | null>(null);
 
   // Use the adaptive processing hook for optimized processing
   const adaptiveProcessing = useAdaptiveProcessing(activities.length > 0 ? activities : null);
-
-  const router = useRouter();
 
   // Load activities from IndexedDB
   useEffect(() => {
     const loadActivitiesData = async () => {
       try {
         setLoading(true);
-        setLoadingPhase('checking-storage');
-        setLoadingProgress(10);
         
         // Load data from IndexedDB only
         const { getActivitiesFromIndexedDB } = await import('../utils/storage');
         let activitiesData: UserActivity[] = [];
         
         try {
-          setLoadingPhase('loading-from-indexeddb');
-          setLoadingProgress(20);
           activitiesData = await getActivitiesFromIndexedDB();
           console.log(`Loaded ${activitiesData.length} activities from IndexedDB`);
         } catch (storageError) {
           console.error('Error loading from IndexedDB:', storageError);
           setError('Error accessing data storage. Please try uploading data again.');
-          setLoadingPhase('complete');
-          setLoadingProgress(100);
           setLoading(false);
           return;
         }
@@ -68,15 +56,9 @@ export default function Page() {
         // If no data is found, show error message
         if (activitiesData.length === 0) {
           setError('No activity data found. Please upload data from the Upload page.');
-          setLoadingPhase('complete');
-          setLoadingProgress(100);
           setLoading(false);
           return;
         }
-        
-        // Process the data
-        setLoadingPhase('processing-data');
-        setLoadingProgress(70);
         
         // Set activities to trigger the adaptive processing
         setActivities(activitiesData);
@@ -89,7 +71,6 @@ export default function Page() {
         setHighRiskActivities(statistics.highRiskActivities);
         setPolicyBreaches(statistics.totalPolicyBreaches);
         setUsersAtRisk(statistics.usersAtRisk);
-        setAverageRiskScore(statistics.averageRiskScore);
         
         // Sort activities by risk score (highest first)
         const sortedActivities = [...activitiesData].sort((a, b) => {
@@ -100,32 +81,16 @@ export default function Page() {
         // Get the 5 activities with highest risk scores
         setRecentActivities(sortedActivities.slice(0, 5));
         
-        setLoadingPhase('complete');
-        setLoadingProgress(100);
+        setLoading(false);
       } catch (error) {
         console.error('Fatal error loading activities:', error);
         setError('Error loading activity data: ' + (error instanceof Error ? error.message : String(error)));
-      } finally {
-        setLoading(false);
       }
     };
     
     // Initialize adaptive config and then load data
     adaptiveConfig.initialize().then(loadActivitiesData);
   }, []);
-
-  // Custom loading indicator
-  const renderLoadingIndicator = () => (
-    <div className="flex flex-col justify-center items-center h-64">
-      <CircularProgress variant="determinate" value={loadingProgress} size={60} />
-      <div className="mt-4 text-gray-600">
-        {loadingPhase === 'initializing' && 'Initializing application...'}
-        {loadingPhase === 'checking-storage' && 'Checking data storage...'}
-        {loadingPhase === 'loading-from-indexeddb' && 'Loading data from storage...'}
-        {loadingPhase === 'processing-data' && 'Processing activity data...'}
-      </div>
-    </div>
-  );
 
   return (
     <div className="min-h-screen bg-[#121324] px-6 py-10 font-['IBM_Plex_Sans',Inter,sans-serif] flex flex-col">

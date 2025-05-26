@@ -354,12 +354,12 @@ function normalizeDateTime(activity: any): { timestamp: string, date?: string, t
       // Validate the timestamp
       const testDate = new Date(timestamp);
       if (isNaN(testDate.getTime())) {
-        console.warn(`Invalid date/time combination: ${date} ${time}, fallback to current time`);
-        timestamp = new Date().toISOString();
+        console.warn(`Invalid date/time combination: ${date} ${time}, using today's date with default time`);
+        timestamp = `${new Date().toISOString().split('T')[0]}T09:00:00.000Z`;
       }
     } catch (e) {
       console.warn(`Error parsing date/time: ${date} ${time}`, e);
-      timestamp = new Date().toISOString();
+      timestamp = `${new Date().toISOString().split('T')[0]}T09:00:00.000Z`;
     }
   }
 
@@ -506,7 +506,7 @@ function normalizeIntegration(integration: any): string {
  * Generate ML recommendations based on activity data
  * This is a placeholder for the actual ML recommendation generation
  */
-export function generateRecommendations(activities: UserActivity[]): MLRecommendation[] {
+export function generateRecommendations(_activities: UserActivity[]): MLRecommendation[] {
   // This would be replaced with actual ML recommendation logic
   // For now, just return an empty array
   return [];

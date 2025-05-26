@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState } from "react";
-import { FaInfoCircle, FaPlus, FaMinus, FaChevronDown, FaEnvelope, FaFileAlt, FaSignInAlt, FaArrowLeft } from "react-icons/fa";
+import { FaInfoCircle, FaPlus, FaMinus, FaEnvelope, FaFileAlt, FaSignInAlt, FaArrowLeft } from "react-icons/fa";
 import Tooltip from '@mui/material/Tooltip';
 import '@fontsource/ibm-plex-sans/400.css';
 import '@fontsource/ibm-plex-sans/500.css';
@@ -10,11 +10,6 @@ import ComboBox, { ComboBoxOption } from '../../components/ComboBox';
 import TextField from '@mui/material/TextField';
 import Switch from '@mui/material/Switch';
 import Link from 'next/link';
-
-const usersList = [
-  "caleb.ross@zenith.com",
-  "lily.evans@zenith.com"
-];
 
 const activityTypes = ["Email", "Login", "File Upload"];
 
@@ -42,8 +37,6 @@ const conditionOptionsCombo: ComboBoxOption[] = conditionOptions.map(opt => ({ .
 const CustomAlertsPage = () => {
   const [alertName, setAlertName] = useState("");
   const [description, setDescription] = useState("");
-  const [selectedUsers, setSelectedUsers] = useState([usersList[0], usersList[1]]);
-  const [allUsers, setAllUsers] = useState(false);
   const [activityType, setActivityType] = useState(activityTypes[0]);
   const [neverExpires, setNeverExpires] = useState(true);
   const [expiresDate, setExpiresDate] = useState<Date | null>(null);

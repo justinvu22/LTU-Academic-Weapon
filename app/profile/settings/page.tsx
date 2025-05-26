@@ -1,8 +1,9 @@
 "use client";
 
-import { useState, useEffect, ChangeEvent, FormEvent } from "react";
-import { FaUser, FaEnvelope, FaLock, FaBell, FaSave, FaTrash, FaCog } from "react-icons/fa";
+import { useState, ChangeEvent, FormEvent } from "react";
+import { FaUser, FaLock, FaBell, FaSave, FaTrash } from "react-icons/fa";
 import Switch from '@mui/material/Switch';
+import Image from 'next/image';
 
 interface FormDataType {
   name: string;
@@ -71,11 +72,13 @@ export default function ProfileSettingsPage() {
         <div className="w-full md:w-1/3 bg-[#232346] p-8 flex flex-col justify-between items-center shadow-[0_2px_8px_rgba(110,95,254,0.10)] rounded-2xl border border-[#333] relative min-w-[260px] max-w-md h-full min-h-[500px]">
           <div className="relative mb-4 w-full flex flex-col items-center">
             <div className="w-48 h-48 rounded-full bg-gradient-to-tr from-[#6E5FFE]/60 to-[#8F7BFF]/40 flex items-center justify-center shadow-lg ring-4 ring-[#6E5FFE]/30">
-              {formData.avatar ? (
-                <img src={typeof formData.avatar === 'string' ? formData.avatar : ''} alt="User avatar" className="w-40 h-40 rounded-full object-cover" />
-              ) : (
-                <span className="text-8xl font-extrabold text-white drop-shadow-lg">{formData.name.charAt(0)}</span>
-              )}
+              <Image
+                src={typeof formData.avatar === 'string' ? formData.avatar : '/default-avatar.png'}
+                alt="User avatar"
+                className="w-40 h-40 rounded-full object-cover"
+                width={160}
+                height={160}
+              />
             </div>
           </div>
           <div className="flex flex-col flex-1 w-full justify-between h-full">

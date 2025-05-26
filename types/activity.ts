@@ -153,4 +153,64 @@ export interface ChartDataPoint {
   value: number;
   color?: string;
   extra?: Record<string, any>;
+}
+
+/**
+ * Timeline data point for activity trends over time
+ */
+export interface TimelineDataPoint {
+  date: string;
+  low: number;
+  medium: number;
+  high: number;
+  critical: number;
+  total: number;
+}
+
+// New ML Alert Types
+export interface MLAlertItem {
+  id: string;
+  userId: string;
+  userEmail: string;
+  mlInsightId: string;
+  threatType: string; // "Data Exfiltration", "Suspicious Timing", etc.
+  severity: 'critical' | 'high' | 'medium' | 'low';
+  confidence: number;
+  policiesBreached: string[];
+  detectionTime: string;
+  riskScore: number;
+  status: 'pending' | 'reviewing' | 'resolved' | 'dismissed';
+  description: string;
+  detectionFactors: string[];
+  suggestedActions: string[];
+  timeline: TimelineEvent[];
+  mlRecommendation?: MLRecommendation;
+  assignedTo?: string;
+  managerAction?: ManagerAction;
+}
+
+export interface TimelineEvent {
+  id: string;
+  timestamp: string;
+  title: string;
+  description: string;
+  riskScore?: number;
+  isCritical: boolean;
+  activityId?: string;
+  policyBreach?: string;
+}
+
+export interface ManagerAction {
+  action: string;
+  comments: string;
+  timestamp: string;
+  managerId: string;
+}
+
+export interface AlertFilters {
+  severity: string[];
+  status: string[];
+  threatType: string[];
+  dateRange: [string, string];
+  assignedTo: string[];
 } 

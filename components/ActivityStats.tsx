@@ -1,5 +1,5 @@
 import React from 'react';
-import { Box, Grid, Paper, Typography } from '@mui/material';
+import { Box, Paper, Typography } from '@mui/material';
 import { FaExclamationTriangle, FaChartPie, FaUsers, FaShieldAlt } from 'react-icons/fa';
 
 /**

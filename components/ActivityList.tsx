@@ -1,75 +1,21 @@
 import React from 'react';
 import '@fontsource/poppins/600.css';
-import { 
-  Table, 
-  TableBody, 
-  TableCell, 
-  TableContainer, 
-  TableHead, 
-  TableRow,
-  Paper,
-  Typography,
-  Chip,
-  Box
-} from '@mui/material';
-import { UserActivity, PolicyIcon } from '../types/activity';
-
-// Format date and time for display
-function formatDateTime(activity: UserActivity): string {
-  // Check if we have both date and time
-  if (activity.date && activity.time) {
-    return `${activity.date} ${activity.time}`;
-  }
-  
-  // If we only have date
-  if (activity.date) {
-    // Add a default time if none exists
-    return `${activity.date} 09:00`;
-  }
-  
-  // If we have a timestamp, extract date and time
-  if (activity.timestamp) {
-    try {
-      const date = new Date(activity.timestamp);
-      if (!isNaN(date.getTime())) {
-        return date.toLocaleString();
-      }
-    } catch (e) {
-      // Ignore parsing errors
-    }
-  }
-  
-  return '';
-}
+import { UserActivity } from '../types/activity';
 
 interface ActivityListProps {
   activities: UserActivity[];
   policyIcons: Record<string, React.ReactNode>;
-  onActivitySelect?: (activity: UserActivity) => void;
 }
-
-/**
- * Returns a background color based on risk score
- * @param score - Risk score value
- * @returns - CSS color value
- */
-const getRiskColor = (score: number): string => {
-  if (score >= 90) return 'rgba(255, 0, 0, 0.08)';  // High risk
-  if (score >= 70) return 'rgba(255, 165, 0, 0.08)'; // Medium-high risk
-  if (score >= 40) return 'rgba(255, 255, 0, 0.08)'; // Medium risk
-  return 'transparent'; // Low risk
-};
 
 /**
  * Component that displays a list of user activities with policy breach indicators
  */
 export const ActivityList: React.FC<ActivityListProps> = ({ 
   activities, 
-  policyIcons,
-  onActivitySelect 
+  policyIcons
 }) => {
   if (!activities || activities.length === 0) {
-    return <Typography className="text-gray-400">No activities found</Typography>;
+    return <span className="text-gray-400">No activities found</span>;
   }
 
   /**
@@ -78,9 +24,6 @@ export const ActivityList: React.FC<ActivityListProps> = ({
    * @returns - Formatted policy breach icons
    */
   const formatBreaches = (breaches: any): React.ReactNode => {
-    // Add debug logging to see what's coming in
-    console.log('Policy breaches format input:', breaches);
-    
     // Quick return for empty breaches - be more specific about checking
     if (!breaches) {
       return <span className="text-xs text-gray-400">No policy breaches</span>;
@@ -88,7 +31,7 @@ export const ActivityList: React.FC<ActivityListProps> = ({
     
     // If it's an empty object, return no breaches
     if (typeof breaches === 'object' && Object.keys(breaches).length === 0) {
-      return <Typography variant="body2">No policy breaches</Typography>;
+      return <span className="text-sm text-gray-400">No policy breaches</span>;
     }
     
     // Handle string-formatted JSON that wasn't properly parsed
@@ -100,25 +43,23 @@ export const ActivityList: React.FC<ActivityListProps> = ({
         // Try to parse if it's a string (it might be a JSON string)
         const breachesStr = String(breaches).trim();
         if (breachesStr.length === 0) {
-          return <Typography variant="body2">No policy breaches</Typography>;
+          return <span className="text-sm text-gray-400">No policy breaches</span>;
         }
         
         parsedBreaches = JSON.parse(breachesStr.replace(/\\"/g, '"').replace(/"{2,}/g, '"'));
         if (!parsedBreaches || Object.keys(parsedBreaches).length === 0) {
-          return <Typography variant="body2">No policy breaches</Typography>;
+          return <span className="text-sm text-gray-400">No policy breaches</span>;
         }
       } catch (e) {
         // If parsing failed but there's text content, show it as a single breach
         return (
-          <Box sx={{ display: 'flex', gap: 0.5, flexWrap: 'wrap' }}>
-            <Chip
-              label={String(breaches).substring(0, 50)}
-              size="small"
-              color="error"
-              variant="outlined"
-              sx={{ m: 0.5 }}
-            />
-          </Box>
+          <div className="flex gap-2 flex-wrap">
+            <span
+              className="inline-flex items-center bg-red-100 border border-red-300 text-red-800 text-xs px-2 py-1 rounded-full font-medium"
+            >
+              {String(breaches).substring(0, 50)}
+            </span>
+          </div>
         );
       }
     } else {
@@ -133,16 +74,9 @@ export const ActivityList: React.FC<ActivityListProps> = ({
         (Array.isArray(value) ? value.length > 0 : Boolean(value));
     });
     
-    // Log the categories found for debugging
-    console.log('Policy breach categories found:', categories);
-    
     if (categories.length === 0) {
       return <span className="text-xs text-gray-400">No policy breaches</span>;
     }
-    
-    // Limit the number of rendered breach chips to improve performance
-    const MAX_CHIPS = 5;
-    let chipCount = 0;
     
     return (
       <div className="flex flex-wrap gap-1">
@@ -162,7 +96,6 @@ export const ActivityList: React.FC<ActivityListProps> = ({
             ));
           }
           // Handle boolean or primitive values
-          chipCount++;
           return (
             <span
               key={category}
@@ -177,17 +110,6 @@ export const ActivityList: React.FC<ActivityListProps> = ({
         })}
       </div>
     );
-  };
-
-  /**
-   * Truncates text to a specified length
-   * @param text - The text to truncate
-   * @param length - Maximum length
-   * @returns - Truncated text
-   */
-  const truncateText = (text: string | undefined, length: number = 30) => {
-    if (!text) return '';
-    return text.length > length ? `${text.substring(0, length)}...` : text;
   };
 
   /**
@@ -228,7 +150,7 @@ export const ActivityList: React.FC<ActivityListProps> = ({
           </tr>
         </thead>
         <tbody>
-          {activities.map((activity, idx) => (
+          {activities.map((activity) => (
             <tr
               key={activity.id}
               className={`odd:bg-[#24243A] even:bg-[#1E1E2F] hover:bg-[#312E51] transition-colors duration-200 border-b border-[#2E2E4A]`}

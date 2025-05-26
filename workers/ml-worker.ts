@@ -96,7 +96,6 @@ async function processInChunks<T>(
   }
   
   // Initialize result storage based on first chunk result type
-  let firstChunkResult: T | null = null;
   let combinedResult: any = null;
   
   // Process each chunk
@@ -109,16 +108,7 @@ async function processInChunks<T>(
     
     // Initialize combined result structure based on first result
     if (i === 0) {
-      firstChunkResult = chunkResult;
-      
-      if (Array.isArray(chunkResult)) {
-        combinedResult = [...chunkResult];
-      } else if (typeof chunkResult === 'object') {
-        combinedResult = { ...chunkResult };
-      } else {
-        // For primitive types, just use the first result
-        combinedResult = chunkResult;
-      }
+      combinedResult = chunkResult;
     } else {
       // Merge results based on type
       if (Array.isArray(chunkResult) && Array.isArray(combinedResult)) {
@@ -150,13 +140,13 @@ async function processInChunks<T>(
     
     // Yield to the event loop to keep the worker responsive
     await new Promise(resolve => setTimeout(resolve, 0));
-    }
+  }
   
   return combinedResult as T;
 }
 
 // Process activities and analyze with ML modules
-async function processActivities(activities: UserActivity[], options?: any) {
+async function processActivities(activities: UserActivity[]) {
   if (!activities || activities.length < 10) {
     safePostMessage({ type: 'error', error: 'Not enough data for analysis (minimum 10 activities required)' });
     return;
@@ -335,7 +325,7 @@ if (isWorkerEnvironment) {
     try {
       switch (action) {
         case 'processActivities':
-          await processActivities(data.activities, data.options);
+          await processActivities(data.activities);
           break;
           
         case 'optimize':
